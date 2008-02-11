@@ -16,10 +16,10 @@
 -record(callthread, {pid=null, callid=null}).
 
 start(Args) ->
-	gen_server:start({local, rtpproxy}, rtpproxy, Args, []).
+	gen_server:start({global, rtpproxy}, rtpproxy, Args, []).
 
 start_link(Args) ->
-	gen_server:start_link({local, rtpproxy}, rtpproxy, Args, []).
+	gen_server:start_link({global, rtpproxy}, rtpproxy, Args, []).
 
 init([IpAtom, PortAtom]) when is_atom(IpAtom), is_atom(PortAtom) ->
 	process_flag(trap_exit, true),
@@ -55,11 +55,11 @@ watcher() ->
 					gen_udp:send(Fd, Ip, Port, [MsgOut]),
 					io:format(" OK~n", []);
 				[UnixPid, "U", CallId, OrigIp, OrigPort, FromTag, MediaId] ->
-					Reply = gen_server:call(rtpproxy, {message_u, CallId, OrigIp, OrigPort, FromTag, MediaId}),
+					Reply = gen_server:call({global, rtpproxy}, {message_u, CallId, OrigIp, OrigPort, FromTag, MediaId}),
 					MsgOut = UnixPid ++ Reply,
 					gen_udp:send(Fd, Ip, Port, [MsgOut]);
 				[UnixPid, "L", CallId, OrigIp, OrigPort, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
-					case gen_server:call(rtpproxy, {message_l, CallId, OrigIp, OrigPort, FromTag, MediaIdFrom, ToTag, MediaIdTo}) of
+					case gen_server:call({global, rtpproxy}, {message_l, CallId, OrigIp, OrigPort, FromTag, MediaIdFrom, ToTag, MediaIdTo}) of
 						{ok, Reply} ->
 							MsgOut = UnixPid ++ Reply,
 							gen_udp:send(Fd, Ip, Port, [MsgOut]);
@@ -125,7 +125,7 @@ handle_cast({call_terminated, {Pid, _Reason}}, {Fd, Pid, CallsList}) ->
 			{noreply, {Fd, Pid, CallsList}}
 	end;
 
-handle_cast(_Request, State) ->
+handle_cast(_Other, State) ->
 	{noreply, State}.
 
 handle_info({'EXIT', Pid, _Reason}, {Fd, Pid, CallsList}) ->
