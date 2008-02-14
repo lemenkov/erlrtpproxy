@@ -35,8 +35,8 @@ handle_call({message_u, {OrigIp, OrigPort, FromTag, MediaId}}, _From, {Ip, Watch
 		% call already exists
 		{value, Party} ->
 			io:format("::: call[~w] Already exists!~n", [self()]),
-			{ok, {LocalIp, LocalPort}} = inet:sockname(Party#party.fdfrom),
-			Reply = " " ++ integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
+			{ok, {LocalIp1, LocalPort1}} = inet:sockname(Party#party.fdfrom),
+			Reply = " " ++ integer_to_list(LocalPort1) ++ " " ++ inet_parse:ntoa(LocalIp1),
 			{reply, Reply, {Ip, WatcherPid, Parties}};
 		false ->
 			% open new Fd and attach it
@@ -45,8 +45,13 @@ handle_call({message_u, {OrigIp, OrigPort, FromTag, MediaId}}, _From, {Ip, Watch
 				{ok, Fd} ->
 					io:format("::: call[~w] Create new socket... OK~n", [self()]),
 					gen_udp:controlling_process(Fd, WatcherPid),
-					Party = #party{fdfrom=Fd, origipfrom=OrigIp, origportfrom=OrigPort, tagfrom=FromTag, mediaidfrom=MediaId},
+
+					{ok, Ip} = inet_parse:address(OrigIp),
+					Port = list_to_integer(OrigPort),
 					{ok, {LocalIp, LocalPort}} = inet:sockname(Fd),
+
+					Party = #party{fdfrom=Fd, origipfrom=Ip, origportfrom=Port, tagfrom=FromTag, mediaidfrom=MediaId},
+
 					Reply = " " ++ integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 					io:format("::: call[~w] answer [~s]~n", [self(), Reply]),
 					{reply, Reply, {Ip, WatcherPid, lists:append(Parties, [Party])}};
@@ -67,8 +72,12 @@ handle_call({message_l, {OrigIp, OrigPort, FromTag, MediaIdFrom, ToTag, MediaIdT
 				{ok, Fd} ->
 					io:format(" OK~n"),
 					gen_udp:controlling_process(Fd, WatcherPid),
-					NewParty = Party#party{fdto=Fd, origipto=OrigIp, origportto=OrigPort, tagto=ToTag, mediaidto=MediaIdTo},
+					
+					{ok, Ip} = inet_parse:address(OrigIp),
+					Port = list_to_integer(OrigPort),
 					{ok, {LocalIp, LocalPort}} = inet:sockname(Fd),
+					
+					NewParty = Party#party{fdto=Fd, origipto=Ip, origportto=Port, tagto=ToTag, mediaidto=MediaIdTo},
 					Reply = " " ++ integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 					io:format("::: call[~w] answer [~s]~n", [self(), Reply]),
 					List1 = lists:delete(Party, Parties),
@@ -88,52 +97,37 @@ handle_call(_Other, _From, State) ->
 	{noreply, State}.
 
 % rtp from some port
-handle_cast({udp, {Fd, Ip, Port, Msg}}, {MainIp, WatcherPid, Parties}) ->
-%	io:format ("::: call[~w] message rtp.~n", [self()]),
+handle_cast({udp, {Fd, Ip, Port, Msg}}, {MainIp, WatcherPid, Parties}) ->	
 	case lists:keysearch(Fd, #party.fdfrom, Parties) of
 		{value, Party} ->
-%			io:format ("::: call[~w] message 1 rtp. [~p]~n", [self(), Party]),
 			if
-				Party#party.fdfrom /= null, Party#party.origipfrom /= null, Party#party.origportfrom /= null ->
-%					gen_udp:send(Party#party.fdto, Party#party.origipto, Party#party.origportto, Msg)
-					{ok, OrigIp} = inet_parse:address(Party#party.origipfrom),
-					gen_udp:send(Party#party.fdfrom, OrigIp, list_to_integer(Party#party.origportfrom), Msg)
+				Party#party.fdto /= null, Party#party.origipto /= null, Party#party.origportto /= null ->
+					gen_udp:send(Party#party.fdto, Party#party.origipto, Party#party.origportto, Msg)
 			end,
 			if
-				Party#party.origipto == null, Party#party.origportto == null ->
-					NewParty = Party#party{origipto=Ip, origportto=Port},
+				Party#party.origipfrom == null, Party#party.origportfrom == null ->
+					NewParty = Party#party{origipfrom=Ip, origportfrom=Port},
 					List1 = lists:delete(Party, Parties),
-					{norey,{MainIp, WatcherPid, lists:append(List1, [NewParty])}};
+					{noreply, {MainIp, WatcherPid, lists:append(List1, [NewParty])}};
 				true ->
 					{noreply, {MainIp, WatcherPid, Parties}}
 			end;
 		false ->
 			case lists:keysearch(Fd, #party.fdto, Parties) of
 				{value, Party} ->
-%					io:format ("::: call[~w] message 2.0 rtp. [~p]~n", [self(), Party]),
-%					if
-%						Party#party.fdto /= null, Party#party.origipto /= null, Party#party.origportto /= null ->
-%							gen_udp:send(Party#party.fdfrom, Party#party.origipfrom, Party#party.origportfrom, Msg)
-%							io:format ("::: call[~w] message 2.0.1 rtp.~n", [self()]),
-							{ok, OrigIp} = inet_parse:address(Party#party.origipto),
-%							io:format ("::: call[~w] message 2.0.2 rtp.~n", [self()]),
-							gen_udp:send(Party#party.fdto, OrigIp, list_to_integer(Party#party.origportto), Msg),
-%							io:format ("::: call[~w] message 2.0.3 rtp.~n", [self()])
-%					end,
-%					io:format ("::: call[~w] message 2.1 rtp.~n", [self()]),
 					if
-						Party#party.origipfrom == null, Party#party.origportto == null ->
-%							io:format ("::: call[~w] message 2.1.1 rtp.~n", [self()]),
-							NewParty = Party#party{origipfrom=Ip, origportfrom=Port},
-%							io:format ("::: call[~w] message 2.1.2 rtp.~n", [self()]),
+						Party#party.fdfrom /= null, Party#party.origipfrom /= null, Party#party.origportfrom /= null ->
+							gen_udp:send(Party#party.fdfrom, Party#party.origipfrom, Party#party.origportfrom, Msg)
+					end,
+					if
+						Party#party.origipto == null, Party#party.origportto == null ->
+							NewParty = Party#party{origipto=Ip, origportto=Port},
 							List1 = lists:delete(Party, Parties),
-%							io:format ("::: call[~w] message 2.1.3 rtp.~n", [self()]),
 							{noreply, {MainIp, WatcherPid, lists:append(List1, [NewParty])}};
 						true ->
 							{noreply, {MainIp, WatcherPid, Parties}}
 					end;
 				false ->
-					io:format ("::: call[~w] message UNKNOWN rtp.~n", [self()]),
 					{noreply, {MainIp, WatcherPid, Parties}}
 			end
 	end;
