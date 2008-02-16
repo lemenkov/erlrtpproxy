@@ -82,7 +82,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList}) ->
 				{value, CallInfo} ->
 					%  update existing record
 					io:format("Session exists. Updating existing.~n"),
-					Reply = gen_server:call(CallInfo#callthread.pid, {message_u, {OrigIp, OrigPort, FromTag, MediaId}}),
+					Reply = gen_server:call(CallInfo#callthread.pid, {message_u, {FromTag, MediaId}}),
 					MsgOut = UnixPid ++ Reply,
 					gen_udp:send(Fd, Ip, Port, [MsgOut]),
 					{noreply, {Fd, CallsList}};
@@ -93,7 +93,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList}) ->
 						{ok, CallPid} ->
 							io:format(" OK~n"),
 							NewCallThread = #callthread{pid=CallPid, callid=CallId},
-							Reply = gen_server:call(CallPid, {message_u, {OrigIp, OrigPort, FromTag, MediaId}}),
+							Reply = gen_server:call(CallPid, {message_u, {FromTag, MediaId}}),
 							MsgOut = UnixPid ++ Reply,
 							gen_udp:send(Fd, Ip, Port, [MsgOut]),
 							{noreply, {Fd, lists:append (CallsList, [NewCallThread])}};
@@ -109,10 +109,11 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList}) ->
 				{value, CallInfo} ->
 					% update existing session
 		%			io:format("Session exists. Updating existing.~n"),
-					Reply = gen_server:call(CallInfo#callthread.pid, {message_l, {OrigIp, OrigPort, FromTag, MediaIdFrom, ToTag, MediaIdTo}}),
+					Reply = gen_server:call(CallInfo#callthread.pid, {message_l, {FromTag, MediaIdFrom, ToTag, MediaIdTo}}),
 					MsgOut = UnixPid ++ Reply,
 					gen_udp:send(Fd, Ip, Port, [MsgOut]);
 				false ->
+					% FIXME reply to OpenSER with error message
 					io:format("Session not exists. Do nothing.~n")
 			end,
 			{noreply, {Fd, CallsList}};
