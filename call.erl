@@ -84,7 +84,9 @@ handle_call({message_l, {FromTag, MediaIdFrom, ToTag, MediaIdTo}}, _From, {MainI
 		% call already exists and Fd is opened
 		{value, Party} when Party#party.fdto /= null ->
 			io:format("::: call[~w] Already exists!~n", [self()]),
+
 			{ok, {LocalIp, LocalPort}} = inet:sockname(Party#party.fdto),
+
 			Reply = " " ++ integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 			io:format("::: call[~w] answer [~s]~n", [self(), Reply]),
 			{reply, Reply, {MainIp, WatcherPid, Parties}};
