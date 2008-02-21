@@ -23,9 +23,9 @@ init (_Unused) ->
 	process_flag(trap_exit, true),
 	{ok, Name} = inet:gethostname(),
 	{ok, MainIp} = inet:getaddr(Name, inet),
-	Pid = spawn (rtpsocket, watcher, [self()]),
+	WatcherPid = spawn (rtpsocket, watcher, [self()]),
 	io:format ("::: call[~w] thread started.~n", [self()]),
-	{ok, {MainIp, Pid, []}}.
+	{ok, {MainIp, WatcherPid, []}}.
 
 % handle originate call leg (new media id possibly)
 handle_call({message_u, {FromTag, MediaId}}, _From, {MainIp, WatcherPid, Parties}) ->
@@ -47,11 +47,11 @@ handle_call({message_u, {FromTag, MediaId}}, _From, {MainIp, WatcherPid, Parties
 					gen_udp:controlling_process(Fd, WatcherPid),
 
 					{ok, {LocalIp, LocalPort}} = inet:sockname(Fd),
-					Party = #party{fdfrom=Fd, tagfrom=FromTag, mediaidfrom=MediaId},
+					NewParty = #party{fdfrom=Fd, tagfrom=FromTag, mediaidfrom=MediaId},
 
 					Reply = " " ++ integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 					io:format("::: call[~w] answer [~s]~n", [self(), Reply]),
-					{reply, Reply, {MainIp, WatcherPid, lists:append(Parties, [Party])}};
+					{reply, Reply, {MainIp, WatcherPid, lists:append(Parties, [NewParty])}};
 				{error, Reason} ->
 					io:format("::: call[~w] Create new socket FAILED [~p]~n", [self(), Reason]),
 					{reply, {error, udp_error}, {MainIp, WatcherPid, Parties}}
@@ -63,8 +63,8 @@ handle_call({message_l, {FromTag, MediaIdFrom, ToTag, MediaIdTo}}, _From, {MainI
 	io:format ("::: call[~w] message [L] MediaIdFrom [~s] MediaIdTo[~s].~n", [self(), MediaIdFrom, MediaIdTo]),
 	% search for already  existed
 	case lists:keysearch(FromTag, #party.tagfrom, Parties) of
-		% call already exists
-		{value, Party} ->
+		% call already exists and Fd is not opened
+		{value, Party} when Party#party.fdto == null ->
 			io:format("::: call[~w] Already exists!~n", [self()]),
 			case gen_udp:open(0, [binary, {ip, MainIp}, {active, true}]) of
 				{ok, Fd} ->
@@ -76,12 +76,18 @@ handle_call({message_l, {FromTag, MediaIdFrom, ToTag, MediaIdTo}}, _From, {MainI
 
 					Reply = " " ++ integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 					io:format("::: call[~w] answer [~s]~n", [self(), Reply]),
-					List = lists:delete(Party, Parties),
-					{reply, Reply, {MainIp, WatcherPid, lists:append(List, [NewParty])}};
+					{reply, Reply, {MainIp, WatcherPid, lists:keyreplace(FromTag, #party.tagfrom, Parties, NewParty)}};
 				{error, Reason} ->
 					io:format(" FAILED [~p]~n", [Reason]),
 					{reply, {error, udp_error}, {MainIp, WatcherPid, Parties}}
 			end;
+		% call already exists and Fd is opened
+		{value, Party} when Party#party.fdto /= null ->
+			io:format("::: call[~w] Already exists!~n", [self()]),
+			{ok, {LocalIp, LocalPort}} = inet:sockname(Party#party.fdto),
+			Reply = " " ++ integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
+			io:format("::: call[~w] answer [~s]~n", [self(), Reply]),
+			{reply, Reply, {MainIp, WatcherPid, Parties}};
 		false ->
 			% Call not found.
 			io:format("::: call[~w] ERROR not found~n", [self()]),
@@ -108,8 +114,7 @@ handle_cast({udp, {Fd, Ip, Port, Msg}}, {MainIp, WatcherPid, Parties}) ->
 			if
 				Party#party.origipto == null, Party#party.origportto == null ->
 					NewParty = Party#party{origipto=Ip, origportto=Port},
-					List = lists:delete(Party, Parties),
-					{noreply, {MainIp, WatcherPid, lists:append(List, [NewParty])}};
+					{noreply, {MainIp, WatcherPid, lists:keyreplace(Fd, #party.fdfrom, Parties, NewParty)}};
 				true ->
 					{noreply, {MainIp, WatcherPid, Parties}}
 			end;
@@ -128,8 +133,7 @@ handle_cast({udp, {Fd, Ip, Port, Msg}}, {MainIp, WatcherPid, Parties}) ->
 					if
 						Party#party.origipfrom == null, Party#party.origportfrom == null ->
 							NewParty = Party#party{origipfrom=Ip, origportfrom=Port},
-							List = lists:delete(Party, Parties),
-							{noreply, {MainIp, WatcherPid, lists:append(List, [NewParty])}};
+							{noreply, {MainIp, WatcherPid, lists:keyreplace(Fd, #party.fdto, Parties, NewParty)}};
 						true ->
 							{noreply, {MainIp, WatcherPid, Parties}}
 					end;
