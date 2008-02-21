@@ -173,11 +173,6 @@ terminate(Reason, {_MainIp, WatcherPid, Parties}) ->
 			Parties),
 	io:format("::: call[~w] thread terminated due to reason [~w]~n", [self(), Reason]).
 
-% Fd from which message arrived must be equal to Fd from our state
-%handle_info({udp, Fd, Ip, Port, Msg}, State) ->
-%	gen_server:cast(self(), {rtp, {Fd, Ip, Port, Msg}}),
-%	{noreply, State};
-
 handle_info(Info, State) ->
 	io:format("::: call[~w] Info [~w]~n", [self(), Info]),
 	{noreply, State}.
