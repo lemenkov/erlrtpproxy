@@ -25,7 +25,7 @@ init([IpAtom, PortAtom]) when is_atom(IpAtom), is_atom(PortAtom) ->
 	Port = list_to_integer(atom_to_list(PortAtom)),
 	case gen_udp:open(Port, [{ip, Ip}, {active, true}, list]) of
 		{ok, Fd} ->
-			io:format("RTPProxy started at ~s:~w~n", [inet_parse:ntoa(Ip), Port]),
+			io:format("RTPProxy[~w] started at ~s:~w~n", [self(), inet_parse:ntoa(Ip), Port]),
 			{ok, {Fd, []}};
 		{error, Reason} ->
 			io:format("RTPPROXY not started. Reason [~p]~n", Reason),
@@ -42,7 +42,7 @@ handle_call(_Message, _From , State) ->
 handle_cast({call_terminated, {Pid, _Reason}}, {Fd, CallsList}) ->
 	case lists:keysearch(Pid, #callthread.pid, CallsList) of
 		{value, CallThread} ->
-			io:format("RTPPROXY call [~p] closed~n", [Pid]),
+			io:format("RTPPROXY call [~w] closed~n", [Pid]),
 			{noreply, {Fd, lists:delete(CallThread, CallsList)}};
 		false ->
 			{noreply, {Fd, CallsList}}
