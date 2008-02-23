@@ -16,8 +16,8 @@ watcher (Parent) ->
 			ok;
 		_Other ->
 			watcher(Parent)
-%	after 60000 ->
-	after 3000 ->
+	after 60000 ->
+%	after 3000 ->
 		gen_server:cast(Parent, {self(), timeout})
 	end.
 

@@ -104,18 +104,17 @@ handle_cast({udp, {Fd, Ip, Port, Msg}}, {MainIp, WatcherPid, Parties}) ->
 %	io:format("::: cast[~w] Fd[~p], Ip[~p] Port[~p] Parties[~p]~n", [self(), Fd, Ip, Port, Parties]),
 	case lists:keysearch(Fd, #party.fdfrom, Parties) of
 		{value, Party} ->
-%			io:format("::: cast[~w] to FdFrom~n", [self()]),
 			if
-				Party#party.origipfrom /= null, Party#party.origportfrom /= null ->
-%					io:format("::: cast[~w] We may send~n", [self()]),
-					gen_udp:send(Party#party.fdfrom, Party#party.origipfrom, Party#party.origportfrom, Msg);
+				Party#party.origipto /= null, Party#party.origportto /= null ->
+					io:format("::: cast[~w] rtp from FdFrom and we can send~n", [self()]),
+					gen_udp:send(Party#party.fdto, Party#party.origipto, Party#party.origportto, Msg);
 				true ->
-%					io:format("::: cast[~w] We want send to FdFrom but we CANNOT yet~n", [self()])
+					io:format("::: cast[~w] rtp from FdFrom and we CANNOT send yet~n", [self()]),
 					ok
 			end,
 			if
-				Party#party.origipto == null, Party#party.origportto == null ->
-					NewParty = Party#party{origipto=Ip, origportto=Port},
+				Party#party.origipfrom == null, Party#party.origportfrom == null ->
+					NewParty = Party#party{origipfrom=Ip, origportfrom=Port},
 					{noreply, {MainIp, WatcherPid, lists:keyreplace(Fd, #party.fdfrom, Parties, NewParty)}};
 				true ->
 					{noreply, {MainIp, WatcherPid, Parties}}
@@ -123,18 +122,17 @@ handle_cast({udp, {Fd, Ip, Port, Msg}}, {MainIp, WatcherPid, Parties}) ->
 		false ->
 			case lists:keysearch(Fd, #party.fdto, Parties) of
 				{value, Party} ->
-%					io:format("::: cast[~w] to FdTo~n", [self()]),
 					if
-						Party#party.origipto /= null, Party#party.origportto /= null ->
-%							io:format("::: cast[~w] We may send~n", [self()]),
-							gen_udp:send(Party#party.fdto, Party#party.origipto, Party#party.origportto, Msg);
+						Party#party.origipfrom /= null, Party#party.origportfrom /= null ->
+							io:format("::: cast[~w] rtp to FdTo and we can send~n", [self()]),
+							gen_udp:send(Party#party.fdfrom, Party#party.origipfrom, Party#party.origportfrom, Msg);
 						true ->
-%							io:format("::: cast[~w] We want send to FdTo but we CANNOT yet~n", [self()])
+							io:format("::: cast[~w] rtp to FdTo and we CANNOT send yet~n", [self()]),
 							ok
 					end,
 					if
-						Party#party.origipfrom == null, Party#party.origportfrom == null ->
-							NewParty = Party#party{origipfrom=Ip, origportfrom=Port},
+						Party#party.origipto == null, Party#party.origportto == null ->
+							NewParty = Party#party{origipto=Ip, origportto=Port},
 							{noreply, {MainIp, WatcherPid, lists:keyreplace(Fd, #party.fdto, Parties, NewParty)}};
 						true ->
 							{noreply, {MainIp, WatcherPid, Parties}}
