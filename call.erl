@@ -101,15 +101,14 @@ handle_call(_Other, _From, State) ->
 
 % rtp from some port
 handle_cast({udp, {Fd, Ip, Port, Msg}}, {MainIp, WatcherPid, Parties}) ->
-%	io:format("::: cast[~w] Fd[~p], Ip[~p] Port[~p] Parties[~p]~n", [self(), Fd, Ip, Port, Parties]),
 	case lists:keysearch(Fd, #party.fdfrom, Parties) of
 		{value, Party} ->
 			if
 				Party#party.origipto /= null, Party#party.origportto /= null ->
-					io:format("::: cast[~w] rtp from FdFrom and we can send~n", [self()]),
+%					io:format("::: cast[~w] rtp from FdFrom and we can send~n", [self()]),
 					gen_udp:send(Party#party.fdto, Party#party.origipto, Party#party.origportto, Msg);
 				true ->
-					io:format("::: cast[~w] rtp from FdFrom and we CANNOT send yet~n", [self()]),
+%					io:format("::: cast[~w] rtp from FdFrom and we CANNOT send yet~n", [self()]),
 					ok
 			end,
 			if
@@ -124,10 +123,10 @@ handle_cast({udp, {Fd, Ip, Port, Msg}}, {MainIp, WatcherPid, Parties}) ->
 				{value, Party} ->
 					if
 						Party#party.origipfrom /= null, Party#party.origportfrom /= null ->
-							io:format("::: cast[~w] rtp to FdTo and we can send~n", [self()]),
+%							io:format("::: cast[~w] rtp to FdTo and we can send~n", [self()]),
 							gen_udp:send(Party#party.fdfrom, Party#party.origipfrom, Party#party.origportfrom, Msg);
 						true ->
-							io:format("::: cast[~w] rtp to FdTo and we CANNOT send yet~n", [self()]),
+%							io:format("::: cast[~w] rtp to FdTo and we CANNOT send yet~n", [self()]),
 							ok
 					end,
 					if
