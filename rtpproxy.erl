@@ -84,61 +84,124 @@ handle_info({'EXIT', Pid, _Reason}, {Fd, CallsList}) ->
 % Fd from which message arrived must be equal to Fd from our state
 handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList}) ->
 	case string:tokens(Msg, " ;") of
-		[UnixPid, "V"] ->
-			io:format("UnixPid [~s], Cmd [V]...", [UnixPid]),
-			MsgOut = UnixPid ++ " 20040107\n",
+		[Cookie, "V"] ->
+			io:format("Cookie [~s], Cmd [V]...", [Cookie]),
+			MsgOut = Cookie ++ " 20040107\n",
 			gen_udp:send(Fd, Ip, Port, [MsgOut]),
 			io:format(" OK~n", []),
 			{noreply, {Fd, CallsList}};
-		[UnixPid, "VF", Params] ->
-			io:format("UnixPid [~s], Cmd [VF] Params [~s]...", [UnixPid, Params]),
-			MsgOut = UnixPid ++ " 1\n",
+		[Cookie, "VF", Params] ->
+			io:format("Cookie [~s], Cmd [VF] Params [~s]...", [Cookie, Params]),
+			MsgOut = Cookie ++ " 1\n",
 			gen_udp:send(Fd, Ip, Port, [MsgOut]),
 			io:format(" OK~n", []),
 			{noreply, {Fd, CallsList}};
-		[UnixPid, "U", CallId, OrigIp, OrigPort, FromTag, MediaId] ->
+		[Cookie, "U", CallId, OrigIp, OrigPort, FromTag, MediaId] ->
 			io:format("Cmd [U] CallId [~s], OrigIp [~s], OrigPort [~s], FromTag [~s] MediaId [~s]~n", [CallId, OrigIp, OrigPort, FromTag, MediaId]),
 			case lists:keysearch(CallId, #callthread.callid, CallsList) of
 				{value, CallInfo} ->
-					%  update existing record
 					io:format("Session exists. Updating existing.~n"),
-					Reply = gen_server:call(CallInfo#callthread.pid, {message_u, {FromTag, MediaId}}),
-					MsgOut = UnixPid ++ Reply,
-					gen_udp:send(Fd, Ip, Port, [MsgOut]),
+					case gen_server:call(CallInfo#callthread.pid, {message_u, {FromTag, MediaId}}) of
+						{ok, Reply} ->
+							MsgOut = Cookie ++ Reply,
+							gen_udp:send(Fd, Ip, Port, [MsgOut]);
+						{error, udp_error} ->
+							MsgOut = Cookie ++ " 7\n",
+							gen_udp:send(Fd, Ip, Port, [MsgOut])
+					end,
 					{noreply, {Fd, CallsList}};
 				false ->
 					io:format("Session not exists. Creating new:~n"),
-					% create new session
 					case call:start_link ([]) of
 						{ok, CallPid} ->
 							io:format(" OK~n"),
 							NewCallThread = #callthread{pid=CallPid, callid=CallId},
-							Reply = gen_server:call(CallPid, {message_u, {FromTag, MediaId}}),
-							MsgOut = UnixPid ++ Reply,
-							gen_udp:send(Fd, Ip, Port, [MsgOut]),
-							{noreply, {Fd, lists:append (CallsList, [NewCallThread])}};
+							case gen_server:call(CallPid, {message_u, {FromTag, MediaId}}) of
+								{ok, Reply} ->
+									MsgOut = Cookie ++ Reply,
+									gen_udp:send(Fd, Ip, Port, [MsgOut]),
+									{noreply, {Fd, lists:append (CallsList, [NewCallThread])}};
+								{error, udp_error} ->
+									MsgOut = Cookie ++ " 7\n",
+									gen_udp:send(Fd, Ip, Port, [MsgOut]),
+									{noreply, {Fd, CallsList}}
+							end;
 						Other ->
 							io:format ("RTPPROXY: error creating call! [~w]~n", [Other]),
-							% FIXME reply to OpenSER with error message
+							MsgOut = Cookie ++ " 7\n",
+							gen_udp:send(Fd, Ip, Port, [MsgOut]),
 							{noreply, {Fd, CallsList}}
 					end
 			end;
-		[UnixPid, "L", CallId, OrigIp, OrigPort, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
+		[Cookie, "L", CallId, OrigIp, OrigPort, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
 			io:format("Cmd [L] CallId [~s], OrigIp [~s], OrigPort [~s], FromTag [~s] MediaIdFrom [~s] ToTag [~s] MediaIdTo [~s]~n",	[CallId, OrigIp, OrigPort, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
 			case lists:keysearch(CallId, #callthread.callid, CallsList) of
 				{value, CallInfo} ->
-					% update existing session
-		%			io:format("Session exists. Updating existing.~n"),
-					Reply = gen_server:call(CallInfo#callthread.pid, {message_l, {FromTag, MediaIdFrom, ToTag, MediaIdTo}}),
-					MsgOut = UnixPid ++ Reply,
-					gen_udp:send(Fd, Ip, Port, [MsgOut]);
+					case gen_server:call(CallInfo#callthread.pid, {message_l, {FromTag, MediaIdFrom, ToTag, MediaIdTo}}) of
+						{error, not_found} ->
+							MsgOut = Cookie ++ " 8\n",
+							gen_udp:send(Fd, Ip, Port, [MsgOut]);							
+						{error, udp_error} ->
+							MsgOut = Cookie ++ " 7\n",
+							gen_udp:send(Fd, Ip, Port, [MsgOut]);							
+						{ok, Reply} ->
+							MsgOut = Cookie ++ Reply,
+							gen_udp:send(Fd, Ip, Port, [MsgOut])
+					end;
 				false ->
-					% FIXME reply to OpenSER with error message
-					io:format("Session not exists. Do nothing.~n")
+					io:format("Session not exists. Do nothing.~n"),
+					MsgOut = Cookie ++ " 8\n",
+					gen_udp:send(Fd, Ip, Port, [MsgOut])
 			end,
 			{noreply, {Fd, CallsList}};
-		_Other ->
+		[Cookie, "D", CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
+			io:format("Cmd [D] CallId [~s], FromTag [~s] MediaIdFrom [~s] ToTag [~s] MediaIdTo [~s]~n", [CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
+			case lists:keysearch(CallId, #callthread.callid, CallsList) of
+				{value, CallInfo} ->
+					gen_server:cast(CallInfo#callthread.pid, message_d),
+					MsgOut = Cookie ++ " 0\n",
+					gen_udp:send(Fd, Ip, Port, [MsgOut]);
+				false ->
+					io:format("Session not exists. Do nothing.~n"),
+					MsgOut = Cookie ++ " 8\n",
+					gen_udp:send(Fd, Ip, Port, [MsgOut])
+			end,
+			{noreply, {Fd, CallsList}};
+		[Cookie, "R", CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
+			io:format("Cmd [R] CallId [~s], FromTag [~s] MediaIdFrom [~s] ToTag [~s] MediaIdTo [~s]~n", [CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
+			case lists:keysearch(CallId, #callthread.callid, CallsList) of
+				{value, CallInfo} ->
+					gen_server:cast(CallInfo#callthread.pid, message_r),
+					MsgOut = Cookie ++ " 0\n",
+					gen_udp:send(Fd, Ip, Port, [MsgOut]);
+				false ->
+					io:format("Session not exists. Do nothing.~n"),
+					MsgOut = Cookie ++ " 8\n",
+					gen_udp:send(Fd, Ip, Port, [MsgOut])
+			end,
+			{noreply, {Fd, CallsList}};
+		[Cookie, "S", CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
+			io:format("Cmd [R] CallId [~s], FromTag [~s] MediaIdFrom [~s] ToTag [~s] MediaIdTo [~s]~n", [CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
+			case lists:keysearch(CallId, #callthread.callid, CallsList) of
+				{value, CallInfo} ->
+					gen_server:cast(CallInfo#callthread.pid, message_s),
+					MsgOut = Cookie ++ " 0\n",
+					gen_udp:send(Fd, Ip, Port, [MsgOut]);
+				false ->
+					io:format("Session not exists. Do nothing.~n"),
+					MsgOut = Cookie ++ " 8\n",
+					gen_udp:send(Fd, Ip, Port, [MsgOut])
+			end,
+			{noreply, {Fd, CallsList}};
+		[Cookie, "I"] ->
+			io:format("Cookie [~s], Cmd [I]~n", [Cookie]),
+			% TODO
+			{noreply, {Fd, CallsList}};
+		[Cookie | _Other] ->
 			io:format("Other command [~s]~n", [Msg]),
+			% bad syntax
+			MsgOut = Cookie ++ " 1\n",
+			gen_udp:send(Fd, Ip, Port, [MsgOut]),
 			{noreply, {Fd, CallsList}}
 	end;
 

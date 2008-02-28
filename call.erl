@@ -58,7 +58,7 @@ handle_call({message_u, {FromTag, MediaId}}, _From, {MainIp, WatcherPid, Parties
 			{ok, {LocalIp, LocalPort}} = inet:sockname(Party#party.fdfrom),
 			Reply = " " ++ integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 			io:format("::: call[~w] answer [~s]~n", [self(), Reply]),
-			{reply, Reply, {MainIp, WatcherPid, Parties}};
+			{reply, {ok, Reply}, {MainIp, WatcherPid, Parties}};
 		false ->
 			% open new Fd and attach it
 			case gen_udp:open(0, [binary, {ip, MainIp}, {active, true}]) of
@@ -71,7 +71,7 @@ handle_call({message_u, {FromTag, MediaId}}, _From, {MainIp, WatcherPid, Parties
 
 					Reply = " " ++ integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 					io:format("::: call[~w] answer [~s]~n", [self(), Reply]),
-					{reply, Reply, {MainIp, WatcherPid, lists:append(Parties, [NewParty])}};
+					{reply, {ok, Reply}, {MainIp, WatcherPid, lists:append(Parties, [NewParty])}};
 				{error, Reason} ->
 					io:format("::: call[~w] Create new socket FAILED [~p]~n", [self(), Reason]),
 					{reply, {error, udp_error}, {MainIp, WatcherPid, Parties}}
@@ -96,7 +96,7 @@ handle_call({message_l, {FromTag, MediaIdFrom, ToTag, MediaIdTo}}, _From, {MainI
 
 					Reply = " " ++ integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 					io:format("::: call[~w] answer [~s]~n", [self(), Reply]),
-					{reply, Reply, {MainIp, WatcherPid, lists:keyreplace(FromTag, #party.tagfrom, Parties, NewParty)}};
+					{reply, {ok, Reply}, {MainIp, WatcherPid, lists:keyreplace(FromTag, #party.tagfrom, Parties, NewParty)}};
 				{error, Reason} ->
 					io:format(" FAILED [~p]~n", [Reason]),
 					{reply, {error, udp_error}, {MainIp, WatcherPid, Parties}}
@@ -109,7 +109,7 @@ handle_call({message_l, {FromTag, MediaIdFrom, ToTag, MediaIdTo}}, _From, {MainI
 
 			Reply = " " ++ integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 			io:format("::: call[~w] answer [~s]~n", [self(), Reply]),
-			{reply, Reply, {MainIp, WatcherPid, Parties}};
+			{reply, {ok, Reply}, {MainIp, WatcherPid, Parties}};
 		false ->
 			% Call not found.
 			io:format("::: call[~w] ERROR not found~n", [self()]),
@@ -163,6 +163,17 @@ handle_cast({udp, {Fd, Ip, Port, Msg}}, {MainIp, WatcherPid, Parties}) ->
 
 handle_cast({WatcherPid, timeout}, {MainIp, WatcherPid, Parties}) ->
 	{stop, timeout, {MainIp, WatcherPid, Parties}};
+
+handle_cast(message_d, State) ->
+	{stop, message_d, State};
+
+handle_cast(message_r, State) ->
+	% TODO start recording of RTP
+	{noreply, State};
+
+handle_cast(message_s, State) ->
+	% TODO stop recording of RTP
+	{noreply, State};
 
 % all other messages
 handle_cast(_Request, State) ->
