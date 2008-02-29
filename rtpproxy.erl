@@ -9,7 +9,7 @@
 %%% but WITHOUT ANY WARRANTY; without even the implied warranty of
 %%% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 %%% General Public License for more details.
-%%%                         
+%%%
 %%% You should have received a copy of the GNU General Public License
 %%% along with this program; if not, write to the Free Software
 %%% Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
@@ -96,8 +96,8 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList}) ->
 			gen_udp:send(Fd, Ip, Port, [MsgOut]),
 			io:format(" OK~n", []),
 			{noreply, {Fd, CallsList}};
-		[Cookie, "U", CallId, OrigIp, OrigPort, FromTag, MediaId] ->
-			io:format("Cmd [U] CallId [~s], OrigIp [~s], OrigPort [~s], FromTag [~s] MediaId [~s]~n", [CallId, OrigIp, OrigPort, FromTag, MediaId]),
+		[Cookie, [$U|Args], CallId, OrigIp, OrigPort, FromTag, MediaId] ->
+			io:format("Cmd [U] CallId [~s], OrigAddr [~s:~s], FromTag [~s;~s]~n", [CallId, OrigIp, OrigPort, FromTag, MediaId]),
 			case lists:keysearch(CallId, #callthread.callid, CallsList) of
 				{value, CallInfo} ->
 					io:format("Session exists. Updating existing.~n"),
@@ -133,17 +133,17 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList}) ->
 							{noreply, {Fd, CallsList}}
 					end
 			end;
-		[Cookie, "L", CallId, OrigIp, OrigPort, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
-			io:format("Cmd [L] CallId [~s], OrigIp [~s], OrigPort [~s], FromTag [~s] MediaIdFrom [~s] ToTag [~s] MediaIdTo [~s]~n",	[CallId, OrigIp, OrigPort, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
+		[Cookie, [$L|Args], CallId, OrigIp, OrigPort, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
+			io:format("Cmd [L] CallId [~s], OrigAddr [~s:~s], FromTag [~s;~s] ToTag [~s;~s]~n", [CallId, OrigIp, OrigPort, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
 			case lists:keysearch(CallId, #callthread.callid, CallsList) of
 				{value, CallInfo} ->
 					case gen_server:call(CallInfo#callthread.pid, {message_l, {FromTag, MediaIdFrom, ToTag, MediaIdTo}}) of
 						{error, not_found} ->
 							MsgOut = Cookie ++ " 8\n",
-							gen_udp:send(Fd, Ip, Port, [MsgOut]);							
+							gen_udp:send(Fd, Ip, Port, [MsgOut]);
 						{error, udp_error} ->
 							MsgOut = Cookie ++ " 7\n",
-							gen_udp:send(Fd, Ip, Port, [MsgOut]);							
+							gen_udp:send(Fd, Ip, Port, [MsgOut]);
 						{ok, Reply} ->
 							MsgOut = Cookie ++ Reply,
 							gen_udp:send(Fd, Ip, Port, [MsgOut])
@@ -155,7 +155,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList}) ->
 			end,
 			{noreply, {Fd, CallsList}};
 		[Cookie, "D", CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
-			io:format("Cmd [D] CallId [~s], FromTag [~s] MediaIdFrom [~s] ToTag [~s] MediaIdTo [~s]~n", [CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
+			io:format("Cmd [D] CallId [~s], FromTag [~s;~s] ToTag [~s;~s]~n", [CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
 			case lists:keysearch(CallId, #callthread.callid, CallsList) of
 				{value, CallInfo} ->
 					gen_server:cast(CallInfo#callthread.pid, message_d),
@@ -168,7 +168,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList}) ->
 			end,
 			{noreply, {Fd, CallsList}};
 		[Cookie, "R", CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
-			io:format("Cmd [R] CallId [~s], FromTag [~s] MediaIdFrom [~s] ToTag [~s] MediaIdTo [~s]~n", [CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
+			io:format("Cmd [R] CallId [~s], FromTag [~s;~s] ToTag [~s;~s]~n", [CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
 			case lists:keysearch(CallId, #callthread.callid, CallsList) of
 				{value, CallInfo} ->
 					gen_server:cast(CallInfo#callthread.pid, message_r),
@@ -180,8 +180,12 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList}) ->
 					gen_udp:send(Fd, Ip, Port, [MsgOut])
 			end,
 			{noreply, {Fd, CallsList}};
+		[Cookie, [$P|Args], CallId, PlayName, Codecs, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
+			io:format("Cmd [P] CallId [~s], FromTag [~s;~s] ToTag [~s;~s]~n", [CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
+			% TODO
+			{noreply, {Fd, CallsList}};
 		[Cookie, "S", CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
-			io:format("Cmd [R] CallId [~s], FromTag [~s] MediaIdFrom [~s] ToTag [~s] MediaIdTo [~s]~n", [CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
+			io:format("Cmd [R] CallId [~s], FromTag [~s;~s] ToTag [~s;~s]~n", [CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
 			case lists:keysearch(CallId, #callthread.callid, CallsList) of
 				{value, CallInfo} ->
 					gen_server:cast(CallInfo#callthread.pid, message_s),
