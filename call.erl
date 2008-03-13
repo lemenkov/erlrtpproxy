@@ -33,18 +33,23 @@
 -record(party, {fdfrom=null, origipfrom=null, origportfrom=null, tagfrom=null, mediaidfrom=null,
 		fdto=null,   origipto=null,   origportto=null,   tagto=null,   mediaidto=null}).
 
-start(Args) ->
-	gen_server:start(call, Args, []).
+start({Node, MainIpAtom}) when is_atom(Node), is_atom(MainIpAtom) ->
+	rpc:call(Node, gen_server, start, [?MODULE, [MainIpAtom], []]);
 
-start_link(Args) ->
-	gen_server:start_link(call, Args, []).
+start(Other) ->
+	io:format("::: call[~w] wrong startup params: ~p~n", [self(), Other]).
 
-init (_Unused) ->
+start_link({Node, MainIpAtom}) when is_atom(Node), is_atom(MainIpAtom) ->
+	rpc:call(Node, gen_server, start_link, [?MODULE, [MainIpAtom], []]);
+
+start_link(Other) ->
+	io:format("::: call[~w] wrong startup params: ~p~n", [self(), Other]).
+
+init ([MainIpAtom]) ->
 	process_flag(trap_exit, true),
-	{ok, Name} = inet:gethostname(),
-	{ok, MainIp} = inet:getaddr(Name, inet),
+	{ok, MainIp} = inet_parse:address(atom_to_list(MainIpAtom)),
 	WatcherPid = spawn (rtpsocket, watcher, [self()]),
-	io:format ("::: call[~w] thread started.~n", [self()]),
+	io:format ("::: call[~w] thread started at ~s~n", [self(), inet_parse:ntoa(MainIp)]),
 	{ok, {MainIp, WatcherPid, []}}.
 
 % handle originate call leg (new media id possibly)
@@ -199,7 +204,7 @@ terminate(Reason, {_MainIp, WatcherPid, Parties}) ->
 				end
 			end,
 			Parties),
-	io:format("::: call[~w] thread terminated due to reason [~w]~n", [self(), Reason]).
+	io:format("::: call[~w] thread terminated due to reason [~p]~n", [self(), Reason]).
 
 handle_info(Info, State) ->
 	io:format("::: call[~w] Info [~w]~n", [self(), Info]),

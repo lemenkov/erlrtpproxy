@@ -30,14 +30,21 @@
 -export([code_change/3]).
 -export([terminate/2]).
 
+% include list of hosts
+-include ("config.hrl").
+
 % description of call thread
 -record(callthread, {pid=null, callid=null}).
 
-start(Args) ->
-	gen_server:start({global, rtpproxy}, rtpproxy, Args, []).
+start([Node|Args]) when is_atom(Node) ->
+	rpc:call(Node, gen_server, start, [{global, ?MODULE}, ?MODULE, Args, []]).
 
-start_link(Args) ->
-	gen_server:start_link({global, rtpproxy}, rtpproxy, Args, []).
+start_link([Node|Args]) when is_atom(Node) ->
+	io:format ("Node ~p, Args ~p~n", [Node, Args]),
+	rpc:call(Node, gen_server, start_link, [{global, ?MODULE}, ?MODULE, Args, []]);
+
+start_link(Other) ->
+	io:format("Bad syntax [~p]~n", [Other]).
 
 init([IpAtom, PortAtom]) when is_atom(IpAtom), is_atom(PortAtom) ->
 	process_flag(trap_exit, true),
@@ -46,7 +53,7 @@ init([IpAtom, PortAtom]) when is_atom(IpAtom), is_atom(PortAtom) ->
 	case gen_udp:open(Port, [{ip, Ip}, {active, true}, list]) of
 		{ok, Fd} ->
 			io:format("RTPProxy[~w] started at ~s:~w~n", [self(), inet_parse:ntoa(Ip), Port]),
-			{ok, {Fd, []}};
+			{ok, {Fd, [], ?RtpHosts}};
 		{error, Reason} ->
 			io:format("RTPPROXY not started. Reason [~p]~n", Reason),
 			{stop, Reason}
@@ -59,43 +66,43 @@ init(Args) ->
 handle_call(_Message, _From , State) ->
 	{noreply, State}.
 
-handle_cast({call_terminated, {Pid, _Reason}}, {Fd, CallsList}) ->
+handle_cast({call_terminated, {Pid, _Reason}}, {Fd, CallsList, RtpHostsList}) ->
 	case lists:keysearch(Pid, #callthread.pid, CallsList) of
 		{value, CallThread} ->
 			io:format("RTPPROXY call [~w] closed~n", [Pid]),
-			{noreply, {Fd, lists:delete(CallThread, CallsList)}};
+			{noreply, {Fd, lists:delete(CallThread, CallsList), RtpHostsList}};
 		false ->
-			{noreply, {Fd, CallsList}}
+			{noreply, {Fd, CallsList, RtpHostsList}}
 	end;
 
 handle_cast(_Other, State) ->
 	{noreply, State}.
 
 % Call died (due to timeout)
-handle_info({'EXIT', Pid, _Reason}, {Fd, CallsList}) ->
+handle_info({'EXIT', Pid, _Reason}, {Fd, CallsList, RtpHostsList}) ->
 	case lists:keysearch(Pid, #callthread.pid, CallsList) of
 		{value, CallThread} ->
 			io:format("RTPPROXY call [~p] closed~n", [Pid]),
-			{noreply, {Fd, lists:delete(CallThread, CallsList)}};
+			{noreply, {Fd, lists:delete(CallThread, CallsList), RtpHostsList}};
 		false ->
-			{noreply, {Fd, CallsList}}
+			{noreply, {Fd, CallsList, RtpHostsList}}
 	end;
 
 % Fd from which message arrived must be equal to Fd from our state
-handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList}) ->
+handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList, RtpHostsList}) ->
 	case string:tokens(Msg, " ;") of
 		[Cookie, "V"] ->
 			io:format("Cookie [~s], Cmd [V]...", [Cookie]),
 			MsgOut = Cookie ++ " 20040107\n",
 			gen_udp:send(Fd, Ip, Port, [MsgOut]),
 			io:format(" OK~n", []),
-			{noreply, {Fd, CallsList}};
+			{noreply, {Fd, CallsList, RtpHostsList}};
 		[Cookie, "VF", Params] ->
 			io:format("Cookie [~s], Cmd [VF] Params [~s]...", [Cookie, Params]),
 			MsgOut = Cookie ++ " 1\n",
 			gen_udp:send(Fd, Ip, Port, [MsgOut]),
 			io:format(" OK~n", []),
-			{noreply, {Fd, CallsList}};
+			{noreply, {Fd, CallsList, RtpHostsList}};
 		[Cookie, [$U|Args], CallId, OrigIp, OrigPort, FromTag, MediaId] ->
 			io:format("Cmd [U] CallId [~s], OrigAddr [~s:~s], FromTag [~s;~s]~n", [CallId, OrigIp, OrigPort, FromTag, MediaId]),
 			case lists:keysearch(CallId, #callthread.callid, CallsList) of
@@ -109,10 +116,11 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList}) ->
 							MsgOut = Cookie ++ " 7\n",
 							gen_udp:send(Fd, Ip, Port, [MsgOut])
 					end,
-					{noreply, {Fd, CallsList}};
+					{noreply, {Fd, CallsList, RtpHostsList}};
 				false ->
+					[{RtpHost,RtpIp}|OtherRtpHosts] = RtpHostsList,
 					io:format("Session not exists. Creating new:~n"),
-					case call:start_link ([]) of
+					case rpc:call(RtpHost, call, start, [{RtpHost,RtpIp}]) of
 						{ok, CallPid} ->
 							io:format(" OK~n"),
 							NewCallThread = #callthread{pid=CallPid, callid=CallId},
@@ -120,17 +128,23 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList}) ->
 								{ok, Reply} ->
 									MsgOut = Cookie ++ Reply,
 									gen_udp:send(Fd, Ip, Port, [MsgOut]),
-									{noreply, {Fd, lists:append (CallsList, [NewCallThread])}};
+									{noreply, {Fd, lists:append (CallsList, [NewCallThread]), OtherRtpHosts ++ [{RtpHost,RtpIp}]}};
 								{error, udp_error} ->
 									MsgOut = Cookie ++ " 7\n",
 									gen_udp:send(Fd, Ip, Port, [MsgOut]),
-									{noreply, {Fd, CallsList}}
+									{noreply, {Fd, CallsList, OtherRtpHosts ++ [{RtpHost,RtpIp}]}}
 							end;
+						{badrpc,nodedown} ->
+							io:format ("RTPPROXY: rtp host [~p] seems stopped!~n", [{RtpHost,RtpIp}]),
+							% FIXME remove bad host from list
+							MsgOut = Cookie ++ " 7\n",
+							gen_udp:send(Fd, Ip, Port, [MsgOut]),
+							{noreply, {Fd, CallsList, OtherRtpHosts ++ [{RtpHost,RtpIp}]}};
 						Other ->
 							io:format ("RTPPROXY: error creating call! [~w]~n", [Other]),
 							MsgOut = Cookie ++ " 7\n",
 							gen_udp:send(Fd, Ip, Port, [MsgOut]),
-							{noreply, {Fd, CallsList}}
+							{noreply, {Fd, CallsList, OtherRtpHosts ++ [{RtpHost,RtpIp}]}}
 					end
 			end;
 		[Cookie, [$L|Args], CallId, OrigIp, OrigPort, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
@@ -153,7 +167,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList}) ->
 					MsgOut = Cookie ++ " 8\n",
 					gen_udp:send(Fd, Ip, Port, [MsgOut])
 			end,
-			{noreply, {Fd, CallsList}};
+			{noreply, {Fd, CallsList, RtpHostsList}};
 		[Cookie, "D", CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
 			io:format("Cmd [D] CallId [~s], FromTag [~s;~s] ToTag [~s;~s]~n", [CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
 			case lists:keysearch(CallId, #callthread.callid, CallsList) of
@@ -166,7 +180,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList}) ->
 					MsgOut = Cookie ++ " 8\n",
 					gen_udp:send(Fd, Ip, Port, [MsgOut])
 			end,
-			{noreply, {Fd, CallsList}};
+			{noreply, {Fd, CallsList, RtpHostsList}};
 		[Cookie, "R", CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
 			io:format("Cmd [R] CallId [~s], FromTag [~s;~s] ToTag [~s;~s]~n", [CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
 			case lists:keysearch(CallId, #callthread.callid, CallsList) of
@@ -179,11 +193,11 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList}) ->
 					MsgOut = Cookie ++ " 8\n",
 					gen_udp:send(Fd, Ip, Port, [MsgOut])
 			end,
-			{noreply, {Fd, CallsList}};
+			{noreply, {Fd, CallsList, RtpHostsList}};
 		[Cookie, [$P|Args], CallId, PlayName, Codecs, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
 			io:format("Cmd [P] CallId [~s], FromTag [~s;~s] ToTag [~s;~s]~n", [CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
 			% TODO
-			{noreply, {Fd, CallsList}};
+			{noreply, {Fd, CallsList, RtpHostsList}};
 		[Cookie, "S", CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
 			io:format("Cmd [R] CallId [~s], FromTag [~s;~s] ToTag [~s;~s]~n", [CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
 			case lists:keysearch(CallId, #callthread.callid, CallsList) of
@@ -196,17 +210,17 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList}) ->
 					MsgOut = Cookie ++ " 8\n",
 					gen_udp:send(Fd, Ip, Port, [MsgOut])
 			end,
-			{noreply, {Fd, CallsList}};
+			{noreply, {Fd, CallsList, RtpHostsList}};
 		[Cookie, "I"] ->
 			io:format("Cookie [~s], Cmd [I]~n", [Cookie]),
 			% TODO
-			{noreply, {Fd, CallsList}};
+			{noreply, {Fd, CallsList, RtpHostsList}};
 		[Cookie | _Other] ->
 			io:format("Other command [~s]~n", [Msg]),
 			% bad syntax
 			MsgOut = Cookie ++ " 1\n",
 			gen_udp:send(Fd, Ip, Port, [MsgOut]),
-			{noreply, {Fd, CallsList}}
+			{noreply, {Fd, CallsList, RtpHostsList}}
 	end;
 
 handle_info(Info, State) ->
@@ -216,7 +230,7 @@ handle_info(Info, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, {Fd, _CallsList}) ->
+terminate(Reason, {Fd, CallsList, RtpHostsList}) ->
 	gen_udp:close(Fd),
 	io:format("RTPPROXY terminated due to reason [~w]~n", [Reason]).
 
