@@ -75,6 +75,14 @@ handle_cast({call_terminated, {Pid, _Reason}}, {Fd, CallsList, RtpHostsList}) ->
 			{noreply, {Fd, CallsList, RtpHostsList}}
 	end;
 
+handle_cast({node_add, {Node, Ip}}, {Fd, CallsList, RtpHostsList}) when is_atom(Node), is_atom(Ip) ->
+	io:format("RTPPROXY add node [~p]~n", [{Node, Ip}]),
+	{noreply, {Fd, CallsList, lists:append(RtpHostsList, [{Node, Ip}])}};
+
+handle_cast({node_del, {Node, Ip}}, {Fd, CallsList, RtpHostsList}) when is_atom(Node), is_atom(Ip) ->
+	io:format("RTPPROXY del node [~p]~n", [{Node, Ip}]),
+	{noreply, {Fd, CallsList, lists:delete({Node, Ip}, RtpHostsList)}};
+
 handle_cast(_Other, State) ->
 	{noreply, State}.
 
@@ -118,33 +126,40 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList, RtpHostsList}) ->
 					end,
 					{noreply, {Fd, CallsList, RtpHostsList}};
 				false ->
-					[{RtpHost,RtpIp}|OtherRtpHosts] = RtpHostsList,
-					io:format("Session not exists. Creating new:~n"),
-					case rpc:call(RtpHost, call, start, [{RtpHost,RtpIp}]) of
-						{ok, CallPid} ->
-							io:format(" OK~n"),
-							NewCallThread = #callthread{pid=CallPid, callid=CallId},
-							case gen_server:call(CallPid, {message_u, {FromTag, MediaId}}) of
-								{ok, Reply} ->
-									MsgOut = Cookie ++ Reply,
-									gen_udp:send(Fd, Ip, Port, [MsgOut]),
-									{noreply, {Fd, lists:append (CallsList, [NewCallThread]), OtherRtpHosts ++ [{RtpHost,RtpIp}]}};
-								{error, udp_error} ->
+					case find_node(RtpHostsList) of
+						{{RtpHost, RtpIp}, NewRtpHostsList} ->
+							io:format("Session not exists. Creating new:~n"),
+							case rpc:call(RtpHost, call, start, [{RtpHost,RtpIp}]) of
+								{ok, CallPid} ->
+									io:format(" OK~n"),
+									NewCallThread = #callthread{pid=CallPid, callid=CallId},
+									case gen_server:call(CallPid, {message_u, {FromTag, MediaId}}) of
+										{ok, Reply} ->
+											MsgOut = Cookie ++ Reply,
+											gen_udp:send(Fd, Ip, Port, [MsgOut]),
+											{noreply, {Fd, lists:append (CallsList, [NewCallThread]), NewRtpHostsList}};
+										{error, udp_error} ->
+											MsgOut = Cookie ++ " 7\n",
+											gen_udp:send(Fd, Ip, Port, [MsgOut]),
+											{noreply, {Fd, CallsList, NewRtpHostsList}}
+									end;
+								{badrpc,nodedown} ->
+									io:format ("RTPPROXY: rtp host [~p] seems stopped!~n", [{RtpHost,RtpIp}]),
+									% FIXME remove bad host from list
 									MsgOut = Cookie ++ " 7\n",
 									gen_udp:send(Fd, Ip, Port, [MsgOut]),
-									{noreply, {Fd, CallsList, OtherRtpHosts ++ [{RtpHost,RtpIp}]}}
+									{noreply, {Fd, CallsList, NewRtpHostsList}};
+								Other ->
+									io:format ("RTPPROXY: error creating call! [~w]~n", [Other]),
+									MsgOut = Cookie ++ " 7\n",
+									gen_udp:send(Fd, Ip, Port, [MsgOut]),
+									{noreply, {Fd, CallsList, NewRtpHostsList}}
 							end;
-						{badrpc,nodedown} ->
-							io:format ("RTPPROXY: rtp host [~p] seems stopped!~n", [{RtpHost,RtpIp}]),
-							% FIXME remove bad host from list
+						error_no_node ->
+							io:format ("RTPPROXY: error no suitable nodes!~n"),
 							MsgOut = Cookie ++ " 7\n",
 							gen_udp:send(Fd, Ip, Port, [MsgOut]),
-							{noreply, {Fd, CallsList, OtherRtpHosts ++ [{RtpHost,RtpIp}]}};
-						Other ->
-							io:format ("RTPPROXY: error creating call! [~w]~n", [Other]),
-							MsgOut = Cookie ++ " 7\n",
-							gen_udp:send(Fd, Ip, Port, [MsgOut]),
-							{noreply, {Fd, CallsList, OtherRtpHosts ++ [{RtpHost,RtpIp}]}}
+							{noreply, {Fd, CallsList, RtpHostsList}}
 					end
 			end;
 		[Cookie, [$L|Args], CallId, OrigIp, OrigPort, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
@@ -233,4 +248,18 @@ code_change(_OldVsn, State, _Extra) ->
 terminate(Reason, {Fd, CallsList, RtpHostsList}) ->
 	gen_udp:close(Fd),
 	io:format("RTPPROXY terminated due to reason [~w]~n", [Reason]).
+
+find_node (Nodes) ->
+	find_node(Nodes, []).
+
+find_node([], Acc) ->
+	error_no_nodes;
+
+find_node([{Node,Ip}|OtherNodes], Acc) ->
+	case net_adm:ping(Node) of
+		pong ->
+			{{Node,Ip},OtherNodes ++ Acc ++ [{Node,Ip}]};
+		pang ->
+			find_node(OtherNodes, Acc ++ [{Node,Ip}])
+	end.
 
