@@ -252,7 +252,7 @@ terminate(Reason, {Fd, CallsList, RtpHostsList}) ->
 find_node (Nodes) ->
 	find_node(Nodes, []).
 
-find_node([], Acc) ->
+find_node([], _Acc) ->
 	error_no_nodes;
 
 find_node([{Node,Ip}|OtherNodes], Acc) ->
