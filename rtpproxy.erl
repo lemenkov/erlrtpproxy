@@ -41,10 +41,7 @@ start([Node|Args]) when is_atom(Node) ->
 
 start_link([Node|Args]) when is_atom(Node) ->
 	io:format ("Node ~p, Args ~p~n", [Node, Args]),
-	rpc:call(Node, gen_server, start_link, [{global, ?MODULE}, ?MODULE, Args, []]);
-
-start_link(Other) ->
-	io:format("Bad syntax [~p]~n", [Other]).
+	rpc:call(Node, gen_server, start_link, [{global, ?MODULE}, ?MODULE, Args, []]).
 
 init([IpAtom, PortAtom]) when is_atom(IpAtom), is_atom(PortAtom) ->
 	process_flag(trap_exit, true),
@@ -57,16 +54,13 @@ init([IpAtom, PortAtom]) when is_atom(IpAtom), is_atom(PortAtom) ->
 		{error, Reason} ->
 			io:format("RTPPROXY not started. Reason [~p]~n", Reason),
 			{stop, Reason}
-	end;
-
-init(Args) ->
-	io:format ("Some other [~p]", [Args]),
-	{stop, "Wrong data"}.
+	end.
 
 handle_call(_Message, _From , State) ->
 	{noreply, State}.
 
-handle_cast({call_terminated, {Pid, _Reason}}, {Fd, CallsList, RtpHostsList}) ->
+handle_cast({call_terminated, {Pid, Reason}}, {Fd, CallsList, RtpHostsList}) ->
+	io:format("RTPPROXY received call [~w] closing due to [~p]~n", [Pid, Reason]),
 	case lists:keysearch(Pid, #callthread.pid, CallsList) of
 		{value, CallThread} ->
 			io:format("RTPPROXY call [~w] closed~n", [Pid]),
@@ -128,10 +122,9 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList, RtpHostsList}) ->
 				false ->
 					case find_node(RtpHostsList) of
 						{{RtpHost, RtpIp}, NewRtpHostsList} ->
-							io:format("Session not exists. Creating new:~n"),
+							io:format("Session not exists. Creating new at ~p.~n", [RtpHost]),
 							case rpc:call(RtpHost, call, start, [{RtpHost,RtpIp}]) of
 								{ok, CallPid} ->
-									io:format(" OK~n"),
 									NewCallThread = #callthread{pid=CallPid, callid=CallId},
 									case gen_server:call(CallPid, {message_u, {FromTag, MediaId}}) of
 										{ok, Reply} ->
@@ -141,7 +134,9 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList, RtpHostsList}) ->
 										{error, udp_error} ->
 											MsgOut = Cookie ++ " 7\n",
 											gen_udp:send(Fd, Ip, Port, [MsgOut]),
-											{noreply, {Fd, CallsList, NewRtpHostsList}}
+											{noreply, {Fd, CallsList, NewRtpHostsList}};
+										{Other} ->
+											io:format("Other msg [~p]~n", [Other])
 									end;
 								{badrpc,nodedown} ->
 									io:format ("RTPPROXY: rtp host [~p] seems stopped!~n", [{RtpHost,RtpIp}]),
@@ -178,7 +173,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList, RtpHostsList}) ->
 							gen_udp:send(Fd, Ip, Port, [MsgOut])
 					end;
 				false ->
-					io:format("Session not exists. Do nothing.~n"),
+					io:format("RTPPROXY Session not exists. Do nothing.~n"),
 					MsgOut = Cookie ++ " 8\n",
 					gen_udp:send(Fd, Ip, Port, [MsgOut])
 			end,
@@ -191,7 +186,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList, RtpHostsList}) ->
 					MsgOut = Cookie ++ " 0\n",
 					gen_udp:send(Fd, Ip, Port, [MsgOut]);
 				false ->
-					io:format("Session not exists. Do nothing.~n"),
+					io:format("RTPPROXY Session not exists. Do nothing.~n"),
 					MsgOut = Cookie ++ " 8\n",
 					gen_udp:send(Fd, Ip, Port, [MsgOut])
 			end,
@@ -204,7 +199,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList, RtpHostsList}) ->
 					MsgOut = Cookie ++ " 0\n",
 					gen_udp:send(Fd, Ip, Port, [MsgOut]);
 				false ->
-					io:format("Session not exists. Do nothing.~n"),
+					io:format("RTPPROXY Session not exists. Do nothing.~n"),
 					MsgOut = Cookie ++ " 8\n",
 					gen_udp:send(Fd, Ip, Port, [MsgOut])
 			end,
@@ -221,17 +216,17 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList, RtpHostsList}) ->
 					MsgOut = Cookie ++ " 0\n",
 					gen_udp:send(Fd, Ip, Port, [MsgOut]);
 				false ->
-					io:format("Session not exists. Do nothing.~n"),
+					io:format("RTPRPXY Session not exists. Do nothing.~n"),
 					MsgOut = Cookie ++ " 8\n",
 					gen_udp:send(Fd, Ip, Port, [MsgOut])
 			end,
 			{noreply, {Fd, CallsList, RtpHostsList}};
 		[Cookie, "I"] ->
-			io:format("Cookie [~s], Cmd [I]~n", [Cookie]),
+			io:format("RTPPROXY Cookie [~s], Cmd [I]~n", [Cookie]),
 			% TODO
 			{noreply, {Fd, CallsList, RtpHostsList}};
 		[Cookie | _Other] ->
-			io:format("Other command [~s]~n", [Msg]),
+			io:format("RTPPROXY Other command [~s]~n", [Msg]),
 			% bad syntax
 			MsgOut = Cookie ++ " 1\n",
 			gen_udp:send(Fd, Ip, Port, [MsgOut]),
@@ -256,6 +251,7 @@ find_node([], _Acc) ->
 	error_no_nodes;
 
 find_node([{Node,Ip}|OtherNodes], Acc) ->
+%	io:format("Nodes: [~p]~n",  [[{Node,Ip}|OtherNodes]]),
 	case net_adm:ping(Node) of
 		pong ->
 			{{Node,Ip},OtherNodes ++ Acc ++ [{Node,Ip}]};

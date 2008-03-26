@@ -31,16 +31,11 @@
 -export([code_change/3]).
 -export([terminate/2]).
 
-start({Parent, From, To}) ->
-	io:format("::: media[~w] startup params: from ~p to ~p~n", [self(), From, To]),
-	gen_server:start(?MODULE, {Parent, From, To}, []);
+start({Node, Parent, From, To}) ->
+	rpc:call(Node, gen_server, start, [?MODULE, {Parent, From, To}, []]).
 
-start(Other) ->
-	io:format("::: media[~w] startup params: [~p]n", [self(), Other]).
-
-start_link({Parent, From, To}) ->
-	io:format("::: media[~w] startup params: from ~p to ~p~n", [self(), From, To]),
-	gen_server:start_link(?MODULE, {Parent, From, To}, []).
+start_link({Node, Parent, From, To}) ->
+	rpc:call(Node, gen_server, start_link, [?MODULE, {Parent, From, To}, []]).
 
 init ({Parent, From, To}) ->
 	process_flag(trap_exit, true),
@@ -69,12 +64,12 @@ terminate(Reason, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo
 	io:format("::: media[~w] thread terminated due to reason [~p]~n", [self(), Reason]).
 
 handle_info({udp, FdFrom, Ip, Port, Msg}, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, RtpState}) ->
-	io:format("::: media[~w] Msg from FdFrom~n", [self()]),
+%	io:format("::: media[~w] Msg from FdFrom~n", [self()]),
 	gen_udp:send(FdTo, IpFrom, PortFrom, Msg),
 	{noreply, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, RtpState}};
 
 handle_info({udp, FdTo, Ip, Port, Msg}, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, RtpState}) ->
-	io:format("::: media[~w] Msg from FdTo~n", [self()]),
+%	io:format("::: media[~w] Msg from FdTo~n", [self()]),
 	gen_udp:send(FdFrom, IpTo, PortTo, Msg),
 	{noreply, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, RtpState}};
 
