@@ -65,7 +65,7 @@ terminate(Reason, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo
 	timer:cancel(TRef),
 	gen_udp:close(FdFrom),
 	gen_udp:close(FdTo),
-	gen_server:cast(Parent, {stop, self()
+	gen_server:cast(Parent, {stop, self()}),
 	io:format("::: media[~w] thread terminated due to reason [~p]~n", [self(), Reason]).
 
 handle_info({udp, FdFrom, Ip, Port, Msg}, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, RtpState}) ->

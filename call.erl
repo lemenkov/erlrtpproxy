@@ -140,11 +140,11 @@ handle_cast({stop, Pid}, {MainIp, Parties}) ->
 	io:format("::: call[~w] TIMEOUT~n", [self()]),
 	case lists:keytake (Pid, #party.pid, Parties) of 
 		{value, Party, []} ->
-			{stop, stop, State};
+			{stop, stop, {MainIp, []}};
 		{value, Party, NewParties} ->
-			{noreply, {MainIp, NewParties};
+			{noreply, {MainIp, NewParties}};
 		false ->
-			{noreply, {MainIp, Parties}
+			{noreply, {MainIp, Parties}}
 	end;
 
 % all other messages
