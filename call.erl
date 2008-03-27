@@ -191,7 +191,8 @@ handle_info({udp, Fd, Ip, Port, Msg}, {MainIp, Parties}) ->
 			% We don't need to check FdFrom for existence since it's no doubt exists
 %			io:format("::: cast[~w] rtp from UserA and we can send~n", [self()]),
 			{ok, PartyPid} = media:start({node(), self(), {Party#party.fdfrom, Ip, Port}, {Party#party.fdto, Party#party.ipto, Party#party.portto}}),
-			% FIXME send Msg
+			% FIXME send this Msg
+%			gen_udp:send(Party#party.fdfrom, Party#party.ipfrom, Party#party.portfrom, Msg),
 			gen_udp:controlling_process(Party#party.fdfrom, PartyPid),
 			gen_udp:controlling_process(Party#party.fdto, PartyPid),
 			NewParty = Party#party{ipfrom=Ip, portfrom=Port, pid=PartyPid},
@@ -203,7 +204,8 @@ handle_info({udp, Fd, Ip, Port, Msg}, {MainIp, Parties}) ->
 		{value, Party} when Party#party.fdfrom == Fd, Party#party.ipfrom /= null, Party#party.portfrom /= null, Party#party.fdto /= null, Party#party.pid == null ->
 %			io:format("::: cast[~w] rtp from UserB and we can send~n", [self()]),
 			{ok, PartyPid} = media:start({node(), self(), {Party#party.fdfrom, Party#party.ipfrom, Party#party.portfrom}, {Party#party.fdto, Ip, Port}}),
-			% FIXME send Msg
+			% FIXME send this Msg
+%			gen_udp:send(Party#party.fdto, Ip, Port, Msg),
 			gen_udp:controlling_process(Party#party.fdfrom, PartyPid),
 			gen_udp:controlling_process(Party#party.fdto, PartyPid),
 			NewParty = Party#party{ipto=Ip, portto=Port, pid=PartyPid},

@@ -38,6 +38,7 @@ start_link({Node, Parent, From, To}) ->
 	rpc:call(Node, gen_server, start_link, [?MODULE, {Parent, From, To}, []]).
 
 init ({Parent, From, To}) ->
+	io:format ("::: media[~p] started~n", [self()]),
 	process_flag(trap_exit, true),
 	{ok, TRef} = timer:send_interval(10000, self(), ping),
 	{ok, {Parent, TRef, From, To, rtp}}.
@@ -66,12 +67,12 @@ terminate(Reason, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo
 handle_info({udp, FdFrom, Ip, Port, Msg}, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, RtpState}) ->
 %	io:format("::: media[~w] Msg from FdFrom~n", [self()]),
 	gen_udp:send(FdTo, IpFrom, PortFrom, Msg),
-	{noreply, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, RtpState}};
+	{noreply, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, rtp}};
 
 handle_info({udp, FdTo, Ip, Port, Msg}, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, RtpState}) ->
 %	io:format("::: media[~w] Msg from FdTo~n", [self()]),
 	gen_udp:send(FdFrom, IpTo, PortTo, Msg),
-	{noreply, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, RtpState}};
+	{noreply, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, rtp}};
 
 handle_info(ping, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, rtp}) ->
 	{noreply, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, nortp}};
