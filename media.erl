@@ -37,11 +37,11 @@ start({Node, Parent, From, To}) ->
 start_link({Node, Parent, From, To}) ->
 	rpc:call(Node, gen_server, start_link, [?MODULE, {Parent, From, To}, []]).
 
-init ({Parent, From, To}) ->
-	io:format ("::: media[~p] started~n", [self()]),
+init ({Parent, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}}) ->
+	io:format ("::: media[~p] started {~w [~w:~w]} {~w [~w:~w]}~n", [self(), FdFrom, IpFrom, PortFrom, FdTo, IpTo, PortTo]),
 	process_flag(trap_exit, true),
 	{ok, TRef} = timer:send_interval(10000, self(), ping),
-	{ok, {Parent, TRef, From, To, rtp}}.
+	{ok, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, rtp}}.
 
 % all other calls
 handle_call(_Other, _From, State) ->
@@ -64,12 +64,12 @@ terminate(Reason, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo
 	gen_server:cast(Parent, {stop, self()}),
 	io:format("::: media[~w] thread terminated due to reason [~p]~n", [self(), Reason]).
 
-handle_info({udp, FdFrom, Ip, Port, Msg}, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, RtpState}) ->
+handle_info({udp, FdFrom, IpTo, PortTo, Msg}, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, RtpState}) ->
 %	io:format("::: media[~w] Msg from FdFrom~n", [self()]),
 	gen_udp:send(FdTo, IpFrom, PortFrom, Msg),
 	{noreply, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, rtp}};
 
-handle_info({udp, FdTo, Ip, Port, Msg}, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, RtpState}) ->
+handle_info({udp, FdTo, IpFrom, PortFrom, Msg}, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, RtpState}) ->
 %	io:format("::: media[~w] Msg from FdTo~n", [self()]),
 	gen_udp:send(FdFrom, IpTo, PortTo, Msg),
 	{noreply, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, rtp}};

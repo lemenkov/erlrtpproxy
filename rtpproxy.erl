@@ -110,7 +110,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList, RtpHostsList}) ->
 			case lists:keysearch(CallId, #callthread.callid, CallsList) of
 				{value, CallInfo} ->
 					io:format("Session exists. Updating existing.~n"),
-					case gen_server:call(CallInfo#callthread.pid, {message_u, {FromTag, MediaId}}) of
+					case gen_server:call(CallInfo#callthread.pid, {message_u, {OrigIp, OrigPort, FromTag, MediaId}}) of
 						{ok, Reply} ->
 							MsgOut = Cookie ++ Reply,
 							gen_udp:send(Fd, Ip, Port, [MsgOut]);
@@ -126,7 +126,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList, RtpHostsList}) ->
 							case rpc:call(RtpHost, call, start, [{RtpHost,RtpIp}]) of
 								{ok, CallPid} ->
 									NewCallThread = #callthread{pid=CallPid, callid=CallId},
-									case gen_server:call(CallPid, {message_u, {FromTag, MediaId}}) of
+									case gen_server:call(CallPid, {message_u, {OrigIp, OrigPort, FromTag, MediaId}}) of
 										{ok, Reply} ->
 											MsgOut = Cookie ++ Reply,
 											gen_udp:send(Fd, Ip, Port, [MsgOut]),

@@ -31,6 +31,7 @@
 -export([terminate/2]).
 
 -record(party, {fdfrom=null, ipfrom=null, portfrom=null, tagfrom=null,
+		ipfromguess=null, portfromguess=null,
 		fdto=null,   ipto=null,   portto=null,   tagto=null,
 		mediaid=null, pid=null}).
 
@@ -53,7 +54,7 @@ init ([MainIpAtom]) ->
 	{ok, {MainIp, []}}.
 
 % handle originate call leg (new media id possibly)
-handle_call({message_u, {FromTag, MediaId}}, _From, {MainIp, Parties}) ->
+handle_call({message_u, {OrigIp, OrigPort, FromTag, MediaId}}, _From, {MainIp, Parties}) ->
 	io:format ("::: call[~w] message [U] MediaId [~s].~n", [self(), MediaId]),
 	% search for already  existed
 	case lists:keysearch(MediaId, #party.mediaid, Parties) of
@@ -65,13 +66,27 @@ handle_call({message_u, {FromTag, MediaId}}, _From, {MainIp, Parties}) ->
 			io:format("::: call[~w] answer [~s]~n", [self(), Reply]),
 			{reply, {ok, Reply}, {MainIp, Parties}};
 		false ->
-			% open new Fd and attach it
+			% open new FdFrom and attach it
 			case gen_udp:open(0, [binary, {ip, MainIp}, {active, true}]) of
-				{ok, Fd} ->
+				{ok, Fd1} ->
 					io:format("::: call[~w] Create new socket... OK~n", [self()]),
 
-					{ok, {LocalIp, LocalPort}} = inet:sockname(Fd),
-					NewParty = #party{fdfrom=Fd, tagfrom=FromTag, mediaid=MediaId},
+					% ty to create FdTo also
+					Fd2 = case gen_udp:open(0, [binary, {ip, MainIp}, {active, true}]) of
+						{ok, Fd} ->
+							% Create another socket also
+							Fd;
+						_ ->
+							% Create another socket failed
+							null
+					end,
+					{ok, {LocalIp, LocalPort}} = inet:sockname(Fd1),
+
+					{ok, GuessIp} = inet_parse:address(OrigIp),
+					{ok, [GuessPort], _} = io_lib:fread("~u", OrigPort),
+%					io:format("::: call[~w] Guessing caller listens at ~w:~w~n", [self(), GuessIp, GuessPort]),
+
+					NewParty = #party{fdfrom=Fd1, ipfromguess=GuessIp, portfromguess=GuessPort, tagfrom=FromTag, fdto=Fd2, mediaid=MediaId},
 
 					Reply = " " ++ integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 					io:format("::: call[~w] answer [~s]~n", [self(), Reply]),
@@ -90,7 +105,7 @@ handle_call({message_l, {FromTag, MediaId, ToTag, MediaId}}, _From, {MainIp, Par
 	case lists:keysearch(MediaId, #party.mediaid, Parties) of
 		% call already exists and Fd is not opened
 		{value, Party} when Party#party.fdto == null ->
-			io:format("::: call[~w] Already exists!~n", [self()]),
+			io:format("::: call[~w] Already exists (FdTo == NULL)!~n", [self()]),
 			case gen_udp:open(0, [binary, {ip, MainIp}, {active, true}]) of
 				{ok, Fd} ->
 					{ok, {LocalIp, LocalPort}} = inet:sockname(Fd),
@@ -105,7 +120,7 @@ handle_call({message_l, {FromTag, MediaId, ToTag, MediaId}}, _From, {MainIp, Par
 			end;
 		% call already exists and Fd is opened
 		{value, Party} when Party#party.fdto /= null ->
-			io:format("::: call[~w] Already exists!~n", [self()]),
+			io:format("::: call[~w] Already exists (FdTo != NULL)!~n", [self()]),
 
 			{ok, {LocalIp, LocalPort}} = inet:sockname(Party#party.fdto),
 
@@ -172,7 +187,7 @@ terminate(Reason, {_MainIp, Parties}) ->
 
 % rtp from some port
 handle_info({udp, Fd, Ip, Port, Msg}, {MainIp, Parties}) ->
-%	io:format("::: call[~w] udp from Fd [~w]~n", [self(), Fd]),
+%	io:format("::: call[~w] udp from Fd [~w] [~p:~p]~n", [self(), Fd, Ip, Port]),
 	Fun1 = fun (X,Y1,Y2,Z) ->
 		case lists:keysearch(X,Y1,Z) of
 			{value, Val1} ->
@@ -189,29 +204,35 @@ handle_info({udp, Fd, Ip, Port, Msg}, {MainIp, Parties}) ->
 	case Fun1(Fd, #party.fdfrom, #party.fdto, Parties) of
 		{value, Party} when Party#party.fdto == Fd, Party#party.ipto /= null, Party#party.portto /= null, Party#party.pid == null ->
 			% We don't need to check FdFrom for existence since it's no doubt exists
-%			io:format("::: cast[~w] rtp from UserA and we can send~n", [self()]),
+%			io:format("::: cast[~w] rtp to FdTo [~w] from [~w:~w] and we can send~n", [self(), Fd, Ip, Port]),
 			{ok, PartyPid} = media:start({node(), self(), {Party#party.fdfrom, Ip, Port}, {Party#party.fdto, Party#party.ipto, Party#party.portto}}),
 			% FIXME send this Msg
-%			gen_udp:send(Party#party.fdfrom, Party#party.ipfrom, Party#party.portfrom, Msg),
 			gen_udp:controlling_process(Party#party.fdfrom, PartyPid),
 			gen_udp:controlling_process(Party#party.fdto, PartyPid),
 			NewParty = Party#party{ipfrom=Ip, portfrom=Port, pid=PartyPid},
 			{noreply, {MainIp, lists:keyreplace(Fd, #party.fdto, Parties, NewParty)}};
 		{value, Party} when Party#party.fdto == Fd ->
-%			io:format("::: cast[~w] rtp from FdFrom and we CANNOT send yet~n", [self()]),
+%			io:format("::: cast[~w] rtp to FdTo [~w] from [~w:~w] and we CANNOT send yet~n", [self(), Fd, Ip, Port]),
 			NewParty = Party#party{ipfrom=Ip, portfrom=Port},
 			{noreply, {MainIp, lists:keyreplace(Fd, #party.fdto, Parties, NewParty)}};
 		{value, Party} when Party#party.fdfrom == Fd, Party#party.ipfrom /= null, Party#party.portfrom /= null, Party#party.fdto /= null, Party#party.pid == null ->
-%			io:format("::: cast[~w] rtp from UserB and we can send~n", [self()]),
+%			io:format("::: cast[~w] rtp to FdFrom [~w] from [~w:~w] and we can send~n", [self(), Fd, Ip, Port]),
 			{ok, PartyPid} = media:start({node(), self(), {Party#party.fdfrom, Party#party.ipfrom, Party#party.portfrom}, {Party#party.fdto, Ip, Port}}),
 			% FIXME send this Msg
-%			gen_udp:send(Party#party.fdto, Ip, Port, Msg),
+			gen_udp:send(Party#party.fdto, Party#party.ipfrom, Party#party.portfrom, Msg),
 			gen_udp:controlling_process(Party#party.fdfrom, PartyPid),
 			gen_udp:controlling_process(Party#party.fdto, PartyPid),
 			NewParty = Party#party{ipto=Ip, portto=Port, pid=PartyPid},
 			{noreply, {MainIp, lists:keyreplace(Fd, #party.fdfrom, Parties, NewParty)}};
 		{value, Party} when Party#party.fdfrom == Fd ->
-%			io:format("::: cast[~w] rtp to FdTo and we CANNOT send yet~n", [self()]),
+%			io:format("::: cast[~w] rtp to FdFrom [~w] from [~w:~w] and we CANNOT send yet~n", [self(), Fd, Ip, Port]),
+			% guessing that caller has uPnP
+			case Party#party.fdto of
+				null ->
+					ok;
+				_ ->
+					gen_udp:send(Party#party.fdto, Party#party.ipfromguess, Party#party.portfromguess, Msg)
+			end,
 			NewParty = Party#party{ipto=Ip, portto=Port},
 			{noreply, {MainIp, lists:keyreplace(Fd, #party.fdfrom, Parties, NewParty)}};
 		false ->
