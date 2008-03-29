@@ -33,7 +33,7 @@
 -record(party, {fdfrom=null, ipfrom=null, portfrom=null, tagfrom=null,
 		ipfromguess=null, portfromguess=null,
 		fdto=null,   ipto=null,   portto=null,   tagto=null,
-		mediaid=null, pid=null}).
+		mediaid=null, pid=null, answered=false}).
 
 start({Node, MainIpAtom}) when is_atom(Node), is_atom(MainIpAtom) ->
 	rpc:call(Node, gen_server, start, [?MODULE, [MainIpAtom], []]);
@@ -109,7 +109,7 @@ handle_call({message_l, {FromTag, MediaId, ToTag, MediaId}}, _From, {MainIp, Par
 			case gen_udp:open(0, [binary, {ip, MainIp}, {active, true}]) of
 				{ok, Fd} ->
 					{ok, {LocalIp, LocalPort}} = inet:sockname(Fd),
-					NewParty = Party#party{fdto=Fd, tagto=ToTag},
+					NewParty = Party#party{fdto=Fd, tagto=ToTag, answered=true},
 
 					Reply = " " ++ integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 %					io:format("::: call[~w] answer [~s]~n", [self(), Reply]),
@@ -123,10 +123,11 @@ handle_call({message_l, {FromTag, MediaId, ToTag, MediaId}}, _From, {MainIp, Par
 			io:format("::: call[~w] Already exists (FdTo != NULL)!~n", [self()]),
 
 			{ok, {LocalIp, LocalPort}} = inet:sockname(Party#party.fdto),
+			NewParty = Party#party{answered=true},
 
 			Reply = " " ++ integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 %			io:format("::: call[~w] answer [~s]~n", [self(), Reply]),
-			{reply, {ok, Reply}, {MainIp, Parties}};
+			{reply, {ok, Reply}, {MainIp, lists:keyreplace(MediaId, #party.mediaid, Parties, NewParty)}};
 		false ->
 			% Call not found.
 			io:format("::: call[~w] ERROR not found~n", [self()]),
@@ -202,7 +203,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {MainIp, Parties}) ->
 		end
 	end,
 	case Fun1(Fd, #party.fdfrom, #party.fdto, Parties) of
-		{value, Party} when Party#party.fdto == Fd, Party#party.ipto /= null, Party#party.portto /= null, Party#party.pid == null ->
+		{value, Party} when Party#party.fdto == Fd, Party#party.ipto /= null, Party#party.portto /= null, Party#party.pid == null, Party#party.answered == true ->
 			% We don't need to check FdFrom for existence since it's no doubt exists
 %			io:format("::: cast[~w] rtp to FdTo [~w] from [~w:~w] and we can send~n", [self(), Fd, Ip, Port]),
 			{ok, PartyPid} = media:start({node(), self(), {Party#party.fdfrom, Ip, Port}, {Party#party.fdto, Party#party.ipto, Party#party.portto}}),
@@ -215,11 +216,10 @@ handle_info({udp, Fd, Ip, Port, Msg}, {MainIp, Parties}) ->
 %			io:format("::: cast[~w] rtp to FdTo [~w] from [~w:~w] and we CANNOT send yet~n", [self(), Fd, Ip, Port]),
 			NewParty = Party#party{ipfrom=Ip, portfrom=Port},
 			{noreply, {MainIp, lists:keyreplace(Fd, #party.fdto, Parties, NewParty)}};
-		{value, Party} when Party#party.fdfrom == Fd, Party#party.ipfrom /= null, Party#party.portfrom /= null, Party#party.fdto /= null, Party#party.pid == null ->
+		{value, Party} when Party#party.fdfrom == Fd, Party#party.ipfrom /= null, Party#party.portfrom /= null, Party#party.fdto /= null, Party#party.pid == null, Party#party.answered == true ->
 %			io:format("::: cast[~w] rtp to FdFrom [~w] from [~w:~w] and we can send~n", [self(), Fd, Ip, Port]),
 			{ok, PartyPid} = media:start({node(), self(), {Party#party.fdfrom, Party#party.ipfrom, Party#party.portfrom}, {Party#party.fdto, Ip, Port}}),
 			% FIXME send this Msg
-			gen_udp:send(Party#party.fdto, Party#party.ipfrom, Party#party.portfrom, Msg),
 			gen_udp:controlling_process(Party#party.fdfrom, PartyPid),
 			gen_udp:controlling_process(Party#party.fdto, PartyPid),
 			NewParty = Party#party{ipto=Ip, portto=Port, pid=PartyPid},

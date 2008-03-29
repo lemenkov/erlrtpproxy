@@ -64,15 +64,15 @@ terminate(Reason, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo
 	gen_server:cast(Parent, {stop, self()}),
 	io:format("::: media[~w] thread terminated due to reason [~p]~n", [self(), Reason]).
 
-handle_info({udp, FdFrom, IpTo, PortTo, Msg}, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, RtpState}) ->
+handle_info({udp, FdFrom, Ip, Port, Msg}, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, RtpState}) ->
 %	io:format("::: media[~w] Msg from FdFrom~n", [self()]),
 	gen_udp:send(FdTo, IpFrom, PortFrom, Msg),
-	{noreply, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, rtp}};
+	{noreply, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, Ip, Port}, rtp}};
 
-handle_info({udp, FdTo, IpFrom, PortFrom, Msg}, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, RtpState}) ->
+handle_info({udp, FdTo, Ip, Port, Msg}, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, RtpState}) ->
 %	io:format("::: media[~w] Msg from FdTo~n", [self()]),
 	gen_udp:send(FdFrom, IpTo, PortTo, Msg),
-	{noreply, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, rtp}};
+	{noreply, {Parent, TRef, {FdFrom, Ip, Port}, {FdTo, IpTo, PortTo}, rtp}};
 
 handle_info(ping, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, rtp}) ->
 	{noreply, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, nortp}};
