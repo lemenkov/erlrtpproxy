@@ -253,11 +253,17 @@ find_node([], _Acc) ->
 	error_no_nodes;
 
 find_node([{Node,Ip}|OtherNodes], Acc) ->
-%	io:format("Nodes: [~p]~n",  [[{Node,Ip}|OtherNodes]]),
-	case net_adm:ping(Node) of
+	Parent = self(),
+	spawn (fun() ->
+			Ret = net_adm:ping(Node),
+			Parent ! Ret
+		end),
+	receive
 		pong ->
 			{{Node,Ip},OtherNodes ++ Acc ++ [{Node,Ip}]};
 		pang ->
+			find_node(OtherNodes, Acc ++ [{Node,Ip}])
+	after ?PING_TIMEOUT ->
 			find_node(OtherNodes, Acc ++ [{Node,Ip}])
 	end.
 
