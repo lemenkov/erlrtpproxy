@@ -35,19 +35,13 @@
 		fdto=null,   ipto=null,   portto=null,   tagto=null,
 		mediaid=null, pid=null, answered=false}).
 
-start({Node, MainIpAtom}) when is_atom(Node), is_atom(MainIpAtom) ->
-	rpc:call(Node, gen_server, start, [?MODULE, [MainIpAtom], []]);
+start(MainIpAtom) when is_atom(MainIpAtom) ->
+	gen_server:start(?MODULE, MainIpAtom, []).
 
-start(Other) ->
-	io:format("::: call[~w] wrong startup params: ~p~n", [self(), Other]).
+start_link(MainIpAtom) when is_atom(MainIpAtom) ->
+	gen_server:start_link(?MODULE, MainIpAtom, []).
 
-start_link({Node, MainIpAtom}) when is_atom(Node), is_atom(MainIpAtom) ->
-	rpc:call(Node, gen_server, start_link, [?MODULE, [MainIpAtom], []]);
-
-start_link(Other) ->
-	io:format("::: call[~w] wrong startup params: ~p~n", [self(), Other]).
-
-init ([MainIpAtom]) ->
+init (MainIpAtom) ->
 	process_flag(trap_exit, true),
 	{ok, MainIp} = inet_parse:address(atom_to_list(MainIpAtom)),
 	io:format ("::: call[~w] thread started at ~s~n", [self(), inet_parse:ntoa(MainIp)]),
@@ -206,7 +200,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {MainIp, Parties}) ->
 		{value, Party} when Party#party.fdto == Fd, Party#party.ipto /= null, Party#party.portto /= null, Party#party.pid == null, Party#party.answered == true ->
 			% We don't need to check FdFrom for existence since it's no doubt exists
 %			io:format("::: cast[~w] rtp to FdTo [~w] from [~w:~w] and we can send~n", [self(), Fd, Ip, Port]),
-			{ok, PartyPid} = media:start({node(), self(), {Party#party.fdfrom, Ip, Port}, {Party#party.fdto, Party#party.ipto, Party#party.portto}}),
+			{ok, PartyPid} = media:start({self(), {Party#party.fdfrom, Ip, Port}, {Party#party.fdto, Party#party.ipto, Party#party.portto}}),
 			% FIXME send this Msg
 			gen_udp:controlling_process(Party#party.fdfrom, PartyPid),
 			gen_udp:controlling_process(Party#party.fdto, PartyPid),
@@ -218,7 +212,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {MainIp, Parties}) ->
 			{noreply, {MainIp, lists:keyreplace(Fd, #party.fdto, Parties, NewParty)}};
 		{value, Party} when Party#party.fdfrom == Fd, Party#party.ipfrom /= null, Party#party.portfrom /= null, Party#party.fdto /= null, Party#party.pid == null, Party#party.answered == true ->
 %			io:format("::: cast[~w] rtp to FdFrom [~w] from [~w:~w] and we can send~n", [self(), Fd, Ip, Port]),
-			{ok, PartyPid} = media:start({node(), self(), {Party#party.fdfrom, Party#party.ipfrom, Party#party.portfrom}, {Party#party.fdto, Ip, Port}}),
+			{ok, PartyPid} = media:start({self(), {Party#party.fdfrom, Party#party.ipfrom, Party#party.portfrom}, {Party#party.fdto, Ip, Port}}),
 			% FIXME send this Msg
 			gen_udp:controlling_process(Party#party.fdfrom, PartyPid),
 			gen_udp:controlling_process(Party#party.fdto, PartyPid),

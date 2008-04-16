@@ -36,12 +36,11 @@
 % description of call thread
 -record(callthread, {pid=null, callid=null}).
 
-start([Node|Args]) when is_atom(Node) ->
-	rpc:call(Node, gen_server, start, [{global, ?MODULE}, ?MODULE, Args, []]).
+start(Args) ->
+	gen_server:start({global, ?MODULE}, ?MODULE, Args, []).
 
-start_link([Node|Args]) when is_atom(Node) ->
-	io:format ("Node ~p, Args ~p~n", [Node, Args]),
-	rpc:call(Node, gen_server, start_link, [{global, ?MODULE}, ?MODULE, Args, []]).
+start_link(Args) ->
+	gen_server:start_link({global, ?MODULE}, ?MODULE, Args, []).
 
 init([IpAtom, PortAtom]) when is_atom(IpAtom), is_atom(PortAtom) ->
 	process_flag(trap_exit, true),
@@ -123,7 +122,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList, RtpHostsList}) ->
 					case find_node(RtpHostsList) of
 						{{RtpHost, RtpIp}, NewRtpHostsList} ->
 							io:format("Session not exists. Creating new at ~p.~n", [RtpHost]),
-							case rpc:call(RtpHost, call, start, [{RtpHost,RtpIp}]) of
+							try rpc:call(RtpHost, call, start, [RtpIp]) of
 								{ok, CallPid} ->
 									NewCallThread = #callthread{pid=CallPid, callid=CallId},
 									case gen_server:call(CallPid, {message_u, {OrigIp, OrigPort, FromTag, MediaId}}) of
@@ -149,6 +148,9 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList, RtpHostsList}) ->
 									MsgOut = Cookie ++ " 7\n",
 									gen_udp:send(Fd, Ip, Port, [MsgOut]),
 									{noreply, {Fd, CallsList, NewRtpHostsList}}
+							catch
+								Exception ->
+									io:format("Exception reached [~p]~n", [Exception])
 							end;
 						error_no_node ->
 							io:format ("RTPPROXY: error no suitable nodes!~n"),

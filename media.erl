@@ -31,11 +31,11 @@
 -export([code_change/3]).
 -export([terminate/2]).
 
-start({Node, Parent, From, To}) ->
-	rpc:call(Node, gen_server, start, [?MODULE, {Parent, From, To}, []]).
+start({Parent, From, To}) ->
+	gen_server:start(?MODULE, {Parent, From, To}, []).
 
-start_link({Node, Parent, From, To}) ->
-	rpc:call(Node, gen_server, start_link, [?MODULE, {Parent, From, To}, []]).
+start_link({Parent, From, To}) ->
+	gen_server:start_link(?MODULE, {Parent, From, To}, []).
 
 init ({Parent, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}}) ->
 	io:format ("::: media[~p] started {~w [~w:~w]} {~w [~w:~w]}~n", [self(), FdFrom, IpFrom, PortFrom, FdTo, IpTo, PortTo]),
