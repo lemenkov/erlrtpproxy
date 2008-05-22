@@ -38,7 +38,7 @@ start_link({Parent, From, To}) ->
 	gen_server:start_link(?MODULE, {Parent, From, To}, []).
 
 init ({Parent, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}}) ->
-	io:format ("::: media[~p] started {~w [~w:~w]} {~w [~w:~w]}~n", [self(), FdFrom, IpFrom, PortFrom, FdTo, IpTo, PortTo]),
+	print ("::: media[~p] started {~w [~w:~w]} {~w [~w:~w]}~n", [self(), FdFrom, IpFrom, PortFrom, FdTo, IpTo, PortTo]),
 	process_flag(trap_exit, true),
 	{ok, TRef} = timer:send_interval(10000, self(), ping),
 	{ok, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, rtp}}.
@@ -62,15 +62,15 @@ terminate(Reason, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo
 	gen_udp:close(FdFrom),
 	gen_udp:close(FdTo),
 	gen_server:cast(Parent, {stop, self()}),
-	io:format("::: media[~w] thread terminated due to reason [~p]~n", [self(), Reason]).
+	print("::: media[~w] thread terminated due to reason [~p]~n", [self(), Reason]).
 
 handle_info({udp, FdFrom, Ip, Port, Msg}, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, RtpState}) ->
-%	io:format("::: media[~w] Msg from FdFrom~n", [self()]),
+%	print("::: media[~w] Msg from FdFrom~n", [self()]),
 	gen_udp:send(FdTo, IpFrom, PortFrom, Msg),
 	{noreply, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, Ip, Port}, rtp}};
 
 handle_info({udp, FdTo, Ip, Port, Msg}, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, RtpState}) ->
-%	io:format("::: media[~w] Msg from FdTo~n", [self()]),
+%	print("::: media[~w] Msg from FdTo~n", [self()]),
 	gen_udp:send(FdFrom, IpTo, PortTo, Msg),
 	{noreply, {Parent, TRef, {FdFrom, Ip, Port}, {FdTo, IpTo, PortTo}, rtp}};
 
@@ -78,9 +78,15 @@ handle_info(ping, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo
 	{noreply, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, nortp}};
 
 handle_info(ping, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, nortp}) ->
-	io:format("::: media[~w] ping~n", [self()]),
+	print("::: media[~w] ping~n", [self()]),
 	{stop, timeout, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, timeout}};
 
 handle_info(Other, State) ->
-	io:format("::: media[~w] Other Info [~p]~n", [self(), Other]),
+	print("::: media[~w] Other Info [~p]~n", [self(), Other]),
 	{noreply, State}.
+
+print (Format) ->
+	print (Format, []).
+
+print (Format, Params) ->
+	syslog:send(call, syslog:info(), io_lib:format(Format, Params)).
