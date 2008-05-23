@@ -7,8 +7,8 @@
 %%% Created : 2 Dec 1998 by Torbjorn Tornkvist <tobbe@serc.rmit.edu.au>
 %%% Function: See also the man page for syslog.conf
 %%%
-%%%           syslog:start() 
-%%%           syslog:stop()  
+%%%           syslog:start()
+%%%           syslog:stop()
 %%%           syslog:send(Program, Level, Msg)
 %%%           syslog:send(Facility, Program, Level, Msg)
 %%%
@@ -31,7 +31,7 @@
 version() ->
     [_,Rev|_] = string:tokens("$Revision: 1.6 $ "," "),Rev.
 
-start() -> 
+start() ->
     case whereis(?SERVER_NAME) of
 	Pid when pid(Pid) -> ok;
 	_ ->
@@ -51,31 +51,30 @@ send(Facility,Who,Level,Msg) when integer(Facility),atom(Who),integer(Level),lis
 
 %% Convenient routines for specifying levels.
 
-emergency() -> 0. % system is unusable 
-alert()     -> 1. % action must be taken immediately 
-critical()  -> 2. % critical conditions 
-error()     -> 3. % error conditions 
-warning()   -> 4. % warning conditions 
-notice()    -> 5. % normal but significant condition 
+emergency() -> 0. % system is unusable
+alert()     -> 1. % action must be taken immediately
+critical()  -> 2. % critical conditions
+error()     -> 3. % error conditions
+warning()   -> 4. % warning conditions
+notice()    -> 5. % normal but significant condition
 info()      -> 6. % informational
-debug()     -> 7. % debug-level messages 
+debug()     -> 7. % debug-level messages
 
 %% Convenient routines for specifying facility codes
 
-kern()     -> (0 bsl 3) . % kernel messages 
-user()     -> (1 bsl 3) . % random user-level messages 
-mail()     -> (2 bsl 3) . % mail system 
-daemon()   -> (3 bsl 3) . % system daemons 
-auth()     -> (4 bsl 3) . % security/authorization messages 
-syslog()   -> (5 bsl 3) . % messages generated internally by syslogd 
-lpr()      -> (6 bsl 3) . % line printer subsystem 
-news()     -> (7 bsl 3) . % network news subsystem 
-uucp()     -> (8 bsl 3) . % UUCP subsystem 
-cron()     -> (9 bsl 3) . % clock daemon 
-authpriv() -> (10 bsl 3). % security/authorization messages (private) 
-ftp()      -> (11 bsl 3). % ftp daemon 
+kern()     -> (0 bsl 3) . % kernel messages
+user()     -> (1 bsl 3) . % random user-level messages
+mail()     -> (2 bsl 3) . % mail system
+daemon()   -> (3 bsl 3) . % system daemons
+auth()     -> (4 bsl 3) . % security/authorization messages
+syslog()   -> (5 bsl 3) . % messages generated internally by syslogd
+lpr()      -> (6 bsl 3) . % line printer subsystem
+news()     -> (7 bsl 3) . % network news subsystem
+uucp()     -> (8 bsl 3) . % UUCP subsystem
+cron()     -> (9 bsl 3) . % clock daemon
+authpriv() -> (10 bsl 3). % security/authorization messages (private)
+ftp()      -> (11 bsl 3). % ftp daemon
 
-	  
 %% ----------
 %% The server
 %% ----------
@@ -96,13 +95,12 @@ loop(S,Host,Port) ->
 	    loop(S,Host,Port)
     end.
 
-%% priorities/facilities are encoded into a single 32-bit 
-%% quantity, where the bottom 3 bits are the priority (0-7) 
-%% and the top 28 bits are the facility (0-big number).    
+%% priorities/facilities are encoded into a single 32-bit
+%% quantity, where the bottom 3 bits are the priority (0-7)
+%% and the top 28 bits are the facility (0-big number).
 
 do_send(S,Host,Port,{Who,Level,Msg}) ->
     Packet = "<" ++ i2l(Level) ++ "> " ++ a2l(Who) ++ ": " ++ Msg ++ "\n",
-	io:format("Sending message [~s] from [~p]: [~s]~n", [Msg, Who,Packet]),
     gen_udp:send(S,Host,Port,Packet);
 do_send(S,Host,Port,{Facil,Who,Level,Msg}) ->
     Packet = "<" ++ i2l(Facil bor Level) ++ "> " ++ a2l(Who) ++ ": " ++ Msg ++ "\n",
