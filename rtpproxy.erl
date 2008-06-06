@@ -91,38 +91,26 @@ handle_info({'EXIT', Pid, _Reason}, {Fd, CallsList, RtpHostsList}) ->
 	end;
 
 % Fd from which message arrived must be equal to Fd from our state
+% Brief introbuction of protocol is here: http://rtpproxy.org/wiki/RTPproxyProtocol
 handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList, RtpHostsList}) ->
-	Fun = fun (Format, Params, F) ->
-		print(Format, Params),
-		gen_udp:send(Fd, Ip, Port, [F()]),
-		{noreply, {Fd, CallsList, RtpHostsList}}
-	end,
-
-	case string:tokens(Msg, " ;") of
+	[Answer|Addon] = case string:tokens(Msg, " ;") of
 		[Cookie, "V"] ->
-			Fun (	"Cookie [~s], Cmd [V]~n",
-				[Cookie],
-				fun () -> Cookie ++ " 20040107\n" end
-			);
+			print ("Cookie [~s], Cmd [V]~n", [Cookie]),
+			[Cookie ++ " 20040107\n"];
 		[Cookie, "VF", Params] ->
-			Fun (	"Cookie [~s], Cmd [VF] Params [~s]~n",
-				[Cookie, Params],
-				fun () -> Cookie ++ " 1\n" end
-			);
+			print ("Cookie [~s], Cmd [VF] Params [~s]~n", [Cookie, Params]),
+			[Cookie ++ " 1\n"];
 		[Cookie, [$U|Args], CallId, OrigIp, OrigPort, FromTag, MediaId] ->
 			print("Cmd [U] CallId [~s], OrigAddr [~s:~s], FromTag [~s;~s]~n", [CallId, OrigIp, OrigPort, FromTag, MediaId]),
 			case lists:keysearch(CallId, #callthread.callid, CallsList) of
 				{value, CallInfo} ->
-					Fun (	"Session exists. Updating existing.~n",
-						[],
-						fun () -> case gen_server:call(CallInfo#callthread.pid, {message_u, {OrigIp, OrigPort, FromTag, MediaId}}) of
-								{ok, Reply} ->
-									Cookie ++ Reply;
-								{error, udp_error} ->
-									Cookie ++ " 7\n"
-							end
-						end
-					);
+					print ("Session exists. Updating existing.~n", []),
+					case gen_server:call(CallInfo#callthread.pid, {message_u, {OrigIp, OrigPort, FromTag, MediaId}}) of
+						{ok, Reply} ->
+							[Cookie ++ Reply];
+						{error, udp_error} ->
+							[Cookie ++ " 7\n"]
+					end;
 				false ->
 					case find_node(RtpHostsList) of
 						{{RtpHost, RtpIp}, NewRtpHostsList} ->
@@ -132,112 +120,96 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList, RtpHostsList}) ->
 									NewCallThread = #callthread{pid=CallPid, callid=CallId},
 									case gen_server:call(CallPid, {message_u, {OrigIp, OrigPort, FromTag, MediaId}}) of
 										{ok, Reply} ->
-											MsgOut = Cookie ++ Reply,
-											gen_udp:send(Fd, Ip, Port, [MsgOut]),
-											{noreply, {Fd, lists:append (CallsList, [NewCallThread]), NewRtpHostsList}};
+											[Cookie ++ Reply, lists:append (CallsList, [NewCallThread]), NewRtpHostsList];
 										{error, udp_error} ->
-											MsgOut = Cookie ++ " 7\n",
-											gen_udp:send(Fd, Ip, Port, [MsgOut]),
-											{noreply, {Fd, CallsList, NewRtpHostsList}};
+											[Cookie ++ " 7\n", NewRtpHostsList];
 										{Other} ->
-											print("Other msg [~p]~n", [Other])
+											print("Other msg [~p]~n", [Other]),
+											[Cookie ++ " 7\n"]
 									end;
 								{badrpc, nodedown} ->
 									print ("RTPPROXY: rtp host [~p] seems stopped!~n", [{RtpHost,RtpIp}]),
 									% FIXME remove bad host from list
-									MsgOut = Cookie ++ " 7\n",
-									gen_udp:send(Fd, Ip, Port, [MsgOut]),
-									{noreply, {Fd, CallsList, NewRtpHostsList}};
+									[Cookie ++ " 7\n", NewRtpHostsList];
 								Other ->
 									print ("RTPPROXY: error creating call! [~w]~n", [Other]),
-									MsgOut = Cookie ++ " 7\n",
-									gen_udp:send(Fd, Ip, Port, [MsgOut]),
-									{noreply, {Fd, CallsList, NewRtpHostsList}}
+									[Cookie ++ " 7\n", NewRtpHostsList]
 							catch
 								Exception ->
 									print("Exception reached [~p]~n", [Exception]),
-									MsgOut = Cookie ++ " 7\n",
-									gen_udp:send(Fd, Ip, Port, [MsgOut]),
-									{noreply, {Fd, CallsList, NewRtpHostsList}}
+									[Cookie ++ " 7\n", NewRtpHostsList]
 							end;
 						error_no_node ->
-							Fun (	"RTPPROXY: error no suitable nodes!~n",
-								[],
-								fun () -> Cookie ++ " 7\n" end
-							)
+							print ("RTPPROXY: error no suitable nodes!~n", []),
+							[Cookie ++ " 7\n"]
 					end
 			end;
 		[Cookie, [$L|Args], CallId, OrigIp, OrigPort, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
-			Fun (	"Cmd [L] CallId [~s], OrigAddr [~s:~s], FromTag [~s;~s] ToTag [~s;~s]~n",
-				[CallId, OrigIp, OrigPort, FromTag, MediaIdFrom, ToTag, MediaIdTo],
-				fun () -> case lists:keysearch(CallId, #callthread.callid, CallsList) of
-						{value, CallInfo} ->
-							case gen_server:call(CallInfo#callthread.pid, {message_l, {FromTag, MediaIdFrom, ToTag, MediaIdTo}}) of
-								{error, not_found} ->
-									Cookie ++ " 8\n";
-								{error, udp_error} ->
-									Cookie ++ " 7\n";
-								{ok, Reply} ->
-									Cookie ++ Reply
-							end;
-						false ->
-							print("RTPPROXY Session not exists. Do nothing.~n"),
-							Cookie ++ " 8\n"
-					end
-				end
-			);
+			print ("Cmd [L] CallId [~s], OrigAddr [~s:~s], FromTag [~s;~s] ToTag [~s;~s]~n", [CallId, OrigIp, OrigPort, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
+			case lists:keysearch(CallId, #callthread.callid, CallsList) of
+				{value, CallInfo} ->
+					case gen_server:call(CallInfo#callthread.pid, {message_l, {FromTag, MediaIdFrom, ToTag, MediaIdTo}}) of
+						{error, not_found} ->
+							[Cookie ++ " 8\n"];
+						{error, udp_error} ->
+							[Cookie ++ " 7\n"];
+						{ok, Reply} ->
+							[Cookie ++ Reply]
+					end;
+				false ->
+					print("RTPPROXY Session not exists. Do nothing.~n"),
+					[Cookie ++ " 8\n"]
+			end;
 		[Cookie, "D", CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
-			Fun  (	"Cmd [D] CallId [~s], FromTag [~s;~s] ToTag [~s;~s]~n",
-				[CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo],
-				fun () -> case lists:keysearch(CallId, #callthread.callid, CallsList) of
-						{value, CallInfo} ->
-							gen_server:cast(CallInfo#callthread.pid, message_d),
-							Cookie ++ " 0\n";
-						false ->
-							print("RTPPROXY Session not exists. Do nothing.~n"),
-							Cookie ++ " 8\n"
-					end
-				end
-			);
+			print ("Cmd [D] CallId [~s], FromTag [~s;~s] ToTag [~s;~s]~n", [CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
+			case lists:keysearch(CallId, #callthread.callid, CallsList) of
+				{value, CallInfo} ->
+					gen_server:cast(CallInfo#callthread.pid, message_d),
+					[Cookie ++ " 0\n"];
+				false ->
+					print("RTPPROXY Session not exists. Do nothing.~n"),
+					[Cookie ++ " 8\n"]
+			end;
 		[Cookie, "R", CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
-			Fun (	"Cmd [R] CallId [~s], FromTag [~s;~s] ToTag [~s;~s]~n",
-				[CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo],
-				fun () -> case lists:keysearch(CallId, #callthread.callid, CallsList) of
-						{value, CallInfo} ->
-							gen_server:cast(CallInfo#callthread.pid, message_r),
-							Cookie ++ " 0\n";
-						false ->
-							print("RTPPROXY Session not exists. Do nothing.~n"),
-							Cookie ++ " 8\n"
-					end
-				end
-			);
+			print ("Cmd [R] CallId [~s], FromTag [~s;~s] ToTag [~s;~s]~n", [CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
+			case lists:keysearch(CallId, #callthread.callid, CallsList) of
+				{value, CallInfo} ->
+					gen_server:cast(CallInfo#callthread.pid, message_r),
+					[Cookie ++ " 0\n"];
+				false ->
+					print("RTPPROXY Session not exists. Do nothing.~n"),
+					[Cookie ++ " 8\n"]
+			end;
 		[Cookie, [$P|Args], CallId, PlayName, Codecs, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
-			print("Cmd [P] CallId [~s], FromTag [~s;~s] ToTag [~s;~s]~n", [CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
+			print ("Cmd [P] CallId [~s], FromTag [~s;~s] ToTag [~s;~s]~n", [CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
 			% TODO
-			{noreply, {Fd, CallsList, RtpHostsList}};
+			[Cookie ++ " 0\n"];
 		[Cookie, "S", CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
-			Fun (	"Cmd [R] CallId [~s], FromTag [~s;~s] ToTag [~s;~s]~n",
-				[CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo],
-				fun () -> case lists:keysearch(CallId, #callthread.callid, CallsList) of
-						{value, CallInfo} ->
-							gen_server:cast(CallInfo#callthread.pid, message_s),
-							Cookie ++ " 0\n";
-						false ->
-							print("RTPRPXY Session not exists. Do nothing.~n"),
-							Cookie ++ " 8\n"
-					end
-				end
-			);
+			print ("Cmd [R] CallId [~s], FromTag [~s;~s] ToTag [~s;~s]~n", [CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
+			case lists:keysearch(CallId, #callthread.callid, CallsList) of
+				{value, CallInfo} ->
+					gen_server:cast(CallInfo#callthread.pid, message_s),
+					[Cookie ++ " 0\n"];
+				false ->
+					print("RTPRPXY Session not exists. Do nothing.~n"),
+					[Cookie ++ " 8\n"]
+			end;
 		[Cookie, "I"] ->
 			print("RTPPROXY Cookie [~s], Cmd [I]~n", [Cookie]),
 			% TODO
-			{noreply, {Fd, CallsList, RtpHostsList}};
+			[Cookie ++ " 0\n"];
 		[Cookie | _Other] ->% bad syntax
-			Fun  (	"RTPPROXY Other command [~s]~n",
-				[Msg],
-				fun () -> Cookie ++ " 1\n" end
-			)
+			print ("RTPPROXY Other command [~s]~n", [Msg]),
+			[Cookie ++ " 1\n"]
+	end,
+	gen_udp:send(Fd, Ip, Port, Answer),
+	case Addon of
+		[NewCallsList1, NewRtpHostsList1] ->
+			{noreply, {Fd, NewCallsList1, NewRtpHostsList1}};
+		[NewRtpHostsList1] ->
+			{noreply, {Fd, CallsList, NewRtpHostsList1}};
+		[] ->
+			{noreply, {Fd, CallsList, RtpHostsList}}
 	end;
 
 handle_info(Info, State) ->

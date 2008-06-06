@@ -57,29 +57,35 @@ handle_cast(_Request, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, RtpState}) ->
+terminate(Reason, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, _RtpState}) ->
 	timer:cancel(TRef),
 	gen_udp:close(FdFrom),
 	gen_udp:close(FdTo),
 	gen_server:cast(Parent, {stop, self()}),
 	print("::: media[~w] thread terminated due to reason [~p]~n", [self(), Reason]).
 
-handle_info({udp, FdFrom, Ip, Port, Msg}, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, RtpState}) ->
-%	print("::: media[~w] Msg from FdFrom~n", [self()]),
+% We received UDP-data on FdFrom socket, so we must send in from FdTo-socket (symmetric NAT from the client's POV)
+% We must ignore previous state ('rtp' or 'nortp') and set it to 'rtp'
+% We use Ip and Port as address for future messages to FdTo
+handle_info({udp, FdFrom, Ip, Port, Msg}, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, _RtpState}) ->
 	gen_udp:send(FdTo, IpFrom, PortFrom, Msg),
 	{noreply, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, Ip, Port}, rtp}};
 
-handle_info({udp, FdTo, Ip, Port, Msg}, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, RtpState}) ->
-%	print("::: media[~w] Msg from FdTo~n", [self()]),
+% We received UDP-data on FdTo socket, so we must send in from FdFrom-socket (symmetric NAT from the client's POV)
+% We must ignore previous state ('rtp' or 'nortp') and set it to 'rtp'
+% We use Ip and Port as address for future messages to FdFrom
+handle_info({udp, FdTo, Ip, Port, Msg}, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, _RtpState}) ->
 	gen_udp:send(FdFrom, IpTo, PortTo, Msg),
 	{noreply, {Parent, TRef, {FdFrom, Ip, Port}, {FdTo, IpTo, PortTo}, rtp}};
 
-handle_info(ping, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, rtp}) ->
-	{noreply, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, nortp}};
+% setting state to 'nortp'
+handle_info(ping, {Parent, TRef, From, To, rtp}) ->
+	{noreply, {Parent, TRef, From, To, nortp}};
 
-handle_info(ping, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, nortp}) ->
-	print("::: media[~w] ping~n", [self()]),
-	{stop, timeout, {Parent, TRef, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}, timeout}};
+% We didn't get new messages - we should close this mediastream
+handle_info(ping, {Parent, TRef, From, To, nortp}) ->
+	print("::: media[~w] timeout~n", [self()]),
+	{stop, timeout, {Parent, TRef, From, To, timeout}};
 
 handle_info(Other, State) ->
 	print("::: media[~w] Other Info [~p]~n", [self(), Other]),
