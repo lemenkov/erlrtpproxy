@@ -56,7 +56,7 @@ handle_call({message_u, {OrigIp, OrigPort, FromTag, MediaId}}, _From, {MainIp, P
 		{value, Party} ->
 			print("::: call[~w] Already exists!~n", [self()]),
 			{ok, {LocalIp, LocalPort}} = inet:sockname(Party#party.fdfrom),
-			Reply = " " ++ integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
+			Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 			print("::: call[~w] answer [~s]~n", [self(), Reply]),
 			{reply, {ok, Reply}, {MainIp, Parties}};
 		false ->
@@ -82,7 +82,7 @@ handle_call({message_u, {OrigIp, OrigPort, FromTag, MediaId}}, _From, {MainIp, P
 
 					NewParty = #party{fdfrom=Fd1, ipfromguess=GuessIp, portfromguess=GuessPort, tagfrom=FromTag, fdto=Fd2, mediaid=MediaId},
 
-					Reply = " " ++ integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
+					Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 					print("::: call[~w] answer [~s]~n", [self(), Reply]),
 					{reply, {ok, Reply}, {MainIp, lists:append(Parties, [NewParty])}};
 				{error, Reason} ->
@@ -105,7 +105,7 @@ handle_call({message_l, {FromTag, MediaId, ToTag, MediaId}}, _From, {MainIp, Par
 					{ok, {LocalIp, LocalPort}} = inet:sockname(Fd),
 					NewParty = Party#party{fdto=Fd, tagto=ToTag, answered=true},
 
-					Reply = " " ++ integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
+					Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 %					print("::: call[~w] answer [~s]~n", [self(), Reply]),
 					{reply, {ok, Reply}, {MainIp, lists:keyreplace(MediaId, #party.mediaid, Parties, NewParty)}};
 				{error, Reason} ->
@@ -119,7 +119,7 @@ handle_call({message_l, {FromTag, MediaId, ToTag, MediaId}}, _From, {MainIp, Par
 			{ok, {LocalIp, LocalPort}} = inet:sockname(Party#party.fdto),
 			NewParty = Party#party{answered=true},
 
-			Reply = " " ++ integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
+			Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 %			print("::: call[~w] answer [~s]~n", [self(), Reply]),
 			{reply, {ok, Reply}, {MainIp, lists:keyreplace(MediaId, #party.mediaid, Parties, NewParty)}};
 		false ->

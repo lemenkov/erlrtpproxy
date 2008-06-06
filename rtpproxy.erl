@@ -93,23 +93,24 @@ handle_info({'EXIT', Pid, _Reason}, {Fd, CallsList, RtpHostsList}) ->
 % Fd from which message arrived must be equal to Fd from our state
 % Brief introbuction of protocol is here: http://rtpproxy.org/wiki/RTPproxyProtocol
 handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList, RtpHostsList}) ->
-	[Answer|Addon] = case string:tokens(Msg, " ;") of
-		[Cookie, "V"] ->
+	[Cookie|Rest] = string:tokens(Msg, " ;"),
+	[Answer|Addon] = case Rest of
+		["V"] ->
 			print ("Cookie [~s], Cmd [V]~n", [Cookie]),
-			[Cookie ++ " 20040107\n"];
-		[Cookie, "VF", Params] ->
+			["20040107"];
+		["VF", Params] ->
 			print ("Cookie [~s], Cmd [VF] Params [~s]~n", [Cookie, Params]),
-			[Cookie ++ " 1\n"];
-		[Cookie, [$U|Args], CallId, OrigIp, OrigPort, FromTag, MediaId] ->
+			["1"];
+		[[$U|Args], CallId, OrigIp, OrigPort, FromTag, MediaId] ->
 			print("Cmd [U] CallId [~s], OrigAddr [~s:~s], FromTag [~s;~s]~n", [CallId, OrigIp, OrigPort, FromTag, MediaId]),
 			case lists:keysearch(CallId, #callthread.callid, CallsList) of
 				{value, CallInfo} ->
 					print ("Session exists. Updating existing.~n", []),
 					case gen_server:call(CallInfo#callthread.pid, {message_u, {OrigIp, OrigPort, FromTag, MediaId}}) of
 						{ok, Reply} ->
-							[Cookie ++ Reply];
+							[Reply];
 						{error, udp_error} ->
-							[Cookie ++ " 7\n"]
+							["7"]
 					end;
 				false ->
 					case find_node(RtpHostsList) of
@@ -120,89 +121,89 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList, RtpHostsList}) ->
 									NewCallThread = #callthread{pid=CallPid, callid=CallId},
 									case gen_server:call(CallPid, {message_u, {OrigIp, OrigPort, FromTag, MediaId}}) of
 										{ok, Reply} ->
-											[Cookie ++ Reply, lists:append (CallsList, [NewCallThread]), NewRtpHostsList];
+											[Reply, lists:append (CallsList, [NewCallThread]), NewRtpHostsList];
 										{error, udp_error} ->
-											[Cookie ++ " 7\n", NewRtpHostsList];
+											["7", NewRtpHostsList];
 										{Other} ->
 											print("Other msg [~p]~n", [Other]),
-											[Cookie ++ " 7\n"]
+											["7"]
 									end;
 								{badrpc, nodedown} ->
 									print ("RTPPROXY: rtp host [~p] seems stopped!~n", [{RtpHost,RtpIp}]),
 									% FIXME remove bad host from list
-									[Cookie ++ " 7\n", NewRtpHostsList];
+									["7", NewRtpHostsList];
 								Other ->
 									print ("RTPPROXY: error creating call! [~w]~n", [Other]),
-									[Cookie ++ " 7\n", NewRtpHostsList]
+									["7", NewRtpHostsList]
 							catch
 								Exception ->
 									print("Exception reached [~p]~n", [Exception]),
-									[Cookie ++ " 7\n", NewRtpHostsList]
+									["7", NewRtpHostsList]
 							end;
 						error_no_node ->
 							print ("RTPPROXY: error no suitable nodes!~n", []),
-							[Cookie ++ " 7\n"]
+							["7"]
 					end
 			end;
-		[Cookie, [$L|Args], CallId, OrigIp, OrigPort, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
+		[[$L|Args], CallId, OrigIp, OrigPort, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
 			print ("Cmd [L] CallId [~s], OrigAddr [~s:~s], FromTag [~s;~s] ToTag [~s;~s]~n", [CallId, OrigIp, OrigPort, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
 			case lists:keysearch(CallId, #callthread.callid, CallsList) of
 				{value, CallInfo} ->
 					case gen_server:call(CallInfo#callthread.pid, {message_l, {FromTag, MediaIdFrom, ToTag, MediaIdTo}}) of
 						{error, not_found} ->
-							[Cookie ++ " 8\n"];
+							["8"];
 						{error, udp_error} ->
-							[Cookie ++ " 7\n"];
+							["7"];
 						{ok, Reply} ->
-							[Cookie ++ Reply]
+							[Reply]
 					end;
 				false ->
 					print("RTPPROXY Session not exists. Do nothing.~n"),
-					[Cookie ++ " 8\n"]
+					["8"]
 			end;
-		[Cookie, "D", CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
+		["D", CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
 			print ("Cmd [D] CallId [~s], FromTag [~s;~s] ToTag [~s;~s]~n", [CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
 			case lists:keysearch(CallId, #callthread.callid, CallsList) of
 				{value, CallInfo} ->
 					gen_server:cast(CallInfo#callthread.pid, message_d),
-					[Cookie ++ " 0\n"];
+					["0"];
 				false ->
 					print("RTPPROXY Session not exists. Do nothing.~n"),
-					[Cookie ++ " 8\n"]
+					["8"]
 			end;
-		[Cookie, "R", CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
+		["R", CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
 			print ("Cmd [R] CallId [~s], FromTag [~s;~s] ToTag [~s;~s]~n", [CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
 			case lists:keysearch(CallId, #callthread.callid, CallsList) of
 				{value, CallInfo} ->
 					gen_server:cast(CallInfo#callthread.pid, message_r),
-					[Cookie ++ " 0\n"];
+					["0"];
 				false ->
 					print("RTPPROXY Session not exists. Do nothing.~n"),
-					[Cookie ++ " 8\n"]
+					["8"]
 			end;
-		[Cookie, [$P|Args], CallId, PlayName, Codecs, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
+		[[$P|Args], CallId, PlayName, Codecs, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
 			print ("Cmd [P] CallId [~s], FromTag [~s;~s] ToTag [~s;~s]~n", [CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
 			% TODO
-			[Cookie ++ " 0\n"];
-		[Cookie, "S", CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
+			["0"];
+		["S", CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo] ->
 			print ("Cmd [R] CallId [~s], FromTag [~s;~s] ToTag [~s;~s]~n", [CallId, FromTag, MediaIdFrom, ToTag, MediaIdTo]),
 			case lists:keysearch(CallId, #callthread.callid, CallsList) of
 				{value, CallInfo} ->
 					gen_server:cast(CallInfo#callthread.pid, message_s),
-					[Cookie ++ " 0\n"];
+					["0"];
 				false ->
 					print("RTPRPXY Session not exists. Do nothing.~n"),
-					[Cookie ++ " 8\n"]
+					["8"]
 			end;
-		[Cookie, "I"] ->
+		["I"] ->
 			print("RTPPROXY Cookie [~s], Cmd [I]~n", [Cookie]),
-			% TODO
-			[Cookie ++ " 0\n"];
-		[Cookie | _Other] ->% bad syntax
+			% TODO show information about calls
+			["0"];
+		[_Other] ->% bad syntax
 			print ("RTPPROXY Other command [~s]~n", [Msg]),
-			[Cookie ++ " 1\n"]
+			["1"]
 	end,
-	gen_udp:send(Fd, Ip, Port, Answer),
+	gen_udp:send(Fd, Ip, Port, Cookie ++ " " ++  Answer ++ "\n"),
 	case Addon of
 		[NewCallsList1, NewRtpHostsList1] ->
 			{noreply, {Fd, NewCallsList1, NewRtpHostsList1}};
