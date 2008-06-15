@@ -48,7 +48,7 @@ init (MainIpAtom) ->
 	{ok, {MainIp, []}}.
 
 % handle originate call leg (new media id possibly)
-handle_call({message_u, {OrigIp, OrigPort, FromTag, MediaId}}, _From, {MainIp, Parties}) ->
+handle_call({message_u, {OrigIp, OrigPort, FromTag, MediaId, Modifiers}}, _From, {MainIp, Parties}) ->
 	print ("::: call[~w] message [U] MediaId [~s].~n", [self(), MediaId]),
 	% search for already  existed
 	case lists:keysearch(MediaId, #party.mediaid, Parties) of
@@ -93,7 +93,7 @@ handle_call({message_u, {OrigIp, OrigPort, FromTag, MediaId}}, _From, {MainIp, P
 
 % handle answered call leg
 % Both MediaId's are equal (just guessing)
-handle_call({message_l, {FromTag, MediaId, ToTag, MediaId}}, _From, {MainIp, Parties}) ->
+handle_call({message_l, {FromTag, MediaId, ToTag, MediaId, Modifiers}}, _From, {MainIp, Parties}) ->
 	print ("::: call[~w] message [L] MediaId [~s].~n", [self(), MediaId]),
 	% search for already  existed
 	case lists:keysearch(MediaId, #party.mediaid, Parties) of
@@ -127,8 +127,10 @@ handle_call({message_l, {FromTag, MediaId, ToTag, MediaId}}, _From, {MainIp, Par
 			print("::: call[~w] ERROR not found~n", [self()]),
 			{reply, {error, not_found}, {MainIp, Parties}}
 	end;
-%handle_call(message_i, _From, State) ->
-%	{reply, {ok, Reply}, State};
+
+handle_call(message_i, _From, State) ->
+	% TODO (acquire information about call state)
+	{reply, {ok, "TODO"}, State};
 
 handle_call(_Other, _From, State) ->
 	{noreply, State}.
@@ -140,10 +142,16 @@ handle_cast(message_r, State) ->
 	% TODO start recording of RTP
 	{noreply, State};
 
-handle_cast(message_s, State) ->
-	% TODO stop recording of RTP
+handle_cast(message_p, State) ->
+	% TODO start playback of pre-recorded audio
 	{noreply, State};
 
+handle_cast(message_s, State) ->
+	% TODO stop playback/recording of RTP
+	{noreply, State};
+
+% timeout from media stream
+% TODO consider to stop all other media streams
 handle_cast({stop, Pid}, {MainIp, Parties}) ->
 %	print("::: call[~w] TIMEOUT when state is [~p]~n", [self(), Parties]),
 	case lists:keytake (Pid, #party.pid, Parties) of
@@ -166,8 +174,6 @@ code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 terminate(Reason, {_MainIp, Parties}) ->
-	gen_server:cast({global, rtpproxy}, {call_terminated, {self(), Reason}}),
-	% TODO clean parties
 	_Unused = lists:foreach(
 		fun(X)  ->
 			if
@@ -178,6 +184,7 @@ terminate(Reason, {_MainIp, Parties}) ->
 			end
 		end,
 		Parties),
+	gen_server:cast({global, rtpproxy}, {call_terminated, {self(), Reason}}),
 	print("::: call[~w] thread terminated due to reason [~p]~n", [self(), Reason]).
 
 % rtp from some port
