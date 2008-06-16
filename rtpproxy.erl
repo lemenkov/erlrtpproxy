@@ -143,7 +143,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList, RtpHostsList}) ->
 									end;
 								{badrpc, nodedown} ->
 									print ("RTPPROXY: rtp host [~p] seems stopped!~n", [{RtpHost,RtpIp}]),
-									% FIXME remove bad host from list
+									% FIXME consider to remove bad host from list
 									[?RTPPROXY_ERR_SOFTWARE, NewRtpHostsList];
 								Other ->
 									print ("RTPPROXY: error creating call! [~w]~n", [Other]),

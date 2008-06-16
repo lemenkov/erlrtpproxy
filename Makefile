@@ -4,3 +4,5 @@ all:
 	erlc media.erl
 	erlc syslog.erl
 
+clean:
+	rm -f *.beam *~
