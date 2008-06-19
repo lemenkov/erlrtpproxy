@@ -118,7 +118,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList, RtpHostsList}) ->
 			print("Cmd [U] CallId [~s], OrigAddr [~s:~s], FromTag [~s;~s]~n", [CallId, OrigIp, OrigPort, FromTag, MediaId]),
 			case lists:keysearch(CallId, #callthread.callid, CallsList) of
 				{value, CallInfo} ->
-					print ("Session exists. Updating existing.~n", []),
+					print ("Session exists. Updating existing.~n"),
 					case gen_server:call(CallInfo#callthread.pid, {message_u, {OrigIp, OrigPort, FromTag, MediaId, Modifiers}}) of
 						{ok, Reply} ->
 							[Reply];
@@ -132,7 +132,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList, RtpHostsList}) ->
 							try rpc:call(RtpHost, call, start, [RtpIp]) of
 								{ok, CallPid} ->
 									NewCallThread = #callthread{pid=CallPid, callid=CallId},
-									case gen_server:call(CallPid, {message_u, {OrigIp, OrigPort, FromTag, MediaId}}) of
+									case gen_server:call(CallPid, {message_u, {OrigIp, OrigPort, FromTag, MediaId, Modifiers}}) of
 										{ok, Reply} ->
 											[Reply, NewRtpHostsList, lists:append (CallsList, [NewCallThread])];
 										{error, udp_error} ->
@@ -154,7 +154,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, CallsList, RtpHostsList}) ->
 									[?RTPPROXY_ERR_SOFTWARE, NewRtpHostsList]
 							end;
 						error_no_node ->
-							print ("RTPPROXY: error no suitable nodes!~n", []),
+							print ("RTPPROXY: error no suitable nodes!~n"),
 							[?RTPPROXY_ERR_SOFTWARE]
 					end
 			end;
@@ -267,7 +267,7 @@ code_change(_OldVsn, State, _Extra) ->
 terminate(Reason, {Fd, CallsList, RtpHostsList}) ->
 	gen_udp:close(Fd),
 	syslog:stop(),
-	print("RTPPROXY terminated due to reason [~w]~n", [Reason]).
+	io:format("RTPPROXY terminated due to reason [~p]~n", [Reason]).
 
 find_node (Nodes) ->
 	find_node(Nodes, []).
@@ -294,5 +294,5 @@ print (Format) ->
 	print (Format, []).
 
 print (Format, Params) ->
+%	io:format(Format, Params),
 	syslog:send(rtpproxy, syslog:info(), io_lib:format(Format, Params)).
-%	io:format(Format, Params).

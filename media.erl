@@ -67,19 +67,20 @@ terminate(Reason, {Parent, TRef, From, To, _RtpState}) ->
 	gen_server:cast(Parent, {stop, self()}),
 	print("::: media[~w] thread terminated due to reason [~p]~n", [self(), Reason]).
 
-% We received UDP-data on From socket, so we must send in from To-socket (symmetric NAT from the client's POV)
+% We received UDP-data on From or To socket, so we must send in from To or From socket respectively
+% (symmetric NAT from the client's POV)
 % We must ignore previous state ('rtp' or 'nortp') and set it to 'rtp'
-% We use Ip and Port as address for future messages to FdTo
-handle_info({udp, Fd, Ip, Port, Msg}, {Parent, TRef, From, To, _RtpState}) when Fd == From#media.fd ->
-	gen_udp:send(To#media.fd, From#media.ip, From#media.port, Msg),
-	{noreply, {Parent, TRef, From, #media{fd=Fd, ip=Ip, port=Port}, rtp}};
-
-% We received UDP-data on To socket, so we must send in from From-socket (symmetric NAT from the client's POV)
-% We must ignore previous state ('rtp' or 'nortp') and set it to 'rtp'
-% We use Ip and Port as address for future messages to FdFrom
-handle_info({udp, Fd, Ip, Port, Msg}, {Parent, TRef, From, To, _RtpState}) when Fd == To#media.fd ->
-	gen_udp:send(From#media.fd, To#media.ip, To#media.port, Msg),
-	{noreply, {Parent, TRef, #media{fd=Fd, ip=Ip, port=Port}, To, rtp}};
+% We use Ip and Port as address for future messages to FdTo or FdFrom
+handle_info({udp, Fd, Ip, Port, Msg}, {Parent, TRef, From, To, _RtpState}) ->
+%	print("::: media [~p] [~p] [~p]~n", [{Fd, Ip, Port}, From, To]),
+	case Fd == From#media.fd of 
+		true ->
+			gen_udp:send(To#media.fd, From#media.ip, From#media.port, Msg),
+			{noreply, {Parent, TRef, From, To#media{ip=Ip, port=Port}, rtp}};
+		false ->
+			gen_udp:send(From#media.fd, To#media.ip, To#media.port, Msg),
+			{noreply, {Parent, TRef, From#media{ip=Ip, port=Port}, To, rtp}}
+	end;
 
 % setting state to 'nortp'
 handle_info(ping, {Parent, TRef, From, To, rtp}) ->
@@ -91,11 +92,12 @@ handle_info(ping, {Parent, TRef, From, To, nortp}) ->
 	{stop, nortp, {Parent, TRef, From, To, nortp}};
 
 handle_info(Other, State) ->
-	print("::: media[~w] Other Info [~p]~n", [self(), Other]),
+	print("::: media[~w] Other Info [~p], State [~p]~n", [self(), Other, State]),
 	{noreply, State}.
 
 print (Format) ->
 	print (Format, []).
 
 print (Format, Params) ->
-	syslog:send(call, syslog:info(), io_lib:format(Format, Params)).
+%	io:format(Format, Params),
+	syslog:send(media, syslog:info(), io_lib:format(Format, Params)).

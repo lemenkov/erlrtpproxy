@@ -248,4 +248,5 @@ print (Format) ->
 	print (Format, []).
 
 print (Format, Params) ->
+%	io:format(Format, Params),
 	syslog:send(call, syslog:info(), io_lib:format(Format, Params)).
