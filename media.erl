@@ -73,7 +73,7 @@ terminate(Reason, {Parent, TRef, From, To, _RtpState}) ->
 % We use Ip and Port as address for future messages to FdTo or FdFrom
 handle_info({udp, Fd, Ip, Port, Msg}, {Parent, TRef, From, To, _RtpState}) ->
 %	print("::: media [~p] [~p] [~p]~n", [{Fd, Ip, Port}, From, To]),
-	case Fd == From#media.fd of 
+	case Fd == From#media.fd of
 		true ->
 			gen_udp:send(To#media.fd, From#media.ip, From#media.port, Msg),
 			{noreply, {Parent, TRef, From, To#media{ip=Ip, port=Port}, rtp}};
