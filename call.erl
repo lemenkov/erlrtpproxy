@@ -46,15 +46,14 @@
 		mod_weak=false,
 		mod_z=false}).
 
-start(MainIpAtom) when is_atom(MainIpAtom) ->
-	gen_server:start(?MODULE, MainIpAtom, []).
+start(MainIp) ->
+	gen_server:start(?MODULE, MainIp, []).
 
-start_link(MainIpAtom) when is_atom(MainIpAtom) ->
-	gen_server:start_link(?MODULE, MainIpAtom, []).
+start_link(MainIp) ->
+	gen_server:start_link(?MODULE, MainIp, []).
 
-init (MainIpAtom) ->
+init (MainIp) ->
 	process_flag(trap_exit, true),
-	{ok, MainIp} = inet_parse:address(atom_to_list(MainIpAtom)),
 	print ("::: call[~w] thread started at ~s~n", [self(), inet_parse:ntoa(MainIp)]),
 	{ok, {MainIp, []}}.
 

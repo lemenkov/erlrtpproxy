@@ -36,7 +36,7 @@
 
 % description of call thread
 -record(callthread, {pid=null, callid=null}).
--record(state, {ser_if_pid=null, calls=null, rtphosts=null}).
+-record(state, {calls=null, rtphosts=null}).
 
 start(Args) ->
 	gen_server:start({global, ?MODULE}, ?MODULE, Args, []).
@@ -44,19 +44,11 @@ start(Args) ->
 start_link(Args) ->
 	gen_server:start_link({global, ?MODULE}, ?MODULE, Args, []).
 
-init([IpAtom, PortAtom]) when is_atom(IpAtom), is_atom(PortAtom) ->
+init(_Unused) ->
 	process_flag(trap_exit, true),
-	{ok, Ip} = inet_parse:address(atom_to_list(IpAtom)),
-	Port = list_to_integer(atom_to_list(PortAtom)),
 	syslog:start(),
-	case ser:start({Ip, Port}) of
-		{ok, Pid} ->
-			print("RTPProxy[~w] started at ~s:~w~n", [self(), inet_parse:ntoa(Ip), Port]),
-			{ok, #state{ser_if_pid=Pid, calls=[], rtphosts=?RtpHosts}};
-		{error, Reason} ->
-			print("RTPPROXY not started. Reason [~p]~n", Reason),
-			{stop, Reason}
-	end.
+	print("RTPProxy[~w] started with rtphosts [~p]~n", [self(), ?RtpHosts]),
+	{ok, #state{calls=[], rtphosts=?RtpHosts}}.
 
 handle_call({message, Cmd}, From, State) ->
 	print("Cmd[~p]~n", [Cmd]),
@@ -153,7 +145,7 @@ handle_call({message, Cmd}, From, State) ->
 											print("Exception reached [~p]~n", [Exception]),
 											{reply, ?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts}}
 									end;
-								error_no_node ->
+								error_no_nodes ->
 									print ("RTPPROXY: error no suitable nodes to create new session!~n"),
 									{reply, ?RTPPROXY_ERR_SOFTWARE, State}
 							end;
@@ -207,7 +199,6 @@ code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 terminate(Reason, State) ->
-	gen_server:call(State#state.ser_if_pid, stop),
 	syslog:stop(),
 	io:format("RTPPROXY terminated due to reason [~p]~n", [Reason]).
 

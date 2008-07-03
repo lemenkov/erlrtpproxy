@@ -42,10 +42,10 @@ init ({Ip, Port}) ->
 	process_flag(trap_exit, true),
 	case gen_udp:open(Port, [{ip, Ip}, {active, true}, list]) of
 		{ok, Fd} ->
-			print("ser_cmd[~w] started at ~s:~w~n", [self(), inet_parse:ntoa(Ip), Port]),
+			print("ser[~w] started at [~s:~w]~n", [self(), inet_parse:ntoa(Ip), Port]),
 			{ok, Fd};
 		{error, Reason} ->
-			print("ser_cmd not started. Reason [~p]~n", Reason),
+			print("ser not started. Reason [~p]~n", Reason),
 			{stop, Reason}
 	end.
 
@@ -92,9 +92,9 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 			{ok, GuessIp} = inet_parse:address(OrigIp),
 			GuessPort = list_to_integer(OrigPort),
 			#cmd{cookie=Cookie, type=?CMD_L, callid=CallId, addr={GuessIp, GuessPort}, from={FromTag, list_to_integer(FromMediaId)}, to={ToTag, list_to_integer(ToMediaId)}, params=Modifiers};
-		% delete session
-		["D", CallId, FromTag, FromMediaId, ToTag, ToMediaId] ->
-			#cmd{cookie=Cookie, type=?CMD_D, callid=CallId, from={FromTag, list_to_integer(FromMediaId)}, to={ToTag, list_to_integer(ToMediaId)}};
+		% delete session (no MediaIds)
+		["D", CallId, FromTag, ToTag] ->
+			#cmd{cookie=Cookie, type=?CMD_D, callid=CallId, from={FromTag, 0}, to={ToTag, 0}};
 		% record
 		["R", CallId, FromTag, FromMediaId, ToTag, ToMediaId] ->
 			#cmd{cookie=Cookie, type=?CMD_R, callid=CallId, from={FromTag, list_to_integer(FromMediaId)}, to={ToTag, list_to_integer(ToMediaId)}};
@@ -137,4 +137,4 @@ print (Format) ->
 
 print (Format, Params) ->
 %	io:format(Format, Params),
-	syslog:send(call, syslog:info(), io_lib:format(Format, Params)).
+	syslog:send(ser, syslog:info(), io_lib:format(Format, Params)).
