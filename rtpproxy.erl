@@ -141,8 +141,8 @@ handle_call({message, Cmd}, From, State) ->
 											print ("RTPPROXY: error creating call! [~w]~n", [Other]),
 											{reply, ?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts}}
 									catch
-										Exception ->
-											print("Exception reached [~p]~n", [Exception]),
+										ExceptionClass:ExceptionPattern ->
+											print("Exception [~p] reached with result [~p]~n", [ExceptionClass, ExceptionPattern]),
 											{reply, ?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts}}
 									end;
 								error_no_nodes ->
