@@ -119,7 +119,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 			error_syntax
 	end of
 		error_syntax ->
-			print ("ser[~w]: Other command (bad syntax?) [~s]~n", [Msg]),
+			print ("ser[~w]: Other command (bad syntax?) [~s]~n", [self(), Msg]),
 			?RTPPROXY_ERR_SYNTAX;
 		Cmd ->
 			gen_server:call({global, rtpproxy}, {message, Cmd})
