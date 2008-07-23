@@ -67,6 +67,8 @@ terminate(Reason, Fd) ->
 % Brief introbuction of protocol is here: http://rtpproxy.org/wiki/RTPproxyProtocol
 handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 	% TODO fix issue with missing Cookie
+	% TODO consider parsing Tag and MediaId separately
+	% TODO pass modifiers as atoms (not as string)
 	[Cookie|Rest] = string:tokens(Msg, " ;"),
 	Answer = case case Rest of
 		% Request basic supported rtpproxy protocol version
@@ -77,12 +79,18 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 			#cmd{cookie=Cookie, type=?CMD_VF, params=Params};
 		% update/create session
 		% TODO OrigPort must be == 0...65535
-		[[$U|Args], CallId, OrigIp, OrigPort, FromTag, MediaId] ->
+		[[$U|Args], CallId, OrigIp, OrigPort, FromTag, FromMediaId|To] ->
 			{Modifiers, _} = lists:unzip(lists:filter(fun({_, Sym}) -> lists:member(Sym, Args) end, ?MOD_LIST)),
 			% TODO check addr
 			{ok, GuessIp} = inet_parse:address(OrigIp),
 			GuessPort = list_to_integer(OrigPort),
-			#cmd{cookie=Cookie, type=?CMD_U, callid=CallId, addr={GuessIp, GuessPort}, from={FromTag, list_to_integer(MediaId)}, params=Modifiers};
+			case To of
+				[] ->
+					#cmd{cookie=Cookie, type=?CMD_U, callid=CallId, addr={GuessIp, GuessPort}, from={FromTag, list_to_integer(FromMediaId)}, params=Modifiers};
+				[ToTag,ToMediaId] ->
+					% Hold and Resume
+					#cmd{cookie=Cookie, type=?CMD_U, callid=CallId, addr={GuessIp, GuessPort}, from={FromTag, list_to_integer(FromMediaId)}, to={ToTag, list_to_integer(ToMediaId)}, params=Modifiers}
+			end;
 		% lookup existing session
 		% TODO should both MediaIds be equal?
 		% TODO OrigPort must be == 0...65535
@@ -95,7 +103,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 		% delete session (no MediaIds)
 		["D", CallId, FromTag, ToTag] ->
 			#cmd{cookie=Cookie, type=?CMD_D, callid=CallId, from={FromTag, 0}, to={ToTag, 0}};
-		% record
+		% record (obsoleted)
 		["R", CallId, FromTag, FromMediaId, ToTag, ToMediaId] ->
 			#cmd{cookie=Cookie, type=?CMD_R, callid=CallId, from={FromTag, list_to_integer(FromMediaId)}, to={ToTag, list_to_integer(ToMediaId)}};
 		% playback pre-recorded audio
