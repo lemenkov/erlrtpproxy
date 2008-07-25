@@ -1,9 +1,5 @@
 all:
-	erlc rtpproxy.erl
-	erlc call.erl
-	erlc media.erl
-	erlc syslog.erl
-	erlc ser.erl
+	erlc call.erl media.erl rtpproxy.erl ser.erl syslog.erl utils.erl
 
 clean:
 	rm -f *.beam *~

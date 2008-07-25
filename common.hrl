@@ -31,3 +31,5 @@
 -define(CMD_X, 11).
 -define(CMD_I, 12).
 
+-define(PRINT(X, Y), utils:print(?MODULE, "[~w]: " ++  X ++ "~n", [self()] ++ Y)).
+

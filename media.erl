@@ -31,6 +31,8 @@
 -export([code_change/3]).
 -export([terminate/2]).
 
+-include("common.hrl").
+
 % description of media
 -record(media, {fd=null, ip=null, port=null}).
 
@@ -41,7 +43,7 @@ start_link({Parent, From, To}) ->
 	gen_server:start_link(?MODULE, {Parent, From, To}, []).
 
 init ({Parent, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}}) ->
-	print ("::: media[~p] started {~w [~w:~w]} {~w [~w:~w]}~n", [self(), FdFrom, IpFrom, PortFrom, FdTo, IpTo, PortTo]),
+	?PRINT("started {~w [~w:~w]} {~w [~w:~w]}", [FdFrom, IpFrom, PortFrom, FdTo, IpTo, PortTo]),
 	process_flag(trap_exit, true),
 	{ok, TRef} = timer:send_interval(10000, self(), ping),
 	{ok, {Parent, TRef, #media{fd=FdFrom, ip=IpFrom, port=PortFrom}, #media{fd=FdTo, ip=IpTo, port=PortTo}, rtp}}.
@@ -65,14 +67,14 @@ terminate(Reason, {Parent, TRef, From, To, _RtpState}) ->
 	gen_udp:close(From#media.fd),
 	gen_udp:close(To#media.fd),
 	gen_server:cast(Parent, {stop, self()}),
-	print("::: media[~w] thread terminated due to reason [~p]~n", [self(), Reason]).
+	?PRINT("terminated due to reason [~p]", [Reason]).
 
 % We received UDP-data on From or To socket, so we must send in from To or From socket respectively
 % (symmetric NAT from the client's POV)
 % We must ignore previous state ('rtp' or 'nortp') and set it to 'rtp'
 % We use Ip and Port as address for future messages to FdTo or FdFrom
 handle_info({udp, Fd, Ip, Port, Msg}, {Parent, TRef, From, To, _RtpState}) ->
-%	print("::: media [~p] [~p] [~p]~n", [{Fd, Ip, Port}, From, To]),
+%	?PRINT("[~p] [~p] [~p]", [{Fd, Ip, Port}, From, To]),
 	case Fd == From#media.fd of
 		true ->
 			gen_udp:send(To#media.fd, From#media.ip, From#media.port, Msg),
@@ -88,16 +90,10 @@ handle_info(ping, {Parent, TRef, From, To, rtp}) ->
 
 % We didn't get new messages - we should close this mediastream
 handle_info(ping, {Parent, TRef, From, To, nortp}) ->
-	print("::: media[~w] timeout~n", [self()]),
+	?PRINT("timeout", []),
 	{stop, nortp, {Parent, TRef, From, To, nortp}};
 
 handle_info(Other, State) ->
-	print("::: media[~w] Other Info [~p], State [~p]~n", [self(), Other, State]),
+	?PRINT("Other Info [~p], State [~p]", [Other, State]),
 	{noreply, State}.
 
-print (Format) ->
-	print (Format, []).
-
-print (Format, Params) ->
-%	io:format(Format, Params),
-	syslog:send(media, syslog:info(), io_lib:format(Format, Params)).

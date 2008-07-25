@@ -42,10 +42,10 @@ init ({Ip, Port}) ->
 	process_flag(trap_exit, true),
 	case gen_udp:open(Port, [{ip, Ip}, {active, true}, list]) of
 		{ok, Fd} ->
-			print("ser[~w] started at [~s:~w]~n", [self(), inet_parse:ntoa(Ip), Port]),
+			?PRINT("started at [~s:~w]", [inet_parse:ntoa(Ip), Port]),
 			{ok, Fd};
 		{error, Reason} ->
-			print("ser not started. Reason [~p]~n", Reason),
+			?PRINT("interface not started. Reason [~p]", [Reason]),
 			{stop, Reason}
 	end.
 
@@ -61,7 +61,7 @@ code_change(_OldVsn, Fd, _Extra) ->
 terminate(Reason, Fd) ->
 	gen_udp:close(Fd),
 	gen_server:cast({global, rtpproxy}, {ser_cmd_terminated, self(), Reason}),
-	print("::: ser[~w] thread terminated due to reason [~p]~n", [self(), Reason]).
+	?PRINT("thread terminated due to reason [~p]", [Reason]).
 
 % Fd from which message arrived must be equal to Fd from our state
 % Brief introbuction of protocol is here: http://rtpproxy.org/wiki/RTPproxyProtocol
@@ -127,7 +127,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 			error_syntax
 	end of
 		error_syntax ->
-			print ("ser[~w]: Other command (bad syntax?) [~s]~n", [self(), Msg]),
+			?PRINT("Other command (bad syntax?) [~s]", [Msg]),
 			?RTPPROXY_ERR_SYNTAX;
 		Cmd ->
 			gen_server:call({global, rtpproxy}, {message, Cmd})
@@ -137,12 +137,5 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 	{noreply, Fd};
 
 handle_info(Info, Fd) ->
-	print("::: ser[~w] Info [~w]~n", [self(), Info]),
+	?PRINT("Info [~w]", [Info]),
 	{noreply, Fd}.
-
-print (Format) ->
-	print (Format, []).
-
-print (Format, Params) ->
-%	io:format(Format, Params),
-	syslog:send(ser, syslog:info(), io_lib:format(Format, Params)).
