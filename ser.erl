@@ -124,7 +124,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 			#cmd{cookie=Cookie, type=?CMD_X};
 		["I"] ->
 			#cmd{cookie=Cookie, type=?CMD_I};
-		[_Other] ->
+		_Other ->
 			error_syntax
 	end of
 		error_syntax ->
