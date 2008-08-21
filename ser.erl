@@ -101,13 +101,14 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 			GuessPort = list_to_integer(OrigPort),
 			#cmd{cookie=Cookie, type=?CMD_L, callid=CallId, addr={GuessIp, GuessPort}, from={FromTag, list_to_integer(FromMediaId)}, to={ToTag, list_to_integer(ToMediaId)}, params=Modifiers};
 		% delete session (no MediaIds)
-		["D", CallId, FromTag, ToTag] ->
-			#cmd{cookie=Cookie, type=?CMD_D, callid=CallId, from={FromTag, 0}, to={ToTag, 0}};
+		[[$D|Args], CallId, FromTag, ToTag] ->
+			{Modifiers, _} = lists:unzip(lists:filter(fun({_, Sym}) -> lists:member(Sym, Args) end, ?MOD_LIST)),
+			#cmd{cookie=Cookie, type=?CMD_D, callid=CallId, from={FromTag, 0}, to={ToTag, 0}, params=Modifiers};
 		% record (obsoleted)
 		["R", CallId, FromTag, FromMediaId, ToTag, ToMediaId] ->
 			#cmd{cookie=Cookie, type=?CMD_R, callid=CallId, from={FromTag, list_to_integer(FromMediaId)}, to={ToTag, list_to_integer(ToMediaId)}};
 		% playback pre-recorded audio
-		["P", CallId, PlayName, Codecs, FromTag, FromMediaId, ToTag, ToMediaId] ->
+		[[$P|Args], CallId, PlayName, Codecs, FromTag, FromMediaId, ToTag, ToMediaId] ->
 			#cmd{cookie=Cookie, type=?CMD_P, callid=CallId, from={FromTag, list_to_integer(FromMediaId)}, to={ToTag, list_to_integer(ToMediaId)}, filename=PlayName, codecs=Codecs};
 		% stop playback or record
 		["S", CallId, FromTag, FromMediaId, ToTag, ToMediaId] ->

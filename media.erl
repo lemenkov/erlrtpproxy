@@ -46,7 +46,7 @@ init ({Parent, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}}) ->
 	?PRINT("started {~w [~w:~w]} {~w [~w:~w]}", [FdFrom, IpFrom, PortFrom, FdTo, IpTo, PortTo]),
 	process_flag(trap_exit, true),
 	{ok, TRef} = timer:send_interval(10000, self(), ping),
-	{ok, {Parent, TRef, #media{fd=FdFrom, ip=IpFrom, port=PortFrom}, #media{fd=FdTo, ip=IpTo, port=PortTo}, rtp}}.
+	{ok, {Parent, TRef, #media{fd=FdFrom, ip=IpFrom, port=PortFrom}, #media{fd=FdTo, ip=IpTo, port=PortTo}, rtp, false}}.
 
 % all other calls
 handle_call(_Other, _From, State) ->
@@ -55,6 +55,14 @@ handle_call(_Other, _From, State) ->
 handle_cast(stop, State) ->
 	{stop, stop, State};
 
+handle_cast(hold, {Parent, TRef, From, To, _RtpState, false}) ->
+	?PRINT("HOLD on", []),
+	{noreply, {Parent, TRef, From, To, _RtpState, true}};
+
+handle_cast(hold, {Parent, TRef, From, To, _RtpState, true}) ->
+	?PRINT("HOLD off", []),
+	{noreply, {Parent, TRef, From, To, _RtpState, false}};
+
 % all other casts
 handle_cast(_Request, State) ->
 	{noreply, State}.
@@ -62,7 +70,7 @@ handle_cast(_Request, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, {Parent, TRef, From, To, _RtpState}) ->
+terminate(Reason, {Parent, TRef, From, To, _RtpState, _HoldState}) ->
 	timer:cancel(TRef),
 	gen_udp:close(From#media.fd),
 	gen_udp:close(To#media.fd),
@@ -70,28 +78,37 @@ terminate(Reason, {Parent, TRef, From, To, _RtpState}) ->
 	?PRINT("terminated due to reason [~p]", [Reason]).
 
 % We received UDP-data on From or To socket, so we must send in from To or From socket respectively
+% (if we not in HOLD state)
 % (symmetric NAT from the client's POV)
 % We must ignore previous state ('rtp' or 'nortp') and set it to 'rtp'
 % We use Ip and Port as address for future messages to FdTo or FdFrom
-handle_info({udp, Fd, Ip, Port, Msg}, {Parent, TRef, From, To, _RtpState}) ->
+handle_info({udp, Fd, Ip, Port, Msg}, {Parent, TRef, From, To, _RtpState, HoldState}) ->
 %	?PRINT("[~p] [~p] [~p]", [{Fd, Ip, Port}, From, To]),
-	case Fd == From#media.fd of
+	{F, T, Fd1, Ip1, Port1} = case (Fd == From#media.fd) of
 		true ->
-			gen_udp:send(To#media.fd, From#media.ip, From#media.port, Msg),
-			{noreply, {Parent, TRef, From, To#media{ip=Ip, port=Port}, rtp}};
+			{From, To#media{ip=Ip, port=Port}, To#media.fd, From#media.ip, From#media.port};
 		false ->
-			gen_udp:send(From#media.fd, To#media.ip, To#media.port, Msg),
-			{noreply, {Parent, TRef, From#media{ip=Ip, port=Port}, To, rtp}}
+			{From#media{ip=Ip, port=Port}, To, From#media.fd, To#media.ip, To#media.port}
+	end,
+	case HoldState of
+		true ->
+			% TODO Play prerecorded media
+			ok;
+		false ->
+			gen_udp:send(Fd1, Ip1, Port1, Msg)
+	end,
+	{noreply, {Parent, TRef, F, T, rtp, HoldState}};
+
+handle_info(ping, {Parent, TRef, From, To, RtpState, HoldState}) ->
+	case RtpState of
+		rtp ->
+			% setting state to 'nortp'
+			{noreply, {Parent, TRef, From, To, nortp, HoldState}};
+		nortp ->
+			% We didn't get new messages since last ping - we should close this mediastream
+			?PRINT("timeout", []),
+			{stop, nortp, {Parent, TRef, From, To, nortp, HoldState}}
 	end;
-
-% setting state to 'nortp'
-handle_info(ping, {Parent, TRef, From, To, rtp}) ->
-	{noreply, {Parent, TRef, From, To, nortp}};
-
-% We didn't get new messages - we should close this mediastream
-handle_info(ping, {Parent, TRef, From, To, nortp}) ->
-	?PRINT("timeout", []),
-	{stop, nortp, {Parent, TRef, From, To, nortp}};
 
 handle_info(Other, State) ->
 	?PRINT("Other Info [~p], State [~p]", [Other, State]),

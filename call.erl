@@ -32,13 +32,13 @@
 
 -include("common.hrl").
 
--record(party, {fdfrom=null, ipfrom=null, portfrom=null, tagfrom=null,
-		ipfromguess=null, portfromguess=null,
-		fdto=null,   ipto=null,   portto=null,   tagto=null,
+-record(source, {fd=null, ip=null, port=null}).
+
+-record(party, {from=null,
+		to=null,
 		mediaid=null,
 		pid=null,
 		answered=false,
-		mod_asymmetric=false,
 		mod_e=false,
 		mod_i=false,
 		mod_ipv6=false,
@@ -59,14 +59,14 @@ init (MainIp) ->
 
 % handle originate call leg (new media id possibly)
 % TODO handle Modifiers
-handle_call({message_u, {{GuessIp, GuessPort}, {FromTag, MediaId}, Modifiers}}, _From, {MainIp, Parties}) ->
+handle_call({message_u, {{GuessIp, GuessPort}, {_FromTag, MediaId}, Modifiers}}, _From, {MainIp, Parties}) ->
 	?PRINT ("message [U] MediaId [~b]", [MediaId]),
 	% search for already  existed
 	case lists:keysearch(MediaId, #party.mediaid, Parties) of
 		% call already exists
 		{value, Party} ->
 			?PRINT("Already exists!", []),
-			{ok, {LocalIp, LocalPort}} = inet:sockname(Party#party.fdfrom),
+			{ok, {LocalIp, LocalPort}} = inet:sockname((Party#party.from)#source.fd),
 			Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 			?PRINT("answer [~s]", [Reply]),
 			{reply, {ok, Reply}, {MainIp, Parties}};
@@ -89,7 +89,7 @@ handle_call({message_u, {{GuessIp, GuessPort}, {FromTag, MediaId}, Modifiers}}, 
 
 %					?PRINT("Guessing caller listens at ~w:~w", [GuessIp, GuessPort]),
 
-					NewParty = #party{fdfrom=Fd1, ipfromguess=GuessIp, portfromguess=GuessPort, tagfrom=FromTag, fdto=Fd2, mediaid=MediaId},
+					NewParty = #party{from=#source{fd=Fd1, ip=GuessIp, port=GuessPort}, to=#source{fd=Fd2}, mediaid=MediaId},
 
 					Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 					?PRINT("answer [~s]", [Reply]),
@@ -102,17 +102,17 @@ handle_call({message_u, {{GuessIp, GuessPort}, {FromTag, MediaId}, Modifiers}}, 
 
 % handle answered call leg
 % Both MediaId's are equal (just guessing)
-handle_call({message_l, {{FromTag, MediaId}, {ToTag, MediaId}, Modifiers}}, _From, {MainIp, Parties}) ->
+handle_call({message_l, {{_FromTag, MediaId}, {_ToTag, MediaId}, Modifiers}}, _From, {MainIp, Parties}) ->
 	?PRINT ("message [L] MediaId [~b]", [MediaId]),
 	% search for already  existed
 	case lists:keysearch(MediaId, #party.mediaid, Parties) of
 		% call already exists and Fd is not opened
-		{value, Party} when Party#party.fdto == null ->
-			?PRINT("Already exists (FdTo == NULL)!", []),
+		{value, Party} when (Party#party.to)#source.fd == null ->
+			?PRINT("Already exists (To.Fd == NULL)!", []),
 			case gen_udp:open(0, [binary, {ip, MainIp}, {active, true}]) of
 				{ok, Fd} ->
 					{ok, {LocalIp, LocalPort}} = inet:sockname(Fd),
-					NewParty = Party#party{fdto=Fd, tagto=ToTag, answered=true},
+					NewParty = Party#party{to=(Party#party.to)#source{fd=Fd}, answered=true},
 
 					Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 %					?PRINT("answer [~s]", [Reply]),
@@ -122,10 +122,10 @@ handle_call({message_l, {{FromTag, MediaId}, {ToTag, MediaId}, Modifiers}}, _Fro
 					{reply, {error, udp_error}, {MainIp, Parties}}
 			end;
 		% call already exists and Fd is opened
-		{value, Party} when Party#party.fdto /= null ->
-			?PRINT("Already exists (FdTo != NULL)!", []),
+		{value, Party} when (Party#party.to)#source.fd /= null ->
+			?PRINT("Already exists (To.Fd != NULL)!", []),
 
-			{ok, {LocalIp, LocalPort}} = inet:sockname(Party#party.fdto),
+			{ok, {LocalIp, LocalPort}} = inet:sockname((Party#party.to)#source.fd),
 			NewParty = Party#party{answered=true},
 
 			Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
@@ -151,9 +151,20 @@ handle_cast({message_r, filename}, State) ->
 	% TODO start recording of RTP
 	{noreply, State};
 
-handle_cast({message_p, filename}, State) ->
+handle_cast({message_p, {FromTag, MediaId}, {ToTag, MediaId}, Filename, Codecs}, {MainIp, Parties}) ->
 	% TODO start playback of pre-recorded audio
-	{noreply, State};
+	?PRINT("Message [P] file[~s] codecs[~s] [~p]", [Filename, Codecs, Parties]),
+	_Unused = lists:foreach(
+		fun(X)  ->
+			if
+				X#party.pid /= null ->
+					gen_server:cast(X#party.pid, hold);
+				true ->
+					ok
+			end
+		end,
+		Parties),
+	{noreply, {MainIp, Parties}};
 
 handle_cast(message_s, State) ->
 	% TODO stop playback/recording of RTP
@@ -199,44 +210,65 @@ terminate(Reason, {_MainIp, Parties}) ->
 % rtp from some port
 handle_info({udp, Fd, Ip, Port, Msg}, {MainIp, Parties}) ->
 %	?PRINT("udp from Fd [~w] [~p:~p]", [Fd, Ip, Port]),
-	Fun1 = fun (X,Y1,Y2,Z) ->
-		case lists:keysearch(X,Y1,Z) of
-			{value, Val1} ->
-				{value, Y1, Val1};
-			false ->
-				case lists:keysearch (X,Y2,Z) of
-					{value, Val2} ->
-						{value, Y2, Val2};
-					false ->
-						false
+	Fun = fun (F) ->
+		fun	({[], X}) ->
+				false;
+			({[Elem|Rest], X}) ->
+				case (Elem#party.from)#source.fd of
+					X ->
+						{value, from, Elem};
+					_ ->
+						case (Elem#party.to)#source.fd of
+							X ->
+								{value, to, Elem};
+							_ ->
+								F({Rest, X})
+						end
 				end
 		end
 	end,
-	case Fun1(Fd, #party.fdfrom, #party.fdto, Parties) of
-		{value, #party.fdto, Party} when Party#party.ipto /= null, Party#party.portto /= null, Party#party.pid == null, Party#party.answered == true ->
-			% We don't need to check FdFrom for existence since it's no doubt exists
-			{ok, PartyPid} = media:start({self(), {Party#party.fdfrom, Ip, Port}, {Party#party.fdto, Party#party.ipto, Party#party.portto}}),
-			% FIXME send this Msg
-			gen_udp:controlling_process(Party#party.fdfrom, PartyPid),
-			gen_udp:controlling_process(Party#party.fdto, PartyPid),
-			{noreply, {MainIp, lists:keyreplace(Fd, #party.fdto, Parties, Party#party{ipfrom=Ip, portfrom=Port, pid=PartyPid})}};
-		{value, #party.fdto, Party} ->
-			{noreply, {MainIp, lists:keyreplace(Fd, #party.fdto, Parties, Party#party{ipfrom=Ip, portfrom=Port})}};
-		{value, #party.fdfrom, Party} when Party#party.ipfrom /= null, Party#party.portfrom /= null, Party#party.fdto /= null, Party#party.pid == null, Party#party.answered == true ->
-			{ok, PartyPid} = media:start({self(), {Party#party.fdfrom, Party#party.ipfrom, Party#party.portfrom}, {Party#party.fdto, Ip, Port}}),
-			% FIXME send this Msg
-			gen_udp:controlling_process(Party#party.fdfrom, PartyPid),
-			gen_udp:controlling_process(Party#party.fdto, PartyPid),
-			{noreply, {MainIp, lists:keyreplace(Fd, #party.fdfrom, Parties, Party#party{ipto=Ip, portto=Port, pid=PartyPid})}};
-		{value, #party.fdfrom, Party} ->
-			% guessing that caller has uPnP
-			case Party#party.fdto of
-				null ->
-					ok;
-				_ ->
-					gen_udp:send(Party#party.fdto, Party#party.ipfromguess, Party#party.portfromguess, Msg)
-			end,
-			{noreply, {MainIp, lists:keyreplace(Fd, #party.fdfrom, Parties, Party#party{ipto=Ip, portto=Port})}};
+	case
+		case (y(Fun))({Parties, Fd}) of
+			% RTP to Callee
+			{value, to, Party} when
+						(Party#party.to)#source.ip /= null,
+						(Party#party.to)#source.port /= null,
+						% We don't need to check FdFrom for existence since it's no doubt exists
+						% (Party#party.from)#source.fd /= null,
+						Party#party.pid == null,
+						Party#party.answered == true
+							->
+				{ok, PartyPid} = media:start({self(), {(Party#party.from)#source.fd, Ip, Port}, {(Party#party.to)#source.fd, (Party#party.to)#source.ip, (Party#party.to)#source.port}}),
+				% FIXME send Msg in this case
+				gen_udp:controlling_process((Party#party.from)#source.fd, PartyPid),
+				gen_udp:controlling_process((Party#party.to)#source.fd,   PartyPid),
+				{Party, Party#party{from=(Party#party.from)#source{ip=Ip, port=Port}, pid=PartyPid}};
+			% RTP to Caller
+			{value, from, Party} when
+						(Party#party.from)#source.ip /= null,
+						(Party#party.from)#source.port /= null,
+						(Party#party.to)#source.fd /= null,
+						Party#party.pid == null,
+						Party#party.answered == true
+							->
+				{ok, PartyPid} = media:start({self(), {(Party#party.from)#source.fd, (Party#party.from)#source.ip, (Party#party.from)#source.port}, {(Party#party.to)#source.fd, Ip, Port}}),
+				% FIXME send Msg in this case
+				gen_udp:controlling_process((Party#party.from)#source.fd, PartyPid),
+				gen_udp:controlling_process((Party#party.to)#source.fd, PartyPid),
+				{Party, Party#party{to=(Party#party.to)#source{ip=Ip, port=Port}, pid=PartyPid}};
+			% RTP to Caller
+			{value, from, Party} ->
+				% TODO guess that caller has uPnP
+				{Party, Party#party{to=(Party#party.to)#source{ip=Ip, port=Port}}};
+			% RTP to Callee
+			{value, to, Party} ->
+				{Party, Party#party{from=(Party#party.from)#source{ip=Ip, port=Port}}};
+			false ->
+				false
+		end
+	of
+		{OldParty, NewParty} ->
+			{noreply, {MainIp, lists:delete(OldParty, Parties) ++ [NewParty]}};
 		false ->
 			{noreply, {MainIp, Parties}}
 	end;
@@ -244,3 +276,8 @@ handle_info({udp, Fd, Ip, Port, Msg}, {MainIp, Parties}) ->
 handle_info(Info, State) ->
 	?PRINT("Info [~w]", [Info]),
 	{noreply, State}.
+
+y(M) ->
+	G = fun (F) -> M(fun(A) -> (F(F))(A) end) end,
+	G(G).
+

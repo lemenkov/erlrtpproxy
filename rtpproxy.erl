@@ -31,7 +31,7 @@
 -export([terminate/2]).
 
 % include list of hosts
--include ("config.hrl").
+-include("config.hrl").
 -include("common.hrl").
 
 % description of call thread
@@ -55,6 +55,12 @@ handle_call({message, Cmd}, From, State) ->
 	case Cmd#cmd.type of
 		% Request basic supported rtpproxy protocol version
 		?CMD_V ->
+%			{ "20040107", "Basic RTP proxy functionality" },
+%			{ "20050322", "Support for multiple RTP streams and MOH" },
+%			{ "20060704", "Support for extra parameter in the V command" },
+%			{ "20071116", "Support for RTP re-packetization" },
+%			{ "20071218", "Support for forking (copying) RTP stream" },
+%			{ "20080403", "Support for RTP statistics querying" },
 			{reply, "20040107", State};
 		% Request additional rtpproxy protocol extensions
 		?CMD_VF ->
@@ -107,7 +113,8 @@ handle_call({message, Cmd}, From, State) ->
 							gen_server:cast(CallInfo#callthread.pid, {message_r, Cmd#cmd.filename}),
 							{reply, ?RTPPROXY_OK, State};
 						?CMD_P ->
-							gen_server:cast(CallInfo#callthread.pid, {message_p, Cmd#cmd.filename}),
+							% TODO should be call instead of cast
+							gen_server:cast(CallInfo#callthread.pid, {message_p, Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.filename, Cmd#cmd.codecs}),
 							{reply, ?RTPPROXY_OK, State};
 						?CMD_S ->
 							gen_server:cast(CallInfo#callthread.pid, message_s),
@@ -171,7 +178,7 @@ handle_cast({call_terminated, {Pid, Reason}}, State) ->
 
 handle_cast({node_add, {Node, Ip}}, State) when is_atom(Node), is_atom(Ip) ->
 	?PRINT("add node [~p]", [{Node, Ip}]),
-	% TODO consider do not appending unresponcible hosts
+	% TODO consider do not appending unresponsible hosts
 	{noreply, State#state{rtphosts=lists:append(State#state.rtphosts, [{Node, Ip}])}};
 
 handle_cast({node_del, {Node, Ip}}, State) when is_atom(Node), is_atom(Ip) ->
