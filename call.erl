@@ -141,6 +141,27 @@ handle_call(message_i, _From, State) ->
 	% TODO (acquire information about call state)
 	{reply, {ok, "TODO"}, State};
 
+handle_call(message_p, _From, {MainIp, Parties}) ->
+	?PRINT("Message [P] [~p]", [Parties]),
+	Fun = fun(F) ->
+		fun	({[], Result}) ->
+				Result;
+			({[Party|Rest], Result}) ->
+				case Party#party.pid of
+					null ->
+						F ({Rest, Result});
+					_ ->
+						{ok, {Ip1, Port1}} = inet:sockname((Party#party.from)#source.fd),
+						{ok, {Ip2, Port2}} = inet:sockname((Party#party.to)#source.fd),
+						gen_server:cast(Party#party.pid, hold),
+						F ({Rest, Result ++ [{{Ip1, Port1}, {Ip2, Port2}}]})
+				end
+		end
+	end,
+	Result = (y(Fun))({Parties, []}),
+	{reply, {ok, Result}, {MainIp, Parties}};
+
+
 handle_call(_Other, _From, State) ->
 	{noreply, State}.
 
@@ -150,21 +171,6 @@ handle_cast(message_d, State) ->
 handle_cast({message_r, filename}, State) ->
 	% TODO start recording of RTP
 	{noreply, State};
-
-handle_cast({message_p, {FromTag, MediaId}, {ToTag, MediaId}, Filename, Codecs}, {MainIp, Parties}) ->
-	% TODO start playback of pre-recorded audio
-	?PRINT("Message [P] file[~s] codecs[~s] [~p]", [Filename, Codecs, Parties]),
-	_Unused = lists:foreach(
-		fun(X)  ->
-			if
-				X#party.pid /= null ->
-					gen_server:cast(X#party.pid, hold);
-				true ->
-					ok
-			end
-		end,
-		Parties),
-	{noreply, {MainIp, Parties}};
 
 handle_cast(message_s, State) ->
 	% TODO stop playback/recording of RTP
