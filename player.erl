@@ -20,7 +20,7 @@
 -module(player).
 -author('lemenkov@gmail.com').
 
--export([start/4]).
+-export([start/3]).
 -export([send_rtp/8]).
 
 -include("common.hrl").
@@ -46,7 +46,7 @@ start (Filename, PayloadType, IpAddrs) ->
 	end.
 
 send_rtp (<<"">>, Fd, PayloadType, SequenceNumber, TimestampBase, SSRC, IpAddrs, Sent) ->
-	send_rtp (Sent, Fd, PayloadType, SequenceNumber, TimestampBase, SSRC, Ip, Port, <<"">>);
+	send_rtp (Sent, Fd, PayloadType, SequenceNumber, TimestampBase, SSRC, IpAddrs, <<"">>);
 
 send_rtp (RtpData, Fd, PayloadType, SequenceNumber, TimestampBase, SSRC, IpAddrs, Sent) ->
 	% TODO add more variants (probably when makeann should be able to encode new formats)
