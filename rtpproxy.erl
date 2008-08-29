@@ -36,7 +36,7 @@
 
 % description of call thread
 -record(thread, {pid=null, callid=null}).
--record(state, {calls=null, rtphosts=null, players=null}).
+-record(state, {calls=[], rtphosts=null, players=[]}).
 
 start(Args) ->
 	gen_server:start({global, ?MODULE}, ?MODULE, Args, []).
@@ -48,7 +48,7 @@ init(_Unused) ->
 	process_flag(trap_exit, true),
 	syslog:start(),
 	?PRINT("started with rtphosts [~p]", [?RtpHosts]),
-	{ok, #state{calls=[], rtphosts=?RtpHosts}}.
+	{ok, #state{rtphosts=?RtpHosts}}.
 
 handle_call({message, Cmd}, From, State) ->
 	?PRINT("Cmd[~p]", [Cmd]),
