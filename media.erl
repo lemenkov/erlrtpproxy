@@ -57,10 +57,13 @@ handle_cast(stop, State) ->
 
 handle_cast(hold, {Parent, TRef, From, To, _RtpState, false}) ->
 	?PRINT("HOLD on", []),
-	{noreply, {Parent, TRef, From, To, _RtpState, true}};
+	% We should suppress timer since we shouldn't care this mediastream
+	timer:cancel(TRef),
+	{noreply, {Parent, null, From, To, _RtpState, true}};
 
-handle_cast(hold, {Parent, TRef, From, To, _RtpState, true}) ->
+handle_cast(hold, {Parent, null, From, To, _RtpState, true}) ->
 	?PRINT("HOLD off", []),
+	{ok, TRef} = timer:send_interval(10000, self(), ping),
 	{noreply, {Parent, TRef, From, To, _RtpState, false}};
 
 % all other casts
@@ -83,7 +86,7 @@ terminate(Reason, {Parent, TRef, From, To, _RtpState, _HoldState}) ->
 % We must ignore previous state ('rtp' or 'nortp') and set it to 'rtp'
 % We use Ip and Port as address for future messages to FdTo or FdFrom
 handle_info({udp, Fd, Ip, Port, Msg}, {Parent, TRef, From, To, _RtpState, HoldState}) ->
-%	?PRINT("[~p] [~p] [~p]", [{Fd, Ip, Port}, From, To]),
+%	?PRINT("rtp [~w] [~w] [~w]", [{Fd, Ip, Port}, From, To]),
 	{F, T, Fd1, Ip1, Port1} = case (Fd == From#media.fd) of
 		true ->
 			{From, To#media{ip=Ip, port=Port}, To#media.fd, From#media.ip, From#media.port};
@@ -92,7 +95,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Parent, TRef, From, To, _RtpState, HoldSt
 	end,
 	case HoldState of
 		true ->
-			% TODO Play prerecorded media
+			% do nothing
 			ok;
 		false ->
 			gen_udp:send(Fd1, Ip1, Port1, Msg)
@@ -106,7 +109,6 @@ handle_info(ping, {Parent, TRef, From, To, RtpState, HoldState}) ->
 			{noreply, {Parent, TRef, From, To, nortp, HoldState}};
 		nortp ->
 			% We didn't get new messages since last ping - we should close this mediastream
-			?PRINT("timeout", []),
 			{stop, nortp, {Parent, TRef, From, To, nortp, HoldState}}
 	end;
 

@@ -151,10 +151,9 @@ handle_call(message_p, _From, {MainIp, Parties}) ->
 					null ->
 						F ({Rest, Result});
 					_ ->
-						{ok, {Ip1, Port1}} = inet:sockname((Party#party.from)#source.fd),
-						{ok, {Ip2, Port2}} = inet:sockname((Party#party.to)#source.fd),
 						gen_server:cast(Party#party.pid, hold),
-						F ({Rest, Result ++ [{{Ip1, Port1}, {Ip2, Port2}}]})
+						F ({Rest, Result ++ [{{(Party#party.to)#source.fd, (Party#party.from)#source.ip, (Party#party.from)#source.port},
+									{(Party#party.from)#source.fd, (Party#party.to)#source.ip, (Party#party.to)#source.port}}]})
 				end
 		end
 	end,

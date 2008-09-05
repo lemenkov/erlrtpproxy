@@ -47,7 +47,7 @@ start_link(Args) ->
 init(_Unused) ->
 	process_flag(trap_exit, true),
 	syslog:start(),
-	?PRINT("started with rtphosts [~p]", [?RtpHosts]),
+	?PRINT("started with rtphosts [~w]", [?RtpHosts]),
 	{ok, #state{rtphosts=?RtpHosts}}.
 
 handle_call({message, Cmd}, From, State) ->
@@ -69,6 +69,7 @@ handle_call({message, Cmd}, From, State) ->
 		% stop all active sessions
 		?CMD_X ->
 			lists:foreach(fun(X) -> gen_server:cast(X#thread.pid, message_d) end, State#state.calls),
+			lists:foreach(fun(X) -> gen_server:cast(X#thread.pid, message_d) end, State#state.players),
 			{reply, ?RTPPROXY_OK, State};
 		?CMD_I ->
 			% TODO show information about calls
@@ -109,26 +110,35 @@ handle_call({message, Cmd}, From, State) ->
 							{reply, ?RTPPROXY_OK, State};
 						?CMD_D ->
 							gen_server:cast(CallInfo#thread.pid, message_d),
+							case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.players) of
+								{value, PlayerInfo} ->
+									PlayerInfo#thread.pid ! message_d;
+								_ ->
+									ok
+							end,
 							{reply, ?RTPPROXY_OK, State};
 						?CMD_R ->
 							gen_server:cast(CallInfo#thread.pid, {message_r, Cmd#cmd.filename}),
 							{reply, ?RTPPROXY_OK, State};
 						?CMD_P ->
-							{ok, IpAddrs} = gen_server:call(CallInfo#thread.pid, message_p),
+							{ok, Addrs} = gen_server:call(CallInfo#thread.pid, message_p),
 							case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.players) of
 								{value, PlayerInfo} ->
 									% Already started
 									% TODO should we change played music?
-									{reply, ?RTPPROXY_OK, State};
+									% we simply kill current thread
+									PlayerInfo#thread.pid ! message_s,
+									{reply, ?RTPPROXY_OK, State#state{players=lists:delete(PlayerInfo, State#state.players)}};
+%									{reply, ?RTPPROXY_OK, State};
 								false ->
 									case find_node(State#state.rtphosts) of
 										{{RtpHost, RtpIp}, RtpHosts} ->
-											try rpc:call(RtpHost, player, start, [Cmd#cmd.filename, Cmd#cmd.codecs, IpAddrs]) of
+											try rpc:call(RtpHost, player, start, [Cmd#cmd.filename, Cmd#cmd.codecs, Addrs]) of
 												{ok, PlayerPid} ->
 													NewPlayerThread = #thread{pid=PlayerPid, callid=Cmd#cmd.callid},
 													{reply, ?RTPPROXY_OK, State#state{players=lists:append (State#state.players, [NewPlayerThread]), rtphosts=RtpHosts}};
 												{badrpc, nodedown} ->
-													?PRINT("rtp host [~p] seems stopped!", [{RtpHost,RtpIp}]),
+													?PRINT("rtp host [~w] seems stopped!", [{RtpHost,RtpIp}]),
 													% FIXME consider to remove bad host from list
 													{reply, ?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts}};
 												Other ->
@@ -136,7 +146,7 @@ handle_call({message, Cmd}, From, State) ->
 													{reply, ?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts}}
 											catch
 												ExceptionClass:ExceptionPattern ->
-													?PRINT("Exception [~p] reached with result [~p]", [ExceptionClass, ExceptionPattern]),
+													?PRINT("Exception [~w] reached with result [~w]", [ExceptionClass, ExceptionPattern]),
 													{reply, ?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts}}
 											end;
 										error_no_nodes ->
@@ -148,10 +158,12 @@ handle_call({message, Cmd}, From, State) ->
 							gen_server:cast(CallInfo#thread.pid, message_s),
 							case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.players) of
 								{value, PlayerInfo} ->
+									?PRINT("Stop player thread.", []),
 									PlayerInfo#thread.pid ! message_s,
 									{reply, ?RTPPROXY_OK, State#state{players=lists:delete(PlayerInfo, State#state.players)}};
 								false ->
-									{reply, ?RTPPROXY_OK, State}
+									?PRINT("CANNOT Stop player thread.", []),
+									{reply, ?RTPPROXY_ERR_NOSESSION, State}
 							end;
 						_ ->
 							{reply, ?RTPPROXY_ERR_SOFTWARE, State}
@@ -162,7 +174,7 @@ handle_call({message, Cmd}, From, State) ->
 						?CMD_U ->
 							case find_node(State#state.rtphosts) of
 								{{RtpHost, RtpIp}, RtpHosts} ->
-									?PRINT("Session not exists. Creating new at ~p.", [RtpHost]),
+									?PRINT("Session not exists. Creating new at ~w.", [RtpHost]),
 									try rpc:call(RtpHost, call, start, [RtpIp]) of
 										{ok, CallPid} ->
 											NewCallThread = #thread{pid=CallPid, callid=Cmd#cmd.callid},
@@ -172,11 +184,11 @@ handle_call({message, Cmd}, From, State) ->
 												{error, udp_error} ->
 													{reply, ?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts}};
 												{Other} ->
-													?PRINT("Other msg [~p]", [Other]),
+													?PRINT("Other msg [~w]", [Other]),
 													{reply, ?RTPPROXY_ERR_SOFTWARE, State}
 											end;
 										{badrpc, nodedown} ->
-											?PRINT("rtp host [~p] seems stopped!", [{RtpHost,RtpIp}]),
+											?PRINT("rtp host [~w] seems stopped!", [{RtpHost,RtpIp}]),
 											% FIXME consider to remove bad host from list
 											{reply, ?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts}};
 										Other ->
@@ -184,15 +196,26 @@ handle_call({message, Cmd}, From, State) ->
 											{reply, ?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts}}
 									catch
 										ExceptionClass:ExceptionPattern ->
-											?PRINT("Exception [~p] reached with result [~p]", [ExceptionClass, ExceptionPattern]),
+											?PRINT("Exception [~w] reached with result [~w]", [ExceptionClass, ExceptionPattern]),
 											{reply, ?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts}}
 									end;
 								error_no_nodes ->
 									?PRINT("error no suitable nodes to create new session!", []),
 									{reply, ?RTPPROXY_ERR_SOFTWARE, State}
 							end;
+						?CMD_D ->
+							case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.players) of
+								{value, PlayerInfo} ->
+									?PRINT("Stop player thread.", []),
+									PlayerInfo#thread.pid ! message_d,
+									{reply, ?RTPPROXY_OK, State};
+								false ->
+									?PRINT("CANNOT Stop player thread.", []),
+									{reply, ?RTPPROXY_ERR_NOSESSION, State}
+							end;
 						?CMD_P ->
 							% TODO we must fix OpenSER-rtpproxy protocol to add ip:port of destination
+							?PRINT("Incompatible with current protocol. Do nothing.", []),
 							{reply, ?RTPPROXY_OK, State};
 						_ ->
 							?PRINT("Session not exists. Do nothing.", []),
@@ -205,22 +228,28 @@ handle_call(_Message, _From , State) ->
 	{reply, ?RTPPROXY_ERR_SOFTWARE, State}.
 
 handle_cast({call_terminated, {Pid, Reason}}, State) ->
-	?PRINT("received call [~w] closing due to [~p]", [Pid, Reason]),
+	?PRINT("received call [~w] closing due to [~w]", [Pid, Reason]),
 	case lists:keysearch(Pid, #thread.pid, State#state.calls) of
 		{value, CallThread} ->
 			?PRINT("call [~w] closed", [Pid]),
 			{noreply, State#state{calls=lists:delete(CallThread, State#state.calls)}};
 		false ->
-			{noreply, State}
+			case lists:keysearch(Pid, #thread.pid, State#state.players) of
+				{value, PlayerThread} ->
+					?PRINT("call [~w] closed", [Pid]),
+					{noreply, State#state{players=lists:delete(PlayerThread, State#state.players)}};
+				false ->
+					{noreply, State}
+			end
 	end;
 
 handle_cast({node_add, {Node, Ip}}, State) when is_atom(Node), is_atom(Ip) ->
-	?PRINT("add node [~p]", [{Node, Ip}]),
+	?PRINT("add node [~w]", [{Node, Ip}]),
 	% TODO consider do not appending unresponsible hosts
 	{noreply, State#state{rtphosts=lists:append(State#state.rtphosts, [{Node, Ip}])}};
 
 handle_cast({node_del, {Node, Ip}}, State) when is_atom(Node), is_atom(Ip) ->
-	?PRINT("del node [~p]", [{Node, Ip}]),
+	?PRINT("del node [~w]", [{Node, Ip}]),
 	{noreply, State#state{rtphosts=lists:delete({Node, Ip}, State#state.rtphosts)}};
 
 handle_cast(_Other, State) ->
@@ -230,14 +259,20 @@ handle_cast(_Other, State) ->
 handle_info({'EXIT', Pid, _Reason}, State) ->
 	case lists:keysearch(Pid, #thread.pid, State#state.calls) of
 		{value, CallThread} ->
-			?PRINT("call [~p] closed", [Pid]),
+			?PRINT("call [~w] closed", [Pid]),
 			{noreply, State#state{calls=lists:delete(CallThread, State#state.calls)}};
 		false ->
 			{noreply, State}
 	end;
 
 handle_info(Info, State) ->
-	?PRINT("got INFO [~p]", [Info]),
+	case Info of
+		{udp, Fd, Ip, Port, Data} ->
+			{ok, {LocalIp, LocalPort}} = inet:sockname(Fd),
+			?PRINT("got udp INFO (shouldn't happend) from [~w ~w] to [~w, ~w, ~w] <<some data>> of size ~w", [Ip, Port, Fd, LocalIp, LocalPort, size(Data)]);
+		_ ->
+			?PRINT("got INFO [~w]", [Info])
+	end,
 	{noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -245,7 +280,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 terminate(Reason, State) ->
 	syslog:stop(),
-	io:format("RTPPROXY terminated due to reason [~p]", [Reason]).
+	io:format("RTPPROXY terminated due to reason [~w]", [Reason]).
 
 find_node (Nodes) ->
 	find_node(Nodes, []).

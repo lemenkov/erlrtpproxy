@@ -21,10 +21,11 @@
 -author('lemenkov@gmail.com').
 
 -export([start/3]).
--export([send_rtp/8]).
+-export([send_rtp/3]).
 
 -include("common.hrl").
 
+% http://en.wikipedia.org/wiki/RTP_Audio_Video_Profiles
 -define(RTP_PCMU, 0).
 -define(RTP_GSM, 3).
 -define(RTP_G723, 4).
@@ -34,45 +35,77 @@
 -define(RTP_TSE, 100).
 -define(RTP_TSE_CISCO, 101).
 
-start (Filename, PayloadType, IpAddrs) ->
+-record(state, {payloadtype=null,
+		payloadlimit=0,
+		sequencenumber=0,
+		timestampbase=0,
+		time=0,
+		ssrc=0,
+		addrs=null}).
+
+start (Filename, PayloadTypeStr, IpAddrs) ->
+	process_flag(trap_exit, true),
+	{PayloadType, PayloadLimit} = case PayloadTypeStr of
+		"0PCMU/8000" -> {?RTP_PCMU, 8000};
+		"8PCMA/8000" -> {?RTP_PCMA, 8000};
+		_ -> {?RTP_G729, 0}
+	end,
+
 	case file:read_file(Filename) of
 		{ok, RtpData} ->
-			{ok, Fd} = gen_udp:open(0, [binary, {active, true}]),
 			{MegaSecs, Secs, MicroSecs} = now(),
-			Timestamp = (MegaSecs * 1000000 +  Secs) * 1000000 + MicroSecs,
-			{ok, spawn(player, send_rtp, [RtpData, Fd, PayloadType, Timestamp, random:uniform(2 bsl 31), IpAddrs, <<"">>])};
+			TimestampBase = (MegaSecs * 1000000 +  Secs) * 1000000 + MicroSecs,
+			State = #state{payloadtype=PayloadType, payloadlimit=PayloadLimit, timestampbase=TimestampBase, ssrc=random:uniform(2 bsl 31), addrs=IpAddrs},
+			{ok, spawn(node(), player, send_rtp, [RtpData, State, <<"">>])};
 		{error, Reason} ->
 			{error, Reason}
 	end.
 
-send_rtp (<<"">>, Fd, PayloadType, SequenceNumber, TimestampBase, SSRC, IpAddrs, Sent) ->
-	send_rtp (Sent, Fd, PayloadType, SequenceNumber, TimestampBase, SSRC, IpAddrs, <<"">>);
+send_rtp (<<"">>, State, Sent) ->
+	send_rtp (Sent, State, <<"">>);
 
-send_rtp (RtpData, Fd, PayloadType, SequenceNumber, TimestampBase, SSRC, IpAddrs, Sent) ->
+send_rtp (RtpData, State, Sent) ->
 	% TODO add more variants (probably when makeann should be able to encode new formats)
-	PayloadLength = case PayloadType of
-		<<?RTP_PCMU:7>> -> 160;
-		<<?RTP_PCMA:7>> -> 160;
-		<<?RTP_G729:7>> -> 10;
-		<<?RTP_G723:7>> -> 24;
-		<<?RTP_GSM:7>> -> 33;
+	% TODO Move to  start (...)
+	?PRINT("listener begin! State[~w], sent ~w and remains ~w bytes.~n", [State, size(Sent), size(RtpData)]),
+	PayloadLength = case State#state.payloadtype of
+		?RTP_PCMU ->
+			if
+				size (RtpData) > 160 -> 160;
+				true -> size(RtpData)
+			end;
+		?RTP_PCMA ->
+			if
+				size (RtpData) > 160 -> 160;
+				true -> size(RtpData)
+			end;
+		?RTP_G729 -> 10;
+		?RTP_G723 -> 24;
+		?RTP_GSM -> 33;
 		_ -> 0
 	end,
 
+%	?PRINT("listener 1!~n", []),
 	<<Payload:PayloadLength/binary, Rest/binary>> = RtpData,
+
 	{MegaSecs, Secs, MicroSecs} = now(),
-	Timestamp = (MegaSecs * 1000000 +  Secs) * 1000000 + MicroSecs - TimestampBase,
+	Timestamp = (MegaSecs * 1000000 +  Secs) * 1000000 + MicroSecs - State#state.timestampbase,
 
 	% TODO
-	[{{Ip1, Port1}, {Ip2, Port2}}|Other] = IpAddrs,
-	gen_udp:send(Fd, Ip1, Port1, <<2:2, 0:1, 0:1, 0:4, 0:1, PayloadType:7, SequenceNumber:16, Timestamp:32, SSRC:32, Payload:PayloadLength/binary>>),
-	gen_udp:send(Fd, Ip2, Port2, <<2:2, 0:1, 0:1, 0:4, 0:1, PayloadType:7, SequenceNumber:16, Timestamp:32, SSRC:32, Payload:PayloadLength/binary>>),
+%	?PRINT("listener 2! ~w~n", [State#state.addrs]),
+	[{{Fd1, Ip1, Port1}, {Fd2, Ip2, Port2}}|Other] = State#state.addrs,
 
+%	?PRINT("listener 3!~n", []),
+	gen_udp:send(Fd1, Ip1, Port1, <<2:2, 0:1, 0:1, 0:4, 0:1, (State#state.payloadtype):7, (State#state.sequencenumber):16, Timestamp:32, (State#state.ssrc):32, Payload:PayloadLength/binary>>),
+	gen_udp:send(Fd2, Ip2, Port2, <<2:2, 0:1, 0:1, 0:4, 0:1, (State#state.payloadtype):7, (State#state.sequencenumber):16, Timestamp:32, (State#state.ssrc):32, Payload:PayloadLength/binary>>),
+
+%	?PRINT("listener 4! wait for ~w msec~n", [State#state.time]),
 	receive
-		_ ->
-			gen_udp:close(Fd),
-			io:format("listener RECEIVED!~n")
-	after 0 ->
-		send_rtp(Rest, Fd, PayloadType, SequenceNumber + 1, TimestampBase, SSRC, IpAddrs, <<Sent/binary, Payload:PayloadLength/binary>>)
+		Something ->
+			?PRINT("listener RECEIVED [~p]!~n", [Something]),
+			gen_server:cast({global, rtpproxy}, {call_terminated, {self(), Something}})
+	after State#state.time  ->
+%		?PRINT("listener 5!~n", []),
+		send_rtp(Rest, State#state{time=round(1000 * PayloadLength / State#state.payloadlimit), sequencenumber=State#state.sequencenumber + 1}, <<Sent/binary, Payload:PayloadLength/binary>>)
 	end.
 
