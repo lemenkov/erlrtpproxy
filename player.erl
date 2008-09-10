@@ -59,7 +59,8 @@ start (Filename, PayloadTypeStr, Addr) ->
 		{Fd1, Ip1, Port1} ->
 			{Fd1, Ip1, Port1, false}
 	end,
-	case file:read_file(Filename) of
+	Fn = io_lib:format("~s.~b", [Filename, PAyloadType])
+	case file:read_file(Fn) of
 		{ok, RtpData} ->
 			{MegaSecs, Secs, MicroSecs} = now(),
 			Timestamp = (MegaSecs * 1000000 +  Secs) * 1000000 + MicroSecs,
