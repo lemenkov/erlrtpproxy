@@ -1,0 +1,145 @@
+Index: modules/nathelper/nathelper.c
+===================================================================
+--- modules/nathelper/nathelper.c	(revision 4705)
++++ modules/nathelper/nathelper.c	(working copy)
+@@ -287,6 +287,7 @@
+ static int fixup_fix_sdp(void** param, int param_no);
+ static int add_rcv_param_f(struct sip_msg *, char *, char *);
+ static int start_recording_f(struct sip_msg *, char *, char *);
++static int start_playback_f(struct sip_msg *, char *, char *);
+ 
+ static char *find_sdp_line(char *, char *, char);
+ static char *find_next_sdp_line(char *, char *, char, char *);
+@@ -409,6 +410,8 @@
+ 			REQUEST_ROUTE },
+ 	{"start_recording",    start_recording_f,      0, 0, 0,
+ 			REQUEST_ROUTE | ONREPLY_ROUTE },
++	{"start_playback",    start_playback_f,      0, 0, 0,
++			REQUEST_ROUTE | ONREPLY_ROUTE },
+ 	{0, 0, 0, 0, 0, 0}
+ };
+ 
+@@ -3162,8 +3165,123 @@
+ 	return 1;
+ }
+ 
++static int start_playback_f(struct sip_msg* msg, char *foo, char *bar)
++{
++	int nitems;
++	str callid = {0, 0};
++	str from_tag = {0, 0};
++	str to_tag = {0, 0};
++	str moh = {"/tmp/moh.wav", strlen ("/tmp/moh.wav")};
++	str codecs = {0, 0};
++	str codid = {0, 0};
++	str body;
++	char *cp, *cp1;
++	int len;
++	char* eol = "\r\n";
++	int pf = 0;
++	str mediaip;
++	str mediaport;
++	char* wspace = " ";
++	struct rtpp_node *node;
++	struct iovec v[18] = {
++		{NULL, 0},
++		{"P", 1},
++		{" ", 1},
++		{NULL, 0}, /* CallID  */
++		{" ", 1},
++		{NULL, 0}, /* PlayName */
++		{" ", 1},
++		{NULL, 0},/* CodID */
++		{NULL, 0},/* Codecs */
++		{" ", 1},
++		{NULL, 0},/* FromTag */
++		{";1 ", 3},
++		{NULL, 0},/* ToTag */
++		{";1", 2},
++		{" ", 1},
++		{NULL, 0},/* IP */
++		{" ", 1},
++		{NULL, 0}}; /* Port */
+ 
++	if (get_callid(msg, &callid) == -1 || callid.len == 0) {
++		LM_ERR("can't get Call-Id field\n");
++		return -1;
++	}
+ 
++	if (get_to_tag(msg, &to_tag) == -1) {
++		LM_ERR("can't get To tag\n");
++		return -1;
++	}
++
++	if (get_from_tag(msg, &from_tag) == -1 || from_tag.len == 0) {
++		LM_ERR("can't get From tag\n");
++		return -1;
++	}
++
++	if(msg->id != current_msg_id){
++		selected_rtpp_set = default_rtpp_set;
++	}
++
++	if (extract_body(msg, &body) == -1) {
++		LM_ERR("cannot extract body from msg!\n");
++		return -1;
++	}
++
++	if (extract_mediaip(&body, &mediaip, &pf,"c=") == -1) {
++		LM_ERR("can't extract media IP from the message\n");
++		return -1;
++	}
++
++	if (extract_mediaport(&body, &mediaport) == -1) {
++		LM_ERR("can't extract media port from the message\n");
++		return -1;
++	}
++
++	cp1 = ser_memmem(body.s, "a=rtpmap:", body.len, strlen("a=rtpmap:"));
++
++	if (cp1 == NULL)
++		return -1;
++
++	cp = cp1 + strlen("a=rtpmap:");
++
++	cp1 = ser_memmem(cp, wspace, body.len - (cp - body.s), 1);
++
++	if (cp1 == NULL)
++		return -1;
++
++	codid.s = cp;
++	codid.len = cp1 - cp;
++
++	cp = cp1 + 1;
++
++	cp1 = ser_memmem(cp, eol, body.len - (cp - body.s), 2);
++
++	if (cp1 == NULL)
++		return -1;
++
++	codecs.s = cp;
++	codecs.len = cp1 - cp;
++
++	STR2IOVEC(callid, v[3]);
++	STR2IOVEC(moh, v[5]);
++	STR2IOVEC(codid, v[7]);
++	STR2IOVEC(codecs, v[8]);
++	STR2IOVEC(from_tag, v[10]);
++	STR2IOVEC(to_tag, v[12]);
++	STR2IOVEC(mediaip, v[15]);
++	STR2IOVEC(mediaport, v[17]);
++	node = select_rtpp_node(callid, 1);
++	if (!node) {
++		LM_ERR("no available proxies\n");
++		return -1;
++	}
++
++	nitems = 18;
++	send_rtpp_command(node, v, nitems);
++
++	return 1;
++}
++
+ /*
+  * Create an AVP to be used by registrar with the source IP and port
+  * of the REGISTER

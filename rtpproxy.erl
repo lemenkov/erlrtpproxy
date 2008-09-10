@@ -51,7 +51,7 @@ init(_Unused) ->
 	{ok, #state{rtphosts=?RtpHosts}}.
 
 handle_call({message, Cmd}, From, State) ->
-	?PRINT("Cmd[~p]", [Cmd]),
+%	?PRINT("Cmd[~p]", [Cmd]),
 	case Cmd#cmd.type of
 		% Request basic supported rtpproxy protocol version
 		?CMD_V ->
@@ -82,18 +82,18 @@ handle_call({message, Cmd}, From, State) ->
 			case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.calls) of
 				% Already created session
 				{value, CallInfo} ->
-					?PRINT("Session exists. Updating existing.", []),
+%					?PRINT("Session exists. Updating existing.", []),
 					case Cmd#cmd.type of
 						?CMD_U ->
 							% update/create session
-							case gen_server:call(CallInfo#thread.pid, {message_u, {Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.params}}) of
+							case gen_server:call(CallInfo#thread.pid, {message_u, {Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.params}}) of
 								{ok, Reply} ->
 									{reply, Reply, State};
 								{error, udp_error} ->
 									{reply, ?RTPPROXY_ERR_SOFTWARE, State}
 							end;
 						?CMD_L ->
-							case gen_server:call(CallInfo#thread.pid, {message_l, {Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.params}}) of
+							case gen_server:call(CallInfo#thread.pid, {message_l, {Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.params}}) of
 								{ok, Reply} ->
 									{reply, Reply, State};
 								{error, not_found} ->
@@ -121,38 +121,42 @@ handle_call({message, Cmd}, From, State) ->
 							gen_server:cast(CallInfo#thread.pid, {message_r, Cmd#cmd.filename}),
 							{reply, ?RTPPROXY_OK, State};
 						?CMD_P ->
-							{ok, Addrs} = gen_server:call(CallInfo#thread.pid, message_p),
-							case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.players) of
-								{value, PlayerInfo} ->
-									% Already started
-									% TODO should we change played music?
-									% we simply kill current thread
-									PlayerInfo#thread.pid ! message_s,
-									{reply, ?RTPPROXY_OK, State#state{players=lists:delete(PlayerInfo, State#state.players)}};
-%									{reply, ?RTPPROXY_OK, State};
-								false ->
-									case find_node(State#state.rtphosts) of
-										{{RtpHost, RtpIp}, RtpHosts} ->
-											try rpc:call(RtpHost, player, start, [Cmd#cmd.filename, Cmd#cmd.codecs, Addrs]) of
-												{ok, PlayerPid} ->
-													NewPlayerThread = #thread{pid=PlayerPid, callid=Cmd#cmd.callid},
-													{reply, ?RTPPROXY_OK, State#state{players=lists:append (State#state.players, [NewPlayerThread]), rtphosts=RtpHosts}};
-												{badrpc, nodedown} ->
-													?PRINT("rtp host [~w] seems stopped!", [{RtpHost,RtpIp}]),
-													% FIXME consider to remove bad host from list
-													{reply, ?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts}};
-												Other ->
-													?PRINT("error creating call! [~w]", [Other]),
-													{reply, ?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts}}
-											catch
-												ExceptionClass:ExceptionPattern ->
-													?PRINT("Exception [~w] reached with result [~w]", [ExceptionClass, ExceptionPattern]),
-													{reply, ?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts}}
-											end;
-										error_no_nodes ->
-											?PRINT("error no suitable nodes to create new player!", []),
-											{reply, ?RTPPROXY_ERR_SOFTWARE, State}
-									end
+							case gen_server:call(CallInfo#thread.pid, {message_p, Cmd#cmd.to}) of
+								{ok, Addr} ->
+									case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.players) of
+										{value, PlayerInfo} ->
+											% Already started
+											% TODO should we change played music?
+											% we simply kill current thread
+											PlayerInfo#thread.pid ! message_s,
+											{reply, ?RTPPROXY_OK, State#state{players=lists:delete(PlayerInfo, State#state.players)}};
+		%									{reply, ?RTPPROXY_OK, State};
+										false ->
+											case find_node(State#state.rtphosts) of
+												{{RtpHost, RtpIp}, RtpHosts} ->
+													try rpc:call(RtpHost, player, start, [Cmd#cmd.filename, Cmd#cmd.codecs, Addr]) of
+														{ok, PlayerPid} ->
+															NewPlayerThread = #thread{pid=PlayerPid, callid=Cmd#cmd.callid},
+															{reply, ?RTPPROXY_OK, State#state{players=lists:append (State#state.players, [NewPlayerThread]), rtphosts=RtpHosts}};
+														{badrpc, nodedown} ->
+															?PRINT("rtp host [~w] seems stopped!", [{RtpHost,RtpIp}]),
+															% FIXME consider to remove bad host from list
+															{reply, ?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts}};
+														Other ->
+															?PRINT("error creating call! [~w]", [Other]),
+															{reply, ?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts}}
+													catch
+														ExceptionClass:ExceptionPattern ->
+															?PRINT("Exception [~w] reached with result [~w]", [ExceptionClass, ExceptionPattern]),
+															{reply, ?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts}}
+													end;
+												error_no_nodes ->
+													?PRINT("error no suitable nodes to create new player!", []),
+													{reply, ?RTPPROXY_ERR_SOFTWARE, State}
+											end
+									end;
+								{error, not_found} ->
+									{reply, ?RTPPROXY_ERR_NOSESSION, State}
 							end;
 						?CMD_S ->
 							gen_server:cast(CallInfo#thread.pid, message_s),
@@ -178,7 +182,7 @@ handle_call({message, Cmd}, From, State) ->
 									try rpc:call(RtpHost, call, start, [RtpIp]) of
 										{ok, CallPid} ->
 											NewCallThread = #thread{pid=CallPid, callid=Cmd#cmd.callid},
-											case gen_server:call(CallPid, {message_u, {Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.params}}) of
+											case gen_server:call(CallPid, {message_u, {Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.params}}) of
 												{ok, Reply} ->
 													{reply, Reply, State#state{calls=lists:append (State#state.calls, [NewCallThread]), rtphosts=RtpHosts}};
 												{error, udp_error} ->
@@ -215,8 +219,49 @@ handle_call({message, Cmd}, From, State) ->
 							end;
 						?CMD_P ->
 							% TODO we must fix OpenSER-rtpproxy protocol to add ip:port of destination
-							?PRINT("Incompatible with current protocol. Do nothing.", []),
-							{reply, ?RTPPROXY_OK, State};
+							case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.players) of
+								{value, PlayerInfo} ->
+									% Already started
+									% TODO should we change played music?
+									% we simply kill current thread
+									PlayerInfo#thread.pid ! message_s,
+									{reply, ?RTPPROXY_OK, State#state{players=lists:delete(PlayerInfo, State#state.players)}};
+%									{reply, ?RTPPROXY_OK, State};
+								false ->
+									case find_node(State#state.rtphosts) of
+										{{RtpHost, RtpIp}, RtpHosts} ->
+											{Ip1, Port1} = Cmd#cmd.addr,
+											try rpc:call(RtpHost, player, start, [Cmd#cmd.filename, Cmd#cmd.codecs, {null, Ip1, Port1}]) of
+												{ok, PlayerPid} ->
+													NewPlayerThread = #thread{pid=PlayerPid, callid=Cmd#cmd.callid},
+													{reply, ?RTPPROXY_OK, State#state{players=lists:append (State#state.players, [NewPlayerThread]), rtphosts=RtpHosts}};
+												{badrpc, nodedown} ->
+													?PRINT("rtp host [~w] seems stopped!", [{RtpHost,RtpIp}]),
+													% FIXME consider to remove bad host from list
+													{reply, ?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts}};
+												Other ->
+													?PRINT("error creating call! [~w]", [Other]),
+													{reply, ?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts}}
+											catch
+												ExceptionClass:ExceptionPattern ->
+													?PRINT("Exception [~w] reached with result [~w]", [ExceptionClass, ExceptionPattern]),
+													{reply, ?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts}}
+											end;
+										error_no_nodes ->
+											?PRINT("error no suitable nodes to create new player!", []),
+											{reply, ?RTPPROXY_ERR_SOFTWARE, State}
+									end
+							end;
+						?CMD_S ->
+							case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.players) of
+								{value, PlayerInfo} ->
+									?PRINT("Stop player thread.", []),
+									PlayerInfo#thread.pid ! message_s,
+									{reply, ?RTPPROXY_OK, State#state{players=lists:delete(PlayerInfo, State#state.players)}};
+								false ->
+									?PRINT("CANNOT Stop player thread.", []),
+									{reply, ?RTPPROXY_ERR_NOSESSION, State}
+							end;
 						_ ->
 							?PRINT("Session not exists. Do nothing.", []),
 							{reply, ?RTPPROXY_ERR_NOSESSION, State}

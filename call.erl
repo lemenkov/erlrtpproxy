@@ -32,7 +32,7 @@
 
 -include("common.hrl").
 
--record(source, {fd=null, ip=null, port=null}).
+-record(source, {fd=null, ip=null, port=null, tag=null}).
 
 -record(party, {from=null,
 		to=null,
@@ -59,23 +59,28 @@ init (MainIp) ->
 
 % handle originate call leg (new media id possibly)
 % TODO handle Modifiers
-handle_call({message_u, {{GuessIp, GuessPort}, {_FromTag, MediaId}, Modifiers}}, _From, {MainIp, Parties}) ->
-	?PRINT ("message [U] MediaId [~b]", [MediaId]),
+handle_call({message_u, {{GuessIp, GuessPort}, {FromTag, MediaId}, To, Modifiers}}, _, {MainIp, Parties}) ->
+	case To of
+		null ->
+			?PRINT ("message [U] probably from ~w:~w  MediaId [~b]", [GuessIp, GuessPort, MediaId]);
+		_ ->
+			?PRINT ("message [U] probably from ~w:~w  MediaId [~b] REINVITE!", [GuessIp, GuessPort, MediaId])
+	end,
 	% search for already  existed
 	case lists:keysearch(MediaId, #party.mediaid, Parties) of
 		% call already exists
 		{value, Party} ->
-			?PRINT("Already exists!", []),
-			{ok, {LocalIp, LocalPort}} = inet:sockname((Party#party.from)#source.fd),
+			{ok, {LocalIp, LocalPort}} = if
+				FromTag == (Party#party.from)#source.tag -> inet:sockname((Party#party.from)#source.fd);
+				FromTag == (Party#party.to)#source.tag   -> inet:sockname((Party#party.to)#source.fd)
+			end,
 			Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
-			?PRINT("answer [~s]", [Reply]),
+			?PRINT("answer [~s] (already exists!)", [Reply]),
 			{reply, {ok, Reply}, {MainIp, Parties}};
 		false ->
 			% open new FdFrom and attach it
 			case gen_udp:open(0, [binary, {ip, MainIp}, {active, true}]) of
 				{ok, Fd1} ->
-					?PRINT("Create new socket... OK", []),
-
 					% ty to create FdTo also
 					Fd2 = case gen_udp:open(0, [binary, {ip, MainIp}, {active, true}]) of
 						{ok, Fd} ->
@@ -86,11 +91,7 @@ handle_call({message_u, {{GuessIp, GuessPort}, {_FromTag, MediaId}, Modifiers}},
 							null
 					end,
 					{ok, {LocalIp, LocalPort}} = inet:sockname(Fd1),
-
-%					?PRINT("Guessing caller listens at ~w:~w", [GuessIp, GuessPort]),
-
-					NewParty = #party{from=#source{fd=Fd1, ip=GuessIp, port=GuessPort}, to=#source{fd=Fd2}, mediaid=MediaId},
-
+					NewParty = #party{from=#source{fd=Fd1, ip=GuessIp, port=GuessPort, tag=FromTag}, to=#source{fd=Fd2}, mediaid=MediaId},
 					Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 					?PRINT("answer [~s]", [Reply]),
 					{reply, {ok, Reply}, {MainIp, lists:append(Parties, [NewParty])}};
@@ -102,35 +103,35 @@ handle_call({message_u, {{GuessIp, GuessPort}, {_FromTag, MediaId}, Modifiers}},
 
 % handle answered call leg
 % Both MediaId's are equal (just guessing)
-handle_call({message_l, {{_FromTag, MediaId}, {_ToTag, MediaId}, Modifiers}}, _From, {MainIp, Parties}) ->
-	?PRINT ("message [L] MediaId [~b]", [MediaId]),
+handle_call({message_l, {{GuessIp, GuessPort}, {FromTag, MediaId}, {ToTag, MediaId}, Modifiers}}, _, {MainIp, Parties}) ->
+	?PRINT ("message [L] probably from ~w:~w  MediaId [~b]", [GuessIp, GuessPort, MediaId]),
 	% search for already  existed
 	case lists:keysearch(MediaId, #party.mediaid, Parties) of
-		% call already exists and Fd is not opened
-		{value, Party} when (Party#party.to)#source.fd == null ->
-			?PRINT("Already exists (To.Fd == NULL)!", []),
-			case gen_udp:open(0, [binary, {ip, MainIp}, {active, true}]) of
+		{value, Party} ->
+			case
+				case (Party#party.to)#source.fd of
+					null ->
+						gen_udp:open(0, [binary, {ip, MainIp}, {active, true}]);
+					_ ->
+						if
+							FromTag == (Party#party.to)#source.tag -> {ok, (Party#party.from)#source.fd};
+							FromTag == (Party#party.from)#source.tag   -> {ok, (Party#party.to)#source.fd}
+						end
+				end
+			of
 				{ok, Fd} ->
 					{ok, {LocalIp, LocalPort}} = inet:sockname(Fd),
-					NewParty = Party#party{to=(Party#party.to)#source{fd=Fd}, answered=true},
-
+					NewParty = case (Party#party.to)#source.tag of
+						null -> Party#party{to=#source{fd=Fd, ip=GuessIp, port=GuessPort, tag=ToTag}, answered=true};
+						_ -> Party
+					end,
 					Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
-%					?PRINT("answer [~s]", [Reply]),
+					?PRINT("answer [~s]", [Reply]),
 					{reply, {ok, Reply}, {MainIp, lists:keyreplace(MediaId, #party.mediaid, Parties, NewParty)}};
 				{error, Reason} ->
 					?PRINT("FAILED [~p]", [Reason]),
 					{reply, {error, udp_error}, {MainIp, Parties}}
 			end;
-		% call already exists and Fd is opened
-		{value, Party} when (Party#party.to)#source.fd /= null ->
-			?PRINT("Already exists (To.Fd != NULL)!", []),
-
-			{ok, {LocalIp, LocalPort}} = inet:sockname((Party#party.to)#source.fd),
-			NewParty = Party#party{answered=true},
-
-			Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
-%			?PRINT("answer [~s]", [Reply]),
-			{reply, {ok, Reply}, {MainIp, lists:keyreplace(MediaId, #party.mediaid, Parties, NewParty)}};
 		false ->
 			% Call not found.
 			?PRINT("ERROR not found", []),
@@ -141,24 +142,19 @@ handle_call(message_i, _From, State) ->
 	% TODO (acquire information about call state)
 	{reply, {ok, "TODO"}, State};
 
-handle_call(message_p, _From, {MainIp, Parties}) ->
+handle_call({message_p, {Tag, MediaId}}, _From, {MainIp, Parties}) ->
 	?PRINT("Message [P] [~p]", [Parties]),
-	Fun = fun(F) ->
-		fun	({[], Result}) ->
-				Result;
-			({[Party|Rest], Result}) ->
-				case Party#party.pid of
-					null ->
-						F ({Rest, Result});
-					_ ->
-						gen_server:cast(Party#party.pid, hold),
-						F ({Rest, Result ++ [{{(Party#party.to)#source.fd, (Party#party.from)#source.ip, (Party#party.from)#source.port},
-									{(Party#party.from)#source.fd, (Party#party.to)#source.ip, (Party#party.to)#source.port}}]})
-				end
-		end
-	end,
-	Result = (y(Fun))({Parties, []}),
-	{reply, {ok, Result}, {MainIp, Parties}};
+	case lists:keysearch(MediaId, #party.mediaid, Parties) of
+		% call already exists
+		{value, Party} ->
+			Result = if
+				Tag == (Party#party.from)#source.tag -> {(Party#party.to)#source.fd, (Party#party.from)#source.ip, (Party#party.from)#source.port};
+				Tag == (Party#party.to)#source.tag   -> {(Party#party.from)#source.fd, (Party#party.to)#source.ip, (Party#party.to)#source.port}
+			end,
+			{reply, {ok, Result}, {MainIp, Parties}};
+		false ->
+			{reply, {error, not_found}, {MainIp, Parties}}
+	end;
 
 
 handle_call(_Other, _From, State) ->

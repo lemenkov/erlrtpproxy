@@ -70,6 +70,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 	% TODO consider parsing Tag and MediaId separately
 	% TODO pass modifiers as atoms (not as string)
 	[Cookie|Rest] = string:tokens(Msg, " ;"),
+	?PRINT("SER cmd: ~p", [Rest]),
 	Answer = case case Rest of
 		% Request basic supported rtpproxy protocol version
 		["V"] ->
@@ -108,8 +109,14 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 		["R", CallId, FromTag, FromMediaId, ToTag, ToMediaId] ->
 			#cmd{cookie=Cookie, type=?CMD_R, callid=CallId, from={FromTag, list_to_integer(FromMediaId)}, to={ToTag, list_to_integer(ToMediaId)}};
 		% playback pre-recorded audio
-		[[$P|Args], CallId, PlayName, Codecs, FromTag, FromMediaId, ToTag, ToMediaId] ->
-			#cmd{cookie=Cookie, type=?CMD_P, callid=CallId, from={FromTag, list_to_integer(FromMediaId)}, to={ToTag, list_to_integer(ToMediaId)}, filename=PlayName, codecs=Codecs};
+		[[$P|Args], CallId, PlayName, Codecs, FromTag, FromMediaId, ToTag, ToMediaId|Addr] ->
+			case Addr of
+				[] ->
+					#cmd{cookie=Cookie, type=?CMD_P, callid=CallId, from={FromTag, list_to_integer(FromMediaId)}, to={ToTag, list_to_integer(ToMediaId)}, filename=PlayName, codecs=Codecs};
+				[GuessIp,GuessPort] ->
+					% Hold and Resume
+					#cmd{cookie=Cookie, type=?CMD_P, callid=CallId, from={FromTag, list_to_integer(FromMediaId)}, to={ToTag, list_to_integer(ToMediaId)}, filename=PlayName, codecs=Codecs, addr={GuessIp, GuessPort}}
+			end;
 		% stop playback or record
 		["S", CallId, FromTag, FromMediaId, ToTag, ToMediaId] ->
 			#cmd{cookie=Cookie, type=?CMD_S, callid=CallId, from={FromTag, list_to_integer(FromMediaId)}, to={ToTag, list_to_integer(ToMediaId)}};
