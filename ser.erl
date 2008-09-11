@@ -115,7 +115,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 					#cmd{cookie=Cookie, type=?CMD_P, callid=CallId, from={FromTag, list_to_integer(FromMediaId)}, to={ToTag, list_to_integer(ToMediaId)}, filename=PlayName, codecs=Codecs};
 				[GuessIp,GuessPort] ->
 					% Hold and Resume
-					#cmd{cookie=Cookie, type=?CMD_P, callid=CallId, from={FromTag, list_to_integer(FromMediaId)}, to={ToTag, list_to_integer(ToMediaId)}, filename=PlayName, codecs=Codecs, addr={GuessIp, GuessPort}}
+					#cmd{cookie=Cookie, type=?CMD_P, callid=CallId, from={FromTag, list_to_integer(FromMediaId)}, to={ToTag, list_to_integer(ToMediaId)}, filename=PlayName, codecs=Codecs, addr={inet_parse:address(GuessIp), list_to_integer(GuessPort)}}
 			end;
 		% stop playback or record
 		["S", CallId, FromTag, FromMediaId, ToTag, ToMediaId] ->
