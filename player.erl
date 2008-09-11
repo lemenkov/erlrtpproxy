@@ -49,6 +49,7 @@ start (Filename, PayloadTypeStr, Addr) ->
 	process_flag(trap_exit, true),
 	{PayloadType, PayloadLength, PayloadLimit} = case PayloadTypeStr of
 		"0PCMU/8000" -> {?RTP_PCMU, 160, 8000};
+		"101telephone-event/8000" -> {?RTP_PCMU, 160, 8000};
 		"8PCMA/8000" -> {?RTP_PCMA, 160, 8000};
 		_ -> {?RTP_G729, 10, 0}
 	end,
@@ -59,7 +60,7 @@ start (Filename, PayloadTypeStr, Addr) ->
 		{Fd1, Ip1, Port1} ->
 			{Fd1, Ip1, Port1, false}
 	end,
-	Fn = io_lib:format("~s.~b", [Filename, PAyloadType])
+	Fn = io_lib:format("~s.~b", [Filename, PayloadType]),
 	case file:read_file(Fn) of
 		{ok, RtpData} ->
 			{MegaSecs, Secs, MicroSecs} = now(),
