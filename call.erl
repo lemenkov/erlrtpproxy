@@ -147,6 +147,7 @@ handle_call({message_p, {Tag, MediaId}}, _From, {MainIp, Parties}) ->
 	case lists:keysearch(MediaId, #party.mediaid, Parties) of
 		% call already exists
 		{value, Party} ->
+			gen_server:cast(Party#party.pid, hold),
 			Result = if
 				Tag == (Party#party.from)#source.tag -> {(Party#party.to)#source.fd, (Party#party.from)#source.ip, (Party#party.from)#source.port};
 				Tag == (Party#party.to)#source.tag   -> {(Party#party.from)#source.fd, (Party#party.to)#source.ip, (Party#party.to)#source.port}
@@ -161,6 +162,8 @@ handle_call(_Other, _From, State) ->
 	{noreply, State}.
 
 handle_cast(message_d, State) ->
+	% No need to cleanup  list of media-streams here
+	% we'll do it later, at terminate(...)
 	{stop, message_d, State};
 
 handle_cast({message_r, filename}, State) ->
@@ -229,7 +232,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {MainIp, Parties}) ->
 		end
 	end,
 	case
-		case (y(Fun))({Parties, Fd}) of
+		case (utils:y(Fun))({Parties, Fd}) of
 			% RTP to Callee
 			{value, to, Party} when
 						(Party#party.to)#source.ip /= null,
@@ -277,8 +280,4 @@ handle_info({udp, Fd, Ip, Port, Msg}, {MainIp, Parties}) ->
 handle_info(Info, State) ->
 	?PRINT("Info [~w]", [Info]),
 	{noreply, State}.
-
-y(M) ->
-	G = fun (F) -> M(fun(A) -> (F(F))(A) end) end,
-	G(G).
 

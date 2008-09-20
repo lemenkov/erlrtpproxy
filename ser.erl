@@ -89,7 +89,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 				[] ->
 					#cmd{cookie=Cookie, type=?CMD_U, callid=CallId, addr={GuessIp, GuessPort}, from={FromTag, list_to_integer(FromMediaId)}, params=Modifiers};
 				[ToTag,ToMediaId] ->
-					% Hold and Resume
+					% Reinvite, Hold and Resume
 					#cmd{cookie=Cookie, type=?CMD_U, callid=CallId, addr={GuessIp, GuessPort}, from={FromTag, list_to_integer(FromMediaId)}, to={ToTag, list_to_integer(ToMediaId)}, params=Modifiers}
 			end;
 		% lookup existing session

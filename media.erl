@@ -85,12 +85,12 @@ terminate(Reason, {Parent, TRef, From, To, _RtpState, _HoldState}) ->
 % (symmetric NAT from the client's POV)
 % We must ignore previous state ('rtp' or 'nortp') and set it to 'rtp'
 % We use Ip and Port as address for future messages to FdTo or FdFrom
-handle_info({udp, Fd, Ip, Port, Msg}, {Parent, TRef, From, To, _RtpState, HoldState}) ->
+handle_info({udp, Fd, Ip, Port, Msg}, {Parent, TRef, From, To, _RtpState, HoldState}) when Fd == From#media.fd; Fd == Tom#media.fd ->
 %	?PRINT("rtp [~w] [~w] [~w]", [{Fd, Ip, Port}, From, To]),
-	{F, T, Fd1, Ip1, Port1} = case (Fd == From#media.fd) of
-		true ->
+	{F, T, Fd1, Ip1, Port1} = if
+		Fd == From#media.fd ->
 			{From, To#media{ip=Ip, port=Port}, To#media.fd, From#media.ip, From#media.port};
-		false ->
+		Fd == To#media.fd ->
 			{From#media{ip=Ip, port=Port}, To, From#media.fd, To#media.ip, To#media.port}
 	end,
 	case HoldState of
