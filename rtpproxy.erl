@@ -48,7 +48,7 @@ init(_Unused) ->
 	process_flag(trap_exit, true),
 	syslog:start(),
 	?PRINT("started with rtphosts [~w]", [?RtpHosts]),
-	{ok, #state{rtphosts=?RtpHosts}}.
+	{ok, #state{rtphosts=lists:map(fun({Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}) -> {Node, Ip, lists:seq(MinPort, MaxPort, ?PORTS_PER_MEDIA)} end, ?RtpHosts)}}.
 
 handle_call({message, Cmd}, From, State) ->
 %	?PRINT("Cmd[~p]", [Cmd]),
@@ -130,10 +130,9 @@ handle_call({message, Cmd}, From, State) ->
 											% we simply kill current thread
 											PlayerInfo#thread.pid ! message_s,
 											{reply, ?RTPPROXY_OK, State#state{players=lists:delete(PlayerInfo, State#state.players)}};
-		%									{reply, ?RTPPROXY_OK, State};
 										false ->
 											case find_node(State#state.rtphosts) of
-												{{RtpHost, RtpIp}, RtpHosts} ->
+												{{RtpHost, RtpIp, AvailablePorts}, RtpHosts} ->
 													try rpc:call(RtpHost, player, start, [Cmd#cmd.filename, Cmd#cmd.codecs, Addr]) of
 														{ok, PlayerPid} ->
 															NewPlayerThread = #thread{pid=PlayerPid, callid=Cmd#cmd.callid},
@@ -173,11 +172,11 @@ handle_call({message, Cmd}, From, State) ->
 							{reply, ?RTPPROXY_ERR_SOFTWARE, State}
 					end;
 				false ->
-					% New session
+					% New session - only few commands allowed here
 					case Cmd#cmd.type of
 						?CMD_U ->
 							case find_node(State#state.rtphosts) of
-								{{RtpHost, RtpIp}, RtpHosts} ->
+								{{RtpHost, RtpIp, AvailablePorts}, RtpHosts} ->
 									?PRINT("Session not exists. Creating new at ~w.", [RtpHost]),
 									try rpc:call(RtpHost, call, start, [RtpIp]) of
 										{ok, CallPid} ->
@@ -186,10 +185,7 @@ handle_call({message, Cmd}, From, State) ->
 												{ok, Reply} ->
 													{reply, Reply, State#state{calls=lists:append (State#state.calls, [NewCallThread]), rtphosts=RtpHosts}};
 												{error, udp_error} ->
-													{reply, ?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts}};
-												{Other} ->
-													?PRINT("Other msg [~w]", [Other]),
-													{reply, ?RTPPROXY_ERR_SOFTWARE, State}
+													{reply, ?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts}}
 											end;
 										{badrpc, nodedown} ->
 											?PRINT("rtp host [~w] seems stopped!", [{RtpHost,RtpIp}]),
@@ -218,18 +214,20 @@ handle_call({message, Cmd}, From, State) ->
 									{reply, ?RTPPROXY_ERR_NOSESSION, State}
 							end;
 						?CMD_P ->
-							% TODO we must fix OpenSER-rtpproxy protocol to add ip:port of destination
+							% we must fix OpenSER-rtpproxy protocol to add ip:port of destination
+							% see 'patches' directory for example
+							% TODO probably we need to handle this situation separately
+							% TODO contact sobomax for suggestions
 							case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.players) of
 								{value, PlayerInfo} ->
 									% Already started
-									% TODO should we change played music?
 									% we simply kill current thread
+									% TODO should we change played music?
 									PlayerInfo#thread.pid ! message_s,
 									{reply, ?RTPPROXY_OK, State#state{players=lists:delete(PlayerInfo, State#state.players)}};
-%									{reply, ?RTPPROXY_OK, State};
 								false ->
 									case find_node(State#state.rtphosts) of
-										{{RtpHost, RtpIp}, RtpHosts} ->
+										{{RtpHost, RtpIp, AvailablePorts}, RtpHosts} ->
 											{Ip1, Port1} = Cmd#cmd.addr,
 											try rpc:call(RtpHost, player, start, [Cmd#cmd.filename, Cmd#cmd.codecs, {null, Ip1, Port1}]) of
 												{ok, PlayerPid} ->
@@ -265,6 +263,8 @@ handle_call({message, Cmd}, From, State) ->
 						_ ->
 							?PRINT("Session not exists. Do nothing.", []),
 							{reply, ?RTPPROXY_ERR_NOSESSION, State}
+							% TODO should we raise ERR_SOFTWARE here rather than ERR_NOSESSION
+%							{reply, ?RTPPROXY_ERR_SOFTWARE, State}
 					end
 			end
 	end;

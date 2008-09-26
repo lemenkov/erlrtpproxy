@@ -119,12 +119,10 @@ send_rtp (RtpData, State) ->
 
 	{Fd, Ip, Port} = State#state.addr,
 
-%	?PRINT("listener 3!~n", []),
 	gen_udp:send(Fd, Ip, Port, <<2:2, 0:1, 0:1, 0:4, 0:1, (State#state.payloadtype):7, (State#state.sequencenumber):16, Timestamp:32, (State#state.ssrc):32, Payload:PayloadLength/binary>>),
 
 	Wait = State#state.time - difftime(Begin),
 
-%	?PRINT("listener waits for ~w msec from ~w~n", [Wait, State#state.time]),
 	receive
 		Something ->
 			?PRINT("listener RECEIVED [~p]!~n", [Something]),
@@ -133,9 +131,7 @@ send_rtp (RtpData, State) ->
 				true -> ok
 			end,
 			gen_server:cast({global, rtpproxy}, {call_terminated, {self(), Something}})
-%	after State#state.time  ->
 	after Wait  ->
-%		?PRINT("listener 5!~n", []),
 		send_rtp(RtpData, State#state{timestamp=Timestamp, pos=Pos+PayloadLength, sequencenumber=State#state.sequencenumber + 1})
 	end.
 

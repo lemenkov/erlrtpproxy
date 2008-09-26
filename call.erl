@@ -113,9 +113,13 @@ handle_call({message_l, {{GuessIp, GuessPort}, {FromTag, MediaId}, {ToTag, Media
 					null ->
 						gen_udp:open(0, [binary, {ip, MainIp}, {active, true}]);
 					_ ->
-						if
-							FromTag == (Party#party.to)#source.tag -> {ok, (Party#party.from)#source.fd};
-							FromTag == (Party#party.from)#source.tag   -> {ok, (Party#party.to)#source.fd}
+						try 
+							if
+								FromTag == (Party#party.to)#source.tag -> {ok, (Party#party.from)#source.fd};
+								FromTag == (Party#party.from)#source.tag   -> {ok, (Party#party.to)#source.fd}
+							end
+						catch
+							Exception:ExceptionClass -> {Exception, ExceptionClass}
 						end
 				end
 			of
@@ -166,13 +170,31 @@ handle_cast(message_d, State) ->
 	% we'll do it later, at terminate(...)
 	{stop, message_d, State};
 
-handle_cast({message_r, filename}, State) ->
-	% TODO start recording of RTP
-	{noreply, State};
+handle_cast({message_r, Filename}, {MainIp, Parties}) ->
+	_Unused = lists:foreach(
+		fun(X)  ->
+			if
+				X#party.pid /= null ->
+					gen_server:cast(X#party.pid, {recording, {start, Filename}});
+				true ->
+					ok
+			end
+		end,
+		Parties),
+	{noreply, {MainIp, Parties}};
 
-handle_cast(message_s, State) ->
-	% TODO stop playback/recording of RTP
-	{noreply, State};
+handle_cast(message_s, {MainIp, Parties}) ->
+	_Unused = lists:foreach(
+		fun(X)  ->
+			if
+				X#party.pid /= null ->
+					gen_server:cast(X#party.pid, {recording, stop});
+				true ->
+					ok
+			end
+		end,
+		Parties),
+	{noreply, {MainIp, Parties}};
 
 % timeout from media stream
 % TODO consider to stop all other media streams
@@ -214,7 +236,7 @@ terminate(Reason, {_MainIp, Parties}) ->
 % rtp from some port
 handle_info({udp, Fd, Ip, Port, Msg}, {MainIp, Parties}) ->
 %	?PRINT("udp from Fd [~w] [~p:~p]", [Fd, Ip, Port]),
-	Fun = fun (F) ->
+	FindFd = fun (F) ->
 		fun	({[], X}) ->
 				false;
 			({[Elem|Rest], X}) ->
@@ -232,7 +254,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {MainIp, Parties}) ->
 		end
 	end,
 	case
-		case (utils:y(Fun))({Parties, Fd}) of
+		case (utils:y(FindFd))({Parties, Fd}) of
 			% RTP to Callee
 			{value, to, Party} when
 						(Party#party.to)#source.ip /= null,
@@ -243,9 +265,9 @@ handle_info({udp, Fd, Ip, Port, Msg}, {MainIp, Parties}) ->
 						Party#party.answered == true
 							->
 				{ok, PartyPid} = media:start({self(), {(Party#party.from)#source.fd, Ip, Port}, {(Party#party.to)#source.fd, (Party#party.to)#source.ip, (Party#party.to)#source.port}}),
-				% FIXME send Msg in this case
 				gen_udp:controlling_process((Party#party.from)#source.fd, PartyPid),
 				gen_udp:controlling_process((Party#party.to)#source.fd,   PartyPid),
+				% FIXME send Msg here - we created Media server and we need to pass Msg to him
 				{Party, Party#party{from=(Party#party.from)#source{ip=Ip, port=Port}, pid=PartyPid}};
 			% RTP to Caller
 			{value, from, Party} when
@@ -256,16 +278,18 @@ handle_info({udp, Fd, Ip, Port, Msg}, {MainIp, Parties}) ->
 						Party#party.answered == true
 							->
 				{ok, PartyPid} = media:start({self(), {(Party#party.from)#source.fd, (Party#party.from)#source.ip, (Party#party.from)#source.port}, {(Party#party.to)#source.fd, Ip, Port}}),
-				% FIXME send Msg in this case
 				gen_udp:controlling_process((Party#party.from)#source.fd, PartyPid),
 				gen_udp:controlling_process((Party#party.to)#source.fd, PartyPid),
+				% FIXME send Msg here - we created Media server and we need to pass Msg to him
 				{Party, Party#party{to=(Party#party.to)#source{ip=Ip, port=Port}, pid=PartyPid}};
 			% RTP to Caller
 			{value, from, Party} ->
-				% TODO guess that caller has uPnP
+				% TODO guess that Caller has uPnP - we know Ip and Port for Callee, and we got GuessIp and GuessPort for Caller
+				%      so we should try to start this session here (in any case 'мы ничем не рискуем')
 				{Party, Party#party{to=(Party#party.to)#source{ip=Ip, port=Port}}};
 			% RTP to Callee
 			{value, to, Party} ->
+				% we should dismiss this Msg since we don't know all necessary data about Callee
 				{Party, Party#party{from=(Party#party.from)#source{ip=Ip, port=Port}}};
 			false ->
 				false

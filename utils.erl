@@ -15,5 +15,5 @@ y(M) ->
 	G(G).
 
 make() ->
-	lists:map(fun(X) -> compile:file(X, [verbose, report_errors, report_warnings]) end, [rtpproxy, call, media, syslog, ser, utils, player]).
+	lists:foreach(fun(X) -> compile:file(X, [verbose, report_errors, report_warnings]) end, [rtpproxy, call, media, syslog, ser, utils, player]).
 

@@ -1,4 +1,3 @@
-
 %%%----------------------------------------------------------------------
 %%%
 %%% This program is free software; you can redistribute it and/or
@@ -33,8 +32,12 @@
 
 -include("common.hrl").
 
-% description of media
+% description of media:
+% * fd - our fd, where we will receive messages from other side
+% * ip - real client's ip
+% * port - real client's port
 -record(media, {fd=null, ip=null, port=null}).
+-record(state, {parent, tref, from, to, rtpstate=rtp, holdstate=false}).
 
 start({Parent, From, To}) ->
 	gen_server:start(?MODULE, {Parent, From, To}, []).
@@ -46,25 +49,36 @@ init ({Parent, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}}) ->
 	?PRINT("started {~w [~w:~w]} {~w [~w:~w]}", [FdFrom, IpFrom, PortFrom, FdTo, IpTo, PortTo]),
 	process_flag(trap_exit, true),
 	{ok, TRef} = timer:send_interval(10000, self(), ping),
-	{ok, {Parent, TRef, #media{fd=FdFrom, ip=IpFrom, port=PortFrom}, #media{fd=FdTo, ip=IpTo, port=PortTo}, rtp, false}}.
+	{ok, #state{parent=Parent, tref=TRef, from=#media{fd=FdFrom, ip=IpFrom, port=PortFrom}, to=#media{fd=FdTo, ip=IpTo, port=PortTo}}}.
 
-% all other calls
 handle_call(_Other, _From, State) ->
 	{noreply, State}.
 
 handle_cast(stop, State) ->
 	{stop, stop, State};
 
-handle_cast(hold, {Parent, TRef, From, To, _RtpState, false}) ->
+handle_cast(hold, State) when State#state.holdstate == false ->
 	?PRINT("HOLD on", []),
 	% We should suppress timer since we shouldn't care this mediastream
-	timer:cancel(TRef),
-	{noreply, {Parent, null, From, To, _RtpState, true}};
+	timer:cancel(State#state.tref),
+	{noreply, State#state{tref=null, holdstate=true}};
 
-handle_cast(hold, {Parent, null, From, To, _RtpState, true}) ->
+handle_cast(hold, State) when State#state.holdstate == true ->
 	?PRINT("HOLD off", []),
+	% since we suppressed timer earlier, we need to restart it
 	{ok, TRef} = timer:send_interval(10000, self(), ping),
-	{noreply, {Parent, TRef, From, To, _RtpState, false}};
+	{noreply, State#state{tref=TRef, holdstate=false}};
+
+handle_cast({recording, RecState}, State) ->
+	case RecState of
+		{start, Filename} ->
+			% TODO set flag to record this stream RTP
+			ok;
+		stop ->
+			% TODO stop recording of RTP
+			ok
+	end,
+	{noreply, State};
 
 % all other casts
 handle_cast(_Request, State) ->
@@ -73,43 +87,52 @@ handle_cast(_Request, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, {Parent, TRef, From, To, _RtpState, _HoldState}) ->
-	timer:cancel(TRef),
-	gen_udp:close(From#media.fd),
-	gen_udp:close(To#media.fd),
-	gen_server:cast(Parent, {stop, self()}),
+terminate(Reason, State) ->
+	timer:cancel(State#state.tref),
+	gen_udp:close((State#state.from)#media.fd),
+	gen_udp:close((State#state.to)#media.fd),
+	gen_server:cast(State#state.parent, {stop, self()}),
 	?PRINT("terminated due to reason [~p]", [Reason]).
 
 % We received UDP-data on From or To socket, so we must send in from To or From socket respectively
 % (if we not in HOLD state)
-% (symmetric NAT from the client's POV)
+% (symmetric NAT from the client's PoV)
 % We must ignore previous state ('rtp' or 'nortp') and set it to 'rtp'
 % We use Ip and Port as address for future messages to FdTo or FdFrom
-handle_info({udp, Fd, Ip, Port, Msg}, {Parent, TRef, From, To, _RtpState, HoldState}) when Fd == From#media.fd; Fd == Tom#media.fd ->
-%	?PRINT("rtp [~w] [~w] [~w]", [{Fd, Ip, Port}, From, To]),
+handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.from)#media.fd; Fd == (State#state.to)#media.fd ->
+	% TODO check that message was arrived from valid {Ip, Port}
 	{F, T, Fd1, Ip1, Port1} = if
-		Fd == From#media.fd ->
-			{From, To#media{ip=Ip, port=Port}, To#media.fd, From#media.ip, From#media.port};
-		Fd == To#media.fd ->
-			{From#media{ip=Ip, port=Port}, To, From#media.fd, To#media.ip, To#media.port}
+		Fd == (State#state.from)#media.fd ->
+			{	State#state.from, 
+				(State#state.to)#media{ip=Ip, port=Port}, 
+				(State#state.to)#media.fd, 
+				(State#state.from)#media.ip, 
+				(State#state.from)#media.port};
+		Fd == (State#state.to)#media.fd ->
+			{	(State#state.from)#media{ip=Ip, port=Port}, 
+				State#state.to, 
+				(State#state.from)#media.fd, 
+				(State#state.to)#media.ip, 
+				(State#state.to)#media.port}
 	end,
-	case HoldState of
+	case State#state.holdstate of
 		true ->
 			% do nothing
 			ok;
 		false ->
+			% TODO check whether message is valid rtp stream
 			gen_udp:send(Fd1, Ip1, Port1, Msg)
 	end,
-	{noreply, {Parent, TRef, F, T, rtp, HoldState}};
+	{noreply, State#state{from=F, to=T, rtpstate=rtp}};
 
-handle_info(ping, {Parent, TRef, From, To, RtpState, HoldState}) ->
-	case RtpState of
+handle_info(ping, State) ->
+	case State#state.rtpstate of
 		rtp ->
 			% setting state to 'nortp'
-			{noreply, {Parent, TRef, From, To, nortp, HoldState}};
+			{noreply, State#state{rtpstate=nortp}};
 		nortp ->
 			% We didn't get new messages since last ping - we should close this mediastream
-			{stop, nortp, {Parent, TRef, From, To, nortp, HoldState}}
+			{stop, nortp, State}
 	end;
 
 handle_info(Other, State) ->
