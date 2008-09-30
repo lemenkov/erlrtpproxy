@@ -73,12 +73,14 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 	ParseAddr = fun (ProbableIp, ProbablePort) ->
 		try inet_parse:address(ProbableIp) of
 			{ok, GuessIp} ->
-				try list_to_integer(ProbablePort) of 
-					GuessPort when GuessPort > 0, GuessPort < 65536 -> 
+				try list_to_integer(ProbablePort) of
+					GuessPort when GuessPort >= 0, GuessPort < 65536 ->
 						{GuessIp, GuessPort};
-					_ ->  {error, "Wrong port"}
-				catch 
-					_:_ -> {error, "Wrong port"}
+					_ ->
+						{error, "Wrong port"}
+				catch
+					_:_ ->
+						{error, "Wrong port"}
 				end
 		catch
 			_:_ ->
@@ -98,7 +100,8 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 				{Modifiers, _} = lists:unzip(lists:filter(fun({_, Sym}) -> lists:member(Sym, Args) end, ?MOD_LIST)),
 				case ParseAddr(OrigIp, OrigPort) of
 					{error, ErrMsg} ->
-						?PRINT("Error: ~p", [ErrMsg]);
+						?PRINT("Error: ~p", [ErrMsg]),
+						error_syntax;
 					{GuessIp, GuessPort} ->
 						case To of
 							[] ->
@@ -114,7 +117,8 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 				{Modifiers, _} = lists:unzip(lists:filter(fun({_, Sym}) -> lists:member(Sym, Args) end, ?MOD_LIST)),
 				case ParseAddr(OrigIp, OrigPort) of
 					{error, ErrMsg} ->
-						?PRINT("Error: ~p", [ErrMsg]);
+						?PRINT("Error: ~p", [ErrMsg]),
+						error_syntax;
 					{GuessIp, GuessPort} ->
 						#cmd{cookie=Cookie, type=?CMD_L, callid=CallId, addr={GuessIp, GuessPort}, from={FromTag, list_to_integer(FromMediaId)}, to={ToTag, list_to_integer(ToMediaId)}, params=Modifiers}
 				end;
@@ -136,7 +140,8 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 						% Hold and Resume
 						case ParseAddr(OrigIp, OrigPort) of
 							{error, ErrMsg} ->
-								?PRINT("Error: ~p", [ErrMsg]);
+								?PRINT("Error: ~p", [ErrMsg]),
+								error_syntax;
 							{GuessIp, GuessPort} ->
 								#cmd{cookie=Cookie, type=?CMD_P, callid=CallId, from={FromTag, list_to_integer(FromMediaId)}, to={ToTag, list_to_integer(ToMediaId)}, filename=PlayName, codecs=Codecs, addr={GuessIp, GuessPort}}
 						end
