@@ -333,7 +333,7 @@ find_node (Nodes) ->
 find_node([], _Acc) ->
 	error_no_nodes;
 
-find_node([{Node,Ip}|OtherNodes], Acc) ->
+find_node([{Node,Ip,Ports}|OtherNodes], Acc) ->
 	Parent = self(),
 	spawn (fun() ->
 			Ret = net_adm:ping(Node),
@@ -341,9 +341,9 @@ find_node([{Node,Ip}|OtherNodes], Acc) ->
 		end),
 	receive
 		pong ->
-			{{Node,Ip},OtherNodes ++ Acc ++ [{Node,Ip}]};
+			{{Node,Ip,Ports},OtherNodes ++ Acc ++ [{Node,Ip,Ports}]};
 		pang ->
-			find_node(OtherNodes, Acc ++ [{Node,Ip}])
+			find_node(OtherNodes, Acc ++ [{Node,Ip,Ports}])
 	after ?PING_TIMEOUT ->
-			find_node(OtherNodes, Acc ++ [{Node,Ip}])
+			find_node(OtherNodes, Acc ++ [{Node,Ip,Ports}])
 	end.
