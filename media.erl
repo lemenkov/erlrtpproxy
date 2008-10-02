@@ -37,19 +37,34 @@
 % * ip - real client's ip
 % * port - real client's port
 -record(media, {fd=null, ip=null, port=null}).
--record(state, {parent, tref, from, to, rtpstate=rtp, holdstate=false}).
+-record(state, {parent, tref, from, fromrtcp, to, tortcp, rtpstate=rtp, holdstate=false}).
 
-start({Parent, From, To}) ->
-	gen_server:start(?MODULE, {Parent, From, To}, []).
+start(Args) ->
+	gen_server:start(?MODULE, Args, []).
 
-start_link({Parent, From, To}) ->
-	gen_server:start_link(?MODULE, {Parent, From, To}, []).
+start_link(Args) ->
+	gen_server:start_link(?MODULE, Args, []).
 
-init ({Parent, {FdFrom, IpFrom, PortFrom}, {FdTo, IpTo, PortTo}}) ->
-	?PRINT("started {~w [~w:~w]} {~w [~w:~w]}", [FdFrom, IpFrom, PortFrom, FdTo, IpTo, PortTo]),
+init ({Parent, From, FromRtcp, To, ToRtcp}) ->
+	?PRINT("started ~p ~p", [From, To]),
 	process_flag(trap_exit, true),
 	{ok, TRef} = timer:send_interval(10000, self(), ping),
-	{ok, #state{parent=Parent, tref=TRef, from=#media{fd=FdFrom, ip=IpFrom, port=PortFrom}, to=#media{fd=FdTo, ip=IpTo, port=PortTo}}}.
+	SafeMakeMedia = fun(Desc) ->
+		case Desc of
+			{F,I,P} -> #media{fd=F,ip=I,port=P};
+			_ -> null
+		end
+	end,
+	{ok,
+		#state{
+			parent=Parent,
+			tref=TRef,
+			from	=SafeMakeMedia(From),
+			fromrtcp=SafeMakeMedia(FromRtcp),
+			to	=SafeMakeMedia(To),
+			tortcp	=SafeMakeMedia(ToRtcp)
+		}
+	}.
 
 handle_call(_Other, _From, State) ->
 	{noreply, State}.
@@ -89,8 +104,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 terminate(Reason, State) ->
 	timer:cancel(State#state.tref),
-	gen_udp:close((State#state.from)#media.fd),
-	gen_udp:close((State#state.to)#media.fd),
+	lists:map(fun (X) -> case X of null -> ok; _ -> gen_udp:close(X#media.fd) end end, [State#state.from, State#state.fromrtcp, State#state.to, State#state.tortcp]),
 	gen_server:cast(State#state.parent, {stop, self()}),
 	?PRINT("terminated due to reason [~p]", [Reason]).
 
@@ -103,16 +117,16 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.from)#media
 	% TODO check that message was arrived from valid {Ip, Port}
 	{F, T, Fd1, Ip1, Port1} = if
 		Fd == (State#state.from)#media.fd ->
-			{	State#state.from, 
-				(State#state.to)#media{ip=Ip, port=Port}, 
-				(State#state.to)#media.fd, 
-				(State#state.from)#media.ip, 
+			{	State#state.from,
+				(State#state.to)#media{ip=Ip, port=Port},
+				(State#state.to)#media.fd,
+				(State#state.from)#media.ip,
 				(State#state.from)#media.port};
 		Fd == (State#state.to)#media.fd ->
-			{	(State#state.from)#media{ip=Ip, port=Port}, 
-				State#state.to, 
-				(State#state.from)#media.fd, 
-				(State#state.to)#media.ip, 
+			{	(State#state.from)#media{ip=Ip, port=Port},
+				State#state.to,
+				(State#state.from)#media.fd,
+				(State#state.to)#media.ip,
 				(State#state.to)#media.port}
 	end,
 	case State#state.holdstate of
@@ -124,6 +138,26 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.from)#media
 			gen_udp:send(Fd1, Ip1, Port1, Msg)
 	end,
 	{noreply, State#state{from=F, to=T, rtpstate=rtp}};
+
+handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#media.fd; Fd == (State#state.tortcp)#media.fd ->
+	SafeSendRtcp = fun(F,I,P,M) ->
+		if
+			I == null; P == null ->
+				?PRINT("Probably RTCP to ~p from Ip[~p] Port[~p] but we CANNOT send", [Fd, Ip, Port]),
+				ok;
+			true ->
+				?PRINT("Probably RTCP to ~p from Ip[~p] Port[~p]", [Fd, Ip, Port]),
+				gen_udp:send(F, I, P, Msg)
+		end
+	end,
+	if
+		Fd == (State#state.fromrtcp)#media.fd ->
+			SafeSendRtcp((State#state.to)#media.fd, (State#state.fromrtcp)#media.ip, (State#state.fromrtcp)#media.port, Msg),
+			{noreply, State#state{tortcp=(State#state.tortcp)#media{ip=Ip,port=Port}}};
+		Fd == (State#state.tortcp)#media.fd ->
+			SafeSendRtcp((State#state.from)#media.fd, (State#state.tortcp)#media.ip, (State#state.tortcp)#media.port, Msg),
+			{noreply, State#state{fromrtcp=(State#state.fromrtcp)#media{ip=Ip,port=Port}}}
+	end;
 
 handle_info(ping, State) ->
 	case State#state.rtpstate of

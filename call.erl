@@ -35,7 +35,10 @@
 -record(source, {fd=null, ip=null, port=null, tag=null}).
 
 -record(party, {from=null,
+		fromrtcp=null,
 		to=null,
+		tortcp=null,
+		startport=0,
 		mediaid=null,
 		pid=null,
 		answered=false,
@@ -59,7 +62,7 @@ init (MainIp) ->
 
 % handle originate call leg (new media id possibly)
 % TODO handle Modifiers
-handle_call({message_u, {{GuessIp, GuessPort}, {FromTag, MediaId}, To, Modifiers}}, _, {MainIp, Parties}) ->
+handle_call({message_u, {StartPort, {GuessIp, GuessPort}, {FromTag, MediaId}, To, Modifiers}}, _, {MainIp, Parties}) ->
 	case To of
 		null ->
 			?PRINT ("message [U] probably from ~w:~w  MediaId [~b]", [GuessIp, GuessPort, MediaId]);
@@ -76,25 +79,27 @@ handle_call({message_u, {{GuessIp, GuessPort}, {FromTag, MediaId}, To, Modifiers
 			end,
 			Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 			?PRINT("answer [~s] (already exists!)", [Reply]),
-			{reply, {ok, Reply}, {MainIp, Parties}};
+			{reply, {ok, old, Reply}, {MainIp, Parties}};
 		false ->
 			% open new FdFrom and attach it
-			case gen_udp:open(0, [binary, {ip, MainIp}, {active, true}]) of
-				{ok, Fd1} ->
-					% ty to create FdTo also
-					Fd2 = case gen_udp:open(0, [binary, {ip, MainIp}, {active, true}]) of
-						{ok, Fd} ->
-							% Create another socket also
-							Fd;
-						_ ->
-							% Create another socket failed
-							null
+			case gen_udp:open(StartPort, [binary, {ip, MainIp}, {active, true}]) of
+				{ok, Fd} ->
+					SafeOpenFd = fun(Port, Params) when is_list (Params) ->
+						case gen_udp:open(Port, Params) of
+							{ok, F} -> F;
+							_ -> null
+						end
 					end,
-					{ok, {LocalIp, LocalPort}} = inet:sockname(Fd1),
-					NewParty = #party{from=#source{fd=Fd1, ip=GuessIp, port=GuessPort, tag=FromTag}, to=#source{fd=Fd2}, mediaid=MediaId},
+					NewParty = #party{	from	=#source{fd=Fd, ip=GuessIp, port=GuessPort, tag=FromTag},
+								fromrtcp=#source{fd=SafeOpenFd (StartPort+1, [binary, {ip, MainIp}, {active, true}])},
+								to	=#source{fd=SafeOpenFd (StartPort+2, [binary, {ip, MainIp}, {active, true}])},
+								tortcp	=#source{fd=SafeOpenFd (StartPort+3, [binary, {ip, MainIp}, {active, true}])},
+								startport=StartPort,
+								mediaid=MediaId},
+					{ok, {LocalIp, LocalPort}} = inet:sockname(Fd),
 					Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 					?PRINT("answer [~s]", [Reply]),
-					{reply, {ok, Reply}, {MainIp, lists:append(Parties, [NewParty])}};
+					{reply, {ok, new, Reply}, {MainIp, lists:append(Parties, [NewParty])}};
 				{error, Reason} ->
 					?PRINT("Create new socket FAILED [~p]", [Reason]),
 					{reply, {error, udp_error}, {MainIp, Parties}}
@@ -111,9 +116,9 @@ handle_call({message_l, {{GuessIp, GuessPort}, {FromTag, MediaId}, {ToTag, Media
 			case
 				case (Party#party.to)#source.fd of
 					null ->
-						gen_udp:open(0, [binary, {ip, MainIp}, {active, true}]);
+						gen_udp:open(Party#party.startport+2, [binary, {ip, MainIp}, {active, true}]);
 					_ ->
-						try 
+						try
 							if
 								FromTag == (Party#party.to)#source.tag -> {ok, (Party#party.from)#source.fd};
 								FromTag == (Party#party.from)#source.tag   -> {ok, (Party#party.to)#source.fd}
@@ -124,11 +129,11 @@ handle_call({message_l, {{GuessIp, GuessPort}, {FromTag, MediaId}, {ToTag, Media
 				end
 			of
 				{ok, Fd} ->
-					{ok, {LocalIp, LocalPort}} = inet:sockname(Fd),
 					NewParty = case (Party#party.to)#source.tag of
 						null -> Party#party{to=#source{fd=Fd, ip=GuessIp, port=GuessPort, tag=ToTag}, answered=true};
 						_ -> Party
 					end,
+					{ok, {LocalIp, LocalPort}} = inet:sockname(Fd),
 					Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 					?PRINT("answer [~s]", [Reply]),
 					{reply, {ok, Reply}, {MainIp, lists:keyreplace(MediaId, #party.mediaid, Parties, NewParty)}};
@@ -220,24 +225,25 @@ code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 terminate(Reason, {_MainIp, Parties}) ->
-	_Unused = lists:foreach(
+	Ports = lists:map(
 		fun(X)  ->
 			if
 				X#party.pid /= null ->
 					gen_server:cast(X#party.pid, stop);
 				true ->
 					ok
-			end
+			end,
+			X#party.startport
 		end,
 		Parties),
-	gen_server:cast({global, rtpproxy}, {call_terminated, {self(), Reason}}),
+	gen_server:cast({global, rtpproxy}, {call_terminated, {self(), {ports, Ports}, Reason}}),
 	?PRINT("terminated due to reason [~p]", [Reason]).
 
 % rtp from some port
 handle_info({udp, Fd, Ip, Port, Msg}, {MainIp, Parties}) ->
 %	?PRINT("udp from Fd [~w] [~p:~p]", [Fd, Ip, Port]),
 	FindFd = fun (F) ->
-		fun	({[], X}) ->
+		fun	({[], _X}) ->
 				false;
 			({[Elem|Rest], X}) ->
 				case (Elem#party.from)#source.fd of
@@ -253,9 +259,22 @@ handle_info({udp, Fd, Ip, Port, Msg}, {MainIp, Parties}) ->
 				end
 		end
 	end,
+	SafeStart = fun (F,FRtcp,T,TRtcp) ->
+		SafeGetAddr = fun(X) ->
+			case X of
+				null -> null;
+				_ -> {X#source.fd, X#source.ip, X#source.port}
+			end
+		end,
+		{ok, P} = media:start({self(), {F#source.fd, F#source.ip, F#source.port}, SafeGetAddr(FRtcp), {T#source.fd, T#source.ip, T#source.port}, SafeGetAddr(TRtcp)}),
+		gen_udp:controlling_process(F#source.fd, P),
+		gen_udp:controlling_process(T#source.fd, P),
+		lists:foreach(fun(X) -> case X of null -> ok; _ -> gen_udp:controlling_process(X#source.fd, P) end end, [FRtcp, FRtcp]),
+		P
+	end,
 	case
 		case (utils:y(FindFd))({Parties, Fd}) of
-			% RTP to Callee
+			% RTP from Caller to Callee
 			{value, to, Party} when
 						(Party#party.to)#source.ip /= null,
 						(Party#party.to)#source.port /= null,
@@ -264,12 +283,10 @@ handle_info({udp, Fd, Ip, Port, Msg}, {MainIp, Parties}) ->
 						Party#party.pid == null,
 						Party#party.answered == true
 							->
-				{ok, PartyPid} = media:start({self(), {(Party#party.from)#source.fd, Ip, Port}, {(Party#party.to)#source.fd, (Party#party.to)#source.ip, (Party#party.to)#source.port}}),
-				gen_udp:controlling_process((Party#party.from)#source.fd, PartyPid),
-				gen_udp:controlling_process((Party#party.to)#source.fd,   PartyPid),
+				NewParty = Party#party{from=(Party#party.from)#source{ip=Ip, port=Port}},
 				% FIXME send Msg here - we created Media server and we need to pass Msg to him
-				{Party, Party#party{from=(Party#party.from)#source{ip=Ip, port=Port}, pid=PartyPid}};
-			% RTP to Caller
+				{Party, NewParty#party{pid=SafeStart(NewParty#party.from, NewParty#party.fromrtcp, NewParty#party.to, NewParty#party.tortcp)}};
+			% RTP to Caller from Callee
 			{value, from, Party} when
 						(Party#party.from)#source.ip /= null,
 						(Party#party.from)#source.port /= null,
@@ -277,17 +294,15 @@ handle_info({udp, Fd, Ip, Port, Msg}, {MainIp, Parties}) ->
 						Party#party.pid == null,
 						Party#party.answered == true
 							->
-				{ok, PartyPid} = media:start({self(), {(Party#party.from)#source.fd, (Party#party.from)#source.ip, (Party#party.from)#source.port}, {(Party#party.to)#source.fd, Ip, Port}}),
-				gen_udp:controlling_process((Party#party.from)#source.fd, PartyPid),
-				gen_udp:controlling_process((Party#party.to)#source.fd, PartyPid),
+				NewParty = Party#party{to=(Party#party.to)#source{ip=Ip, port=Port}},
 				% FIXME send Msg here - we created Media server and we need to pass Msg to him
-				{Party, Party#party{to=(Party#party.to)#source{ip=Ip, port=Port}, pid=PartyPid}};
-			% RTP to Caller
+				{Party, NewParty#party{pid=SafeStart(NewParty#party.from, NewParty#party.fromrtcp, NewParty#party.to, NewParty#party.tortcp)}};
+			% RTP to Caller from Callee
 			{value, from, Party} ->
 				% TODO guess that Caller has uPnP - we know Ip and Port for Callee, and we got GuessIp and GuessPort for Caller
 				%      so we should try to start this session here (in any case 'мы ничем не рискуем')
 				{Party, Party#party{to=(Party#party.to)#source{ip=Ip, port=Port}}};
-			% RTP to Callee
+			% RTP from Caller to Callee
 			{value, to, Party} ->
 				% we should dismiss this Msg since we don't know all necessary data about Callee
 				{Party, Party#party{from=(Party#party.from)#source{ip=Ip, port=Port}}};
@@ -295,9 +310,10 @@ handle_info({udp, Fd, Ip, Port, Msg}, {MainIp, Parties}) ->
 				false
 		end
 	of
-		{OldParty, NewParty} ->
-			{noreply, {MainIp, lists:delete(OldParty, Parties) ++ [NewParty]}};
+		{OldParty, NewParty1} ->
+			{noreply, {MainIp, lists:delete(OldParty, Parties) ++ [NewParty1]}};
 		false ->
+			?PRINT("Probably RTCP to ~p from Ip[~p] Port[~p]", [Fd, Ip, Port]),
 			{noreply, {MainIp, Parties}}
 	end;
 
