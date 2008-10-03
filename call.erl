@@ -121,7 +121,7 @@ handle_call({message_l, {{GuessIp, GuessPort}, {FromTag, MediaId}, {ToTag, Media
 						try
 							if
 								FromTag == (Party#party.to)#source.tag -> {ok, (Party#party.from)#source.fd};
-								FromTag == (Party#party.from)#source.tag   -> {ok, (Party#party.to)#source.fd}
+								FromTag == (Party#party.from)#source.tag -> {ok, (Party#party.to)#source.fd}
 							end
 						catch
 							Exception:ExceptionClass -> {Exception, ExceptionClass}
@@ -153,18 +153,25 @@ handle_call(message_i, _From, State) ->
 
 handle_call({message_p, {Tag, MediaId}}, _From, {MainIp, Parties}) ->
 	?PRINT("Message [P] [~p]", [Parties]),
-	case lists:keysearch(MediaId, #party.mediaid, Parties) of
+	Result = case lists:keysearch(MediaId, #party.mediaid, Parties) of
 		% call already exists
 		{value, Party} ->
 			gen_server:cast(Party#party.pid, hold),
-			Result = if
-				Tag == (Party#party.from)#source.tag -> {(Party#party.to)#source.fd, (Party#party.from)#source.ip, (Party#party.from)#source.port};
-				Tag == (Party#party.to)#source.tag   -> {(Party#party.from)#source.fd, (Party#party.to)#source.ip, (Party#party.to)#source.port}
-			end,
-			{reply, {ok, Result}, {MainIp, Parties}};
+			try
+				if
+					Tag == (Party#party.from)#source.tag ->
+						{ok, {(Party#party.to)#source.fd, (Party#party.from)#source.ip, (Party#party.from)#source.port}};
+					Tag == (Party#party.to)#source.tag   ->
+						{ok, {(Party#party.from)#source.fd, (Party#party.to)#source.ip, (Party#party.to)#source.port}}
+				end
+			catch
+				_:_ ->
+					{error, not_found}
+			end;
 		false ->
-			{reply, {error, not_found}, {MainIp, Parties}}
-	end;
+			{error, not_found}
+	end,
+	{reply, Result, {MainIp, Parties}};
 
 
 handle_call(_Other, _From, State) ->

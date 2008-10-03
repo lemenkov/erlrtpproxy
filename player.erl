@@ -37,18 +37,21 @@
 
 -record(state, {payloadtype=null,
 		payloadlimit=0,
-		sequencenumber=0,
+		payloadlength=0,
+		sequencenumber=1,
 		timestamp=0,
+		marker=1,
 		time=0,
 		ssrc=0,
 		pos=0,
+		lastsent={0, 0, 0},
 		myfd=false,
 		addr=null}).
 
 start (Filename, PayloadTypeStr, Addr) ->
 	process_flag(trap_exit, true),
 	{PayloadType, PayloadLength, PayloadLimit} = case PayloadTypeStr of
-		"0PCMU/8000" -> {?RTP_PCMU, 160, 8000};
+		"0PCMU/8000" -> {?RTP_PCMU, 320, 8000};
 		"101telephone-event/8000" -> {?RTP_PCMU, 160, 8000};
 		"8PCMA/8000" -> {?RTP_PCMA, 160, 8000};
 		_ -> {?RTP_G729, 10, 0}
@@ -63,12 +66,11 @@ start (Filename, PayloadTypeStr, Addr) ->
 	Fn = io_lib:format("~s.~b", [Filename, PayloadType]),
 	case file:read_file(Fn) of
 		{ok, RtpData} ->
-			{MegaSecs, Secs, MicroSecs} = now(),
-			Timestamp = (MegaSecs * 1000000 +  Secs) * 1000000 + MicroSecs,
-			State = #state{	time=round(773 * PayloadLength / PayloadLimit),
+			State = #state{	time=round(1000 / (PayloadLimit / PayloadLength)),
 					payloadtype=PayloadType,
 					payloadlimit=PayloadLimit,
-					timestamp=Timestamp,
+					payloadlength=PayloadLength,
+					timestamp=PayloadLength,
 					ssrc=random:uniform(2 bsl 31),
 					myfd=MyFd,
 					addr={Fd, Ip, Port}},
@@ -77,51 +79,49 @@ start (Filename, PayloadTypeStr, Addr) ->
 			{error, Reason}
 	end.
 
-difftime({MegaSecs0, Secs0, MicroSecs0}) ->
-	{MegaSecs1, Secs1, MicroSecs1} = now(),
-	round((((MegaSecs1 - MegaSecs0) * 1000000 + (Secs1 - Secs0)) * 1000000 + (MicroSecs1 - MicroSecs0))/1000).
-
 send_rtp (RtpData, State) ->
 	% TODO add more variants (probably when makeann should be able to encode new formats)
 	% TODO Move to  start (...)
 %	?PRINT("listener begin! State[~w], sent ~w and remains ~w bytes.~n", [State, State#state.pos, size(RtpData)]),
-	Begin = now(),
 
 	Pos = case State#state.pos == size(RtpData) of
 		true -> 0;
 		_ -> State#state.pos
 	end,
 
-	PayloadLength = case State#state.payloadtype of
-		?RTP_PCMU ->
-			if
-				Pos + 160 > size (RtpData) -> size(RtpData) - Pos;
-				true -> 160
-			end;
-		?RTP_PCMA ->
-			if
-				Pos + 160 > size (RtpData) -> size(RtpData) - Pos;
-				true -> size(RtpData)
-			end;
-		?RTP_G729 -> 10;
-		?RTP_G723 -> 24;
-		?RTP_GSM -> 33;
-		_ -> 0
+	PayloadLength =	if
+		Pos + State#state.payloadlength > size (RtpData) ->
+			size(RtpData) - Pos;
+		true ->
+			State#state.payloadlength
 	end,
 
 %	?PRINT("listener 1!~n", []),
 %	?PRINT("player pos ~w from ~w!~n", [Pos, size(RtpData)]),
 	<<_Head:Pos/binary, Payload:PayloadLength/binary, _Tail/binary>> = RtpData,
 
-%	{MegaSecs, Secs, MicroSecs} = now(),
-%	Timestamp = (MegaSecs * 1000000 +  Secs) * 1000000 + MicroSecs - State#state.timestamp,
-	Timestamp =  160 + State#state.timestamp,
-
 	{Fd, Ip, Port} = State#state.addr,
 
-	gen_udp:send(Fd, Ip, Port, <<2:2, 0:1, 0:1, 0:4, 0:1, (State#state.payloadtype):7, (State#state.sequencenumber):16, Timestamp:32, (State#state.ssrc):32, Payload:PayloadLength/binary>>),
-
-	Wait = State#state.time - difftime(Begin),
+	gen_udp:send(Fd, Ip, Port,
+		<<	2:2,
+			0:1,
+			0:1,
+			0:4,
+			(State#state.marker):1,
+			(State#state.payloadtype):7,
+			(State#state.sequencenumber):16,
+			(State#state.timestamp):32,
+			(State#state.ssrc):32,
+			Payload:PayloadLength/binary
+		>>),
+	{MegaSecs, Secs, MicroSecs} = now(),
+	{MegaSecs0, Secs0, MicroSecs0} = State#state.lastsent,
+	Wait = case round(State#state.time - ((MegaSecs - MegaSecs0) * 1000000 + (Secs - Secs0)) * 1000 + (MicroSecs - MicroSecs0)/1000) of
+		Interval when Interval > 0, Interval < State#state.time -> Interval;
+		_ -> 0
+	end,
+	?PRINT("Wait for ~p msecs [time ~p, delta ~p]~n", [Wait, State#state.time, ((MegaSecs - MegaSecs0) * 1000000 + (Secs - Secs0)) * 1000 + (MicroSecs - MicroSecs0)/1000]),
+	?PRINT("LS ~p]~n", [State#state.lastsent]),
 
 	receive
 		Something ->
@@ -132,6 +132,11 @@ send_rtp (RtpData, State) ->
 			end,
 			gen_server:cast({global, rtpproxy}, {call_terminated, {self(), Something}})
 	after Wait  ->
-		send_rtp(RtpData, State#state{timestamp=Timestamp, pos=Pos+PayloadLength, sequencenumber=State#state.sequencenumber + 1})
+		send_rtp(RtpData, State#state{
+					timestamp=State#state.payloadlength + State#state.timestamp,
+					marker=0,
+					pos=Pos+PayloadLength,
+					lastsent={MegaSecs, Secs, MicroSecs},
+					sequencenumber=State#state.sequencenumber + 1})
 	end.
 
