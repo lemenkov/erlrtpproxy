@@ -50,7 +50,7 @@
 
 start (Filename, PayloadTypeStr, Addr) ->
 	process_flag(trap_exit, true),
-	{Type, FrameLength, PayloadClock} = case PayloadTypeStr of
+	{Type, FrameLength, Clock} = case PayloadTypeStr of
 		"0PCMU/8000" -> {?RTP_PCMU, 160, 8000};
 		"101telephone-event/8000" -> {?RTP_PCMU, 160, 8000};
 		"8PCMA/8000" -> {?RTP_PCMA, 160, 8000};
@@ -111,14 +111,14 @@ send_rtp (RtpData, State) ->
 			(State#state.ssrc):32,
 			Payload:PayloadLength/binary
 		>>),
-	{MegaSecs, Secs, MicroSecs} = now(),
 	{MegaSecs0, Secs0, MicroSecs0} = State#state.startfrom,
-	Wait = case round(State#state.timestamp - ((MegaSecs - MegaSecs0) * 1000000 + (Secs - Secs0)) * 1000 + (MicroSecs - MicroSecs0)/1000) of
-		Interval when Interval > 0 -> Interval;
-		_ -> 0
+	{MegaSecs, Secs, MicroSecs} = now(),
+	Wait = case round((State#state.sequencenumber * State#state.time) - (((MegaSecs - MegaSecs0) * 1000000 + (Secs - Secs0)) * 1000 + (MicroSecs - MicroSecs0)/1000)) of
+		Interval when Interval > 0, Interval < State#state.time ->
+			Interval;
+		_ ->
+			19
 	end,
-%	?PRINT("Wait for ~p msecs [time ~p, delta ~p]~n", [Wait, State#state.time, ((MegaSecs - MegaSecs0) * 1000000 + (Secs - Secs0)) * 1000 + (MicroSecs - MicroSecs0)/1000]),
-%	?PRINT("LS ~p]~n", [State#state.startfrom]),
 
 	receive
 		Something ->
