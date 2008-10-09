@@ -345,7 +345,7 @@ handle_cast(_Other, State) ->
 
 % Call died (due to timeout)
 handle_info({'EXIT', Pid, Reason}, State) ->
-	?PRINT("received call [~w] closing due to [~w]", ['EXIT', Pid, Reason]),
+	?PRINT("received 'EXIT' from ~p, closing due to [~p]", [Pid, Reason]),
 	case lists:keysearch(Pid, #thread.pid, State#state.calls) of
 		{value, CallThread} ->
 			?PRINT("call [~w] closed", [Pid]),

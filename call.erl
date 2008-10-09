@@ -276,7 +276,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {MainIp, Parties}) ->
 		{ok, P} = media:start({self(), {F#source.fd, F#source.ip, F#source.port}, SafeGetAddr(FRtcp), {T#source.fd, T#source.ip, T#source.port}, SafeGetAddr(TRtcp)}),
 		gen_udp:controlling_process(F#source.fd, P),
 		gen_udp:controlling_process(T#source.fd, P),
-		lists:foreach(fun(X) -> case X of null -> ok; _ -> gen_udp:controlling_process(X#source.fd, P) end end, [FRtcp, FRtcp]),
+		lists:foreach(fun(X) -> case X of null -> ok; _ -> gen_udp:controlling_process(X#source.fd, P) end end, [FRtcp, TRtcp]),
 		P
 	end,
 	case
