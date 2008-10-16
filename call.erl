@@ -320,7 +320,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {MainIp, Parties}) ->
 		{OldParty, NewParty1} ->
 			{noreply, {MainIp, lists:delete(OldParty, Parties) ++ [NewParty1]}};
 		false ->
-			?PRINT("Probably RTCP to ~p from Ip[~p] Port[~p]", [Fd, Ip, Port]),
+%			?PRINT("Probably RTCP to ~p from Ip[~p] Port[~p]", [Fd, Ip, Port]),
 			{noreply, {MainIp, Parties}}
 	end;
 

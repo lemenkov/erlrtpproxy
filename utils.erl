@@ -9,6 +9,7 @@ print (Name, Format) ->
 print (Name, Format, Params) when is_list (Params) ->
 %	io:format(Format, Params),
 	syslog:send(Name, syslog:info(), io_lib:format(Format, Params)).
+%	ok.
 
 y(M) ->
 	G = fun (F) -> M(fun(A) -> (F(F))(A) end) end,

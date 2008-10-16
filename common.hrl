@@ -1,5 +1,6 @@
 -record(cmd, {
 		cookie=null,
+		origin=null,
 		type=null,
 		callid=null,
 		addr=null,
