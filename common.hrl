@@ -34,3 +34,7 @@
 
 -define(PRINT(X, Y), utils:print(?MODULE, "[~w]: " ++  X ++ "~n", [self()] ++ Y)).
 
+-define(ERR(X, Y), utils:print(?MODULE, "[~w]: " ++  X ++ "~n", [self()] ++ Y)).
+-define(INFO(X, Y), utils:print(?MODULE, "[~w]: " ++  X ++ "~n", [self()] ++ Y)).
+-define(WARN(X, Y), utils:print(?MODULE, "[~w]: " ++  X ++ "~n", [self()] ++ Y)).
+

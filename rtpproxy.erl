@@ -295,7 +295,7 @@ handle_cast({message, Cmd}, State) ->
 									PlayerInfo#thread.pid ! message_s,
 									{?RTPPROXY_OK, State#state{players=lists:delete(PlayerInfo, State#state.players)}};
 								false ->
-									?PRINT("CANNOT Stop player thread.", []),
+									?PRINT("Session not exists. Do nothing.", []),
 									?RTPPROXY_ERR_NOSESSION
 							end;
 						_ ->

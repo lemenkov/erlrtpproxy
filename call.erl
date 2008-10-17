@@ -237,8 +237,15 @@ terminate(Reason, {_MainIp, Parties}) ->
 			if
 				X#party.pid /= null ->
 					gen_server:cast(X#party.pid, stop);
-				true ->
-					ok
+				X#party.pid == null ->
+					lists:foreach(
+						fun(Y) ->
+							try gen_udp:close(Y#source.fd)
+							catch
+								_:_ ->
+									ok
+							end
+						end, [X#party.from, X#party.fromrtcp, X#party.to, X#party.tortcp])
 			end,
 			X#party.startport
 		end,
