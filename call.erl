@@ -274,7 +274,8 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 				end
 		end
 	end,
-	SafeStart = fun (F,FRtcp,T,TRtcp) ->
+	SafeStart = fun (NP) ->
+		[F,FRtcp,T,TRtcp] = [NP#party.from, NP#party.fromrtcp, NP#party.to, NP#party.tortcp],
 		SafeGetAddr = fun(X) ->
 			case X of
 				null -> null;
@@ -300,7 +301,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 							->
 				NewParty = Party#party{from=(Party#party.from)#source{ip=Ip, port=Port}},
 				% FIXME send Msg here - we created Media server and we need to pass Msg to him
-				{Party, NewParty#party{pid=SafeStart(NewParty#party.from, NewParty#party.fromrtcp, NewParty#party.to, NewParty#party.tortcp)}};
+				{Party, NewParty#party{pid=SafeStart(NewParty)}};
 			% RTP to Caller from Callee
 			{value, from, Party} when
 						(Party#party.from)#source.ip /= null,
@@ -311,7 +312,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 							->
 				NewParty = Party#party{to=(Party#party.to)#source{ip=Ip, port=Port}},
 				% FIXME send Msg here - we created Media server and we need to pass Msg to him
-				{Party, NewParty#party{pid=SafeStart(NewParty#party.from, NewParty#party.fromrtcp, NewParty#party.to, NewParty#party.tortcp)}};
+				{Party, NewParty#party{pid=SafeStart(NewParty)}};
 			% RTP to Caller from Callee
 			{value, from, Party} ->
 				% TODO guess that Caller has uPnP - we know Ip and Port for Callee, and we got GuessIp and GuessPort for Caller
