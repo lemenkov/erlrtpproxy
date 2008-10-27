@@ -6,7 +6,7 @@
 print (Name, Level, Format) ->
 	print (Name, Level, Format, []).
 
-print (Level, Name, Format, Params) when is_list (Params) ->
+print (Name, Level, Format, Params) when is_list (Params) ->
 %	io:format(Format, Params),
 	syslog:send(Name, Level, io_lib:format(Format, Params)).
 %	ok.
@@ -16,5 +16,5 @@ y(M) ->
 	G(G).
 
 make() ->
-	lists:foreach(fun(X) -> compile:file(X, [verbose, report_errors, report_warnings]) end, [rtpproxy, call, media, syslog, ser, utils, player]).
+	lists:foreach(fun(X) -> compile:file(X, [verbose, report_errors, report_warnings]) end, [rtpproxy, call, media, ser, utils, player]).
 
