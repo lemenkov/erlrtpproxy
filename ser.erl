@@ -103,6 +103,11 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 		end
 	end,
 
+	ParseModifiers = fun (A) ->
+		{Modifiers, _} = lists:unzip(lists:filter(fun({_, Sym}) -> lists:member(Sym, A) end, ?MOD_LIST)),
+		Modifiers
+	end,
+
 	case
 		case Rest of
 			% Request basic supported rtpproxy protocol version
@@ -113,7 +118,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 				#cmd{cookie=Cookie, origin={ser, self(), Ip, Port}, type=?CMD_VF, params=Params};
 			% update/create session
 			[[$U|Args], CallId, OrigIp, OrigPort, FromTag, FromMediaId|To] ->
-				{Modifiers, _} = lists:unzip(lists:filter(fun({_, Sym}) -> lists:member(Sym, Args) end, ?MOD_LIST)),
+				Modifiers = ParseModifiers (Args),
 				case ParseAddr(OrigIp, OrigPort) of
 					{error, ErrMsg} ->
 						?PRINT("Error: ~p", [ErrMsg]),
@@ -145,7 +150,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 			% lookup existing session
 			% TODO should both MediaIds be equal?
 			[[$L|Args], CallId, OrigIp, OrigPort, FromTag, FromMediaId, ToTag, ToMediaId] ->
-				{Modifiers, _} = lists:unzip(lists:filter(fun({_, Sym}) -> lists:member(Sym, Args) end, ?MOD_LIST)),
+				Modifiers = ParseModifiers (Args),
 				case ParseAddr(OrigIp, OrigPort) of
 					{error, ErrMsg} ->
 						?PRINT("Error: ~p", [ErrMsg]),
@@ -162,9 +167,14 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 						}
 				end;
 			% delete session (no MediaIds)
-			[[$D|Args], CallId, FromTag, ToTag] ->
-				{Modifiers, _} = lists:unzip(lists:filter(fun({_, Sym}) -> lists:member(Sym, Args) end, ?MOD_LIST)),
-				#cmd{cookie=Cookie, origin={ser, self(), Ip, Port}, type=?CMD_D, callid=CallId, from={FromTag, 0}, to={ToTag, 0}, params=Modifiers};
+			[[$D|Args], CallId, FromTag|ToTag] ->
+				Modifiers = ParseModifiers (Args),
+				case ToTag of
+					[] ->
+						#cmd{cookie=Cookie, origin={ser, self(), Ip, Port}, type=?CMD_D, callid=CallId, from={FromTag, 0}, params=Modifiers};
+					_ ->
+						#cmd{cookie=Cookie, origin={ser, self(), Ip, Port}, type=?CMD_D, callid=CallId, from={FromTag, 0}, to={ToTag, 0}, params=Modifiers}
+				end;
 			% record (obsoleted)
 			% TODO should both MediaIds be equal?
 			["R", CallId, FromTag, FromMediaId, ToTag, ToMediaId] ->
@@ -172,6 +182,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 			% playback pre-recorded audio
 			% TODO should both MediaIds be equal?
 			[[$P|Args], CallId, PlayName, Codecs, FromTag, FromMediaId, ToTag, ToMediaId|Addr] ->
+				Modifiers = ParseModifiers (Args),
 				case Addr of
 					[] ->
 						#cmd{	cookie=Cookie,
@@ -180,6 +191,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 							callid=CallId,
 							from={FromTag, ParseMediaId(FromMediaId)},
 							to={ToTag, ParseMediaId(ToMediaId)},
+							params=Modifiers,
 							filename=PlayName,
 							codecs=Codecs
 						};
@@ -196,6 +208,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 									callid=CallId,
 									from={FromTag, ParseMediaId(FromMediaId)},
 									to={ToTag, ParseMediaId(ToMediaId)},
+									params=Modifiers,
 									filename=PlayName,
 									codecs=Codecs,
 									addr={GuessIp, GuessPort}

@@ -31,6 +31,7 @@
 -export([terminate/2]).
 
 -include("common.hrl").
+-include("config.hrl").
 
 % description of media:
 % * fd - our fd, where we will receive messages from other side
@@ -47,8 +48,8 @@ start_link(Args) ->
 
 init ({Parent, From, FromRtcp, To, ToRtcp}) ->
 	?PRINT("started ~p ~p", [From, To]),
-	process_flag(trap_exit, true),
-	{ok, TRef} = timer:send_interval(10000, self(), ping),
+%	process_flag(trap_exit, true),
+	{ok, TRef} = timer:send_interval(?MEDIA_TIME_TO_LIVE, ping),
 	SafeMakeMedia = fun(Desc) ->
 		case Desc of
 			{F,I,P} -> #media{fd=F,ip=I,port=P};
@@ -81,7 +82,7 @@ handle_cast(hold, State) when State#state.holdstate == false ->
 handle_cast(hold, State) when State#state.holdstate == true ->
 	?PRINT("HOLD off", []),
 	% since we suppressed timer earlier, we need to restart it
-	{ok, TRef} = timer:send_interval(10000, self(), ping),
+	{ok, TRef} = timer:send_interval(?MEDIA_TIME_TO_LIVE, self(), ping),
 	{noreply, State#state{tref=TRef, holdstate=false}};
 
 handle_cast({recording, RecState}, State) ->

@@ -107,7 +107,7 @@ handle_cast({message, Cmd}, State) ->
 									end
 							end;
 						?CMD_L ->
-							case gen_server:call(CallInfo#thread.pid, {message_l, {Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.params}}) of
+							try gen_server:call(CallInfo#thread.pid, {message_l, {Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.params}}) of
 								{ok, Reply} ->
 									Reply;
 								{error, not_found} ->
@@ -115,6 +115,10 @@ handle_cast({message, Cmd}, State) ->
 									?RTPPROXY_ERR_NOSESSION;
 								{error, udp_error} ->
 									?PRINT("error in udp while CMD_L!", []),
+									?RTPPROXY_ERR_SOFTWARE
+							catch
+								Error:ErrorClass ->
+									?PRINT("Exception {~p,~p} in udp while CMD_L!", [Error,ErrorClass]),
 									?RTPPROXY_ERR_SOFTWARE
 							end;
 						?CMD_Q ->
@@ -244,7 +248,7 @@ handle_cast({message, Cmd}, State) ->
 									PlayerInfo#thread.pid ! message_d,
 									?RTPPROXY_OK;
 								false ->
-									?PRINT("CANNOT Stop player thread.", []),
+									?PRINT("CANNOT find thread.", []),
 									?RTPPROXY_ERR_NOSESSION
 							end;
 						?CMD_P ->
@@ -382,7 +386,12 @@ code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 terminate(Reason, State) ->
-	?PRINT("RTPPROXY terminated due to reason [~w]", [Reason]),
+	case Reason of
+		{ErrorClass, {Module,Function, [Pid, Message]}} ->
+			?PRINT("RTPPROXY terminated due to Error [~p] in ~p:~p(...) with Msg[~p] from Pid ~p", [ErrorClass, Module, Function, Message, Pid]);
+		_ ->
+			?PRINT("RTPPROXY terminated due to reason [~w]", [Reason])
+	end,
 	syslog:stop(),
 	io:format("RTPPROXY terminated due to reason [~w]", [Reason]).
 
