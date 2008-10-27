@@ -47,7 +47,7 @@ start_link(Args) ->
 	gen_server:start_link(?MODULE, Args, []).
 
 init ({Parent, From, FromRtcp, To, ToRtcp}) ->
-	?PRINT("started ~p ~p", [From, To]),
+	?INFO("started ~p ~p", [From, To]),
 %	process_flag(trap_exit, true),
 	{ok, TRef} = timer:send_interval(?MEDIA_TIME_TO_LIVE, ping),
 	SafeMakeMedia = fun(Desc) ->
@@ -74,13 +74,13 @@ handle_cast(stop, State) ->
 	{stop, stop, State};
 
 handle_cast(hold, State) when State#state.holdstate == false ->
-	?PRINT("HOLD on", []),
+	?INFO("HOLD on", []),
 	% We should suppress timer since we shouldn't care this mediastream
 	timer:cancel(State#state.tref),
 	{noreply, State#state{tref=null, holdstate=true}};
 
 handle_cast(hold, State) when State#state.holdstate == true ->
-	?PRINT("HOLD off", []),
+	?INFO("HOLD off", []),
 	% since we suppressed timer earlier, we need to restart it
 	{ok, TRef} = timer:send_interval(?MEDIA_TIME_TO_LIVE, self(), ping),
 	{noreply, State#state{tref=TRef, holdstate=false}};
@@ -107,7 +107,7 @@ terminate(Reason, State) ->
 	timer:cancel(State#state.tref),
 	lists:map(fun (X) -> case X of null -> ok; _ -> gen_udp:close(X#media.fd) end end, [State#state.from, State#state.fromrtcp, State#state.to, State#state.tortcp]),
 	gen_server:cast(State#state.parent, {stop, self()}),
-	?PRINT("terminated due to reason [~p]", [Reason]).
+	?ERR("terminated due to reason [~p]", [Reason]).
 
 % We received UDP-data on From or To socket, so we must send in from To or From socket respectively
 % (if we not in HOLD state)
@@ -144,10 +144,10 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#m
 	SafeSendRtcp = fun(F,I,P,M) ->
 		if
 			I == null; P == null ->
-				?PRINT("Probably RTCP to ~p from Ip[~p] Port[~p] but we CANNOT send", [Fd, Ip, Port]),
+				?WARN("Probably RTCP to ~p from Ip[~p] Port[~p] but we CANNOT send", [Fd, Ip, Port]),
 				ok;
 			true ->
-				?PRINT("Probably RTCP to ~p from Ip[~p] Port[~p]", [Fd, Ip, Port]),
+				?INFO("Probably RTCP to ~p from Ip[~p] Port[~p]", [Fd, Ip, Port]),
 				gen_udp:send(F, I, P, Msg)
 		end
 	end,
@@ -171,6 +171,6 @@ handle_info(ping, State) ->
 	end;
 
 handle_info(Other, State) ->
-	?PRINT("Other Info [~p], State [~p]", [Other, State]),
+	?WARN("Other Info [~p], State [~p]", [Other, State]),
 	{noreply, State}.
 

@@ -42,10 +42,10 @@ init ({Ip, Port}) ->
 	process_flag(trap_exit, true),
 	case gen_udp:open(Port, [{ip, Ip}, {active, true}, list]) of
 		{ok, Fd} ->
-			?PRINT("started at [~s:~w]", [inet_parse:ntoa(Ip), Port]),
+			?INFO("started at [~s:~w]", [inet_parse:ntoa(Ip), Port]),
 			{ok, Fd};
 		{error, Reason} ->
-			?PRINT("interface not started. Reason [~p]", [Reason]),
+			?ERR("interface not started. Reason [~p]", [Reason]),
 			{stop, Reason}
 	end.
 
@@ -65,7 +65,7 @@ code_change(_OldVsn, Fd, _Extra) ->
 
 terminate(Reason, Fd) ->
 	gen_udp:close(Fd),
-	?PRINT("thread terminated due to reason [~p]", [Reason]).
+	?ERR("thread terminated due to reason [~p]", [Reason]).
 
 % Fd from which message arrived must be equal to Fd from our state
 % Brief introbuction of protocol is here: http://rtpproxy.org/wiki/RTPproxyProtocol
@@ -73,7 +73,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 	% TODO fix issue with missing Cookie
 	% TODO pass modifiers as atoms (not as string)
 	[Cookie|Rest] = string:tokens(Msg, " ;"),
-	?PRINT("SER cmd: ~p", [Rest]),
+	?INFO("SER cmd: ~p", [Rest]),
 
 	ParseAddr = fun (ProbableIp, ProbablePort) ->
 		try inet_parse:address(ProbableIp) of
@@ -121,7 +121,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 				Modifiers = ParseModifiers (Args),
 				case ParseAddr(OrigIp, OrigPort) of
 					{error, ErrMsg} ->
-						?PRINT("Error: ~p", [ErrMsg]),
+						?ERR("Error: ~p", [ErrMsg]),
 						error_syntax;
 					{GuessIp, GuessPort} ->
 						case To of
@@ -153,7 +153,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 				Modifiers = ParseModifiers (Args),
 				case ParseAddr(OrigIp, OrigPort) of
 					{error, ErrMsg} ->
-						?PRINT("Error: ~p", [ErrMsg]),
+						?ERR("Error: ~p", [ErrMsg]),
 						error_syntax;
 					{GuessIp, GuessPort} ->
 						#cmd{	cookie=Cookie,
@@ -199,7 +199,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 						% Hold and Resume
 						case ParseAddr(OrigIp, OrigPort) of
 							{error, ErrMsg} ->
-								?PRINT("Error: ~p", [ErrMsg]),
+								?ERR("Error: ~p", [ErrMsg]),
 								error_syntax;
 							{GuessIp, GuessPort} ->
 								#cmd{	cookie=Cookie,
@@ -244,7 +244,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 		end
 	of
 		error_syntax ->
-			?PRINT("Other command (bad syntax?) [~s]", [Msg]),
+			?ERR("Other command (bad syntax?) [~s]", [Msg]),
 			gen_udp:send(Fd, Ip, Port, Cookie ++ " " ++  ?RTPPROXY_ERR_SYNTAX ++ "\n");
 		Cmd ->
 			gen_server:cast({global, rtpproxy}, {message, Cmd})
@@ -253,5 +253,5 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 	{noreply, Fd};
 
 handle_info(Info, Fd) ->
-	?PRINT("Info [~w]", [Info]),
+	?WARN("Info [~w]", [Info]),
 	{noreply, Fd}.

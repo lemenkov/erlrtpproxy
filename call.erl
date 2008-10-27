@@ -58,7 +58,7 @@ start_link(Args) ->
 
 init (MainIp) ->
 %	process_flag(trap_exit, true),
-%	?PRINT("started at ~s", [inet_parse:ntoa(MainIp)]),
+%	?INFO("started at ~s", [inet_parse:ntoa(MainIp)]),
 	{ok, #state{ip=MainIp}}.
 
 % handle originate call leg (new media id possibly)
@@ -66,9 +66,9 @@ init (MainIp) ->
 handle_call({message_u, {StartPort, {GuessIp, GuessPort}, {FromTag, MediaId}, To, Modifiers}}, _, State) ->
 	case To of
 		null ->
-			?PRINT ("message [U] probably from ~w:~w  MediaId [~b]", [GuessIp, GuessPort, MediaId]);
+			?INFO("message [U] probably from ~w:~w  MediaId [~b]", [GuessIp, GuessPort, MediaId]);
 		_ ->
-			?PRINT ("message [U] probably from ~w:~w  MediaId [~b] REINVITE!", [GuessIp, GuessPort, MediaId])
+			?INFO("message [U] probably from ~w:~w  MediaId [~b] REINVITE!", [GuessIp, GuessPort, MediaId])
 	end,
 	% search for already  existed
 	case lists:keysearch(MediaId, #party.mediaid, State#state.parties) of
@@ -79,7 +79,7 @@ handle_call({message_u, {StartPort, {GuessIp, GuessPort}, {FromTag, MediaId}, To
 				FromTag == (Party#party.to)#source.tag   -> inet:sockname((Party#party.to)#source.fd)
 			end,
 			Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
-			?PRINT("answer [~s] (already exists!)", [Reply]),
+			?INFO("answer [~s] (already exists!)", [Reply]),
 			{reply, {ok, old, Reply}, State};
 		false ->
 			% open new FdFrom and attach it
@@ -99,10 +99,10 @@ handle_call({message_u, {StartPort, {GuessIp, GuessPort}, {FromTag, MediaId}, To
 								mediaid=MediaId},
 					{ok, {LocalIp, LocalPort}} = inet:sockname(Fd),
 					Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
-					?PRINT("answer [~s]", [Reply]),
+					?INFO("answer [~s]", [Reply]),
 					{reply, {ok, new, Reply}, State#state{parties=lists:append(State#state.parties, [NewParty])}};
 				{error, Reason} ->
-					?PRINT("Create new socket FAILED [~p]", [Reason]),
+					?ERR("Create new socket FAILED [~p]", [Reason]),
 					{reply, {error, udp_error}, State}
 			end
 	end;
@@ -110,7 +110,7 @@ handle_call({message_u, {StartPort, {GuessIp, GuessPort}, {FromTag, MediaId}, To
 % handle answered call leg
 % Both MediaId's are equal (just guessing)
 handle_call({message_l, {{GuessIp, GuessPort}, {FromTag, MediaId}, {ToTag, MediaId}, Modifiers}}, _, State) ->
-	?PRINT ("message [L] probably from ~w:~w  MediaId [~b]", [GuessIp, GuessPort, MediaId]),
+	?INFO("message [L] probably from ~w:~w  MediaId [~b]", [GuessIp, GuessPort, MediaId]),
 	% search for already  existed
 	case lists:keysearch(MediaId, #party.mediaid, State#state.parties) of
 		{value, Party} ->
@@ -136,15 +136,15 @@ handle_call({message_l, {{GuessIp, GuessPort}, {FromTag, MediaId}, {ToTag, Media
 					end,
 					{ok, {LocalIp, LocalPort}} = inet:sockname(Fd),
 					Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
-					?PRINT("answer [~s]", [Reply]),
+					?INFO("answer [~s]", [Reply]),
 					{reply, {ok, Reply}, State#state{parties=lists:keyreplace(MediaId, #party.mediaid, State#state.parties, NewParty)}};
 				{error, Reason} ->
-					?PRINT("FAILED [~p]", [Reason]),
+					?ERR("FAILED [~p]", [Reason]),
 					{reply, {error, udp_error}, State}
 			end;
 		false ->
 			% Call not found.
-			?PRINT("ERROR not found", []),
+			?ERR("ERROR not found", []),
 			{reply, {error, not_found}, State}
 	end;
 
@@ -153,7 +153,7 @@ handle_call(message_i, _From, State) ->
 	{reply, {ok, "TODO"}, State};
 
 handle_call({message_p, {Tag, MediaId}}, _From, State) ->
-%	?PRINT("Message [P] [~p]", [Parties]),
+%	?INFO("Message [P] [~p]", [Parties]),
 	Result = case lists:keysearch(MediaId, #party.mediaid, State#state.parties) of
 		% call already exists
 		{value, Party} ->
@@ -212,16 +212,16 @@ handle_cast(message_s, State) ->
 % timeout from media stream
 % TODO consider to stop all other media streams
 handle_cast({stop, Pid}, State) ->
-%	?PRINT("TIMEOUT when state is [~p]", [Parties]),
+%	?INFO("TIMEOUT when state is [~p]", [Parties]),
 	case lists:keytake (Pid, #party.pid, State#state.parties) of
 		{value, Party, []} ->
-%			?PRINT("It was the last mediastream - exiting", []),
+%			?INFO("It was the last mediastream - exiting", []),
 			{stop, stop, State#state{parties=[]}};
 		{value, Party, NewParties} ->
-%			?PRINT("It was NOT the last mediastream", []),
+%			?INFO("It was NOT the last mediastream", []),
 			{noreply, State#state{parties=NewParties}};
 		false ->
-			?PRINT("Cannot find such Pid", []),
+			?ERR("Cannot find such Pid", []),
 			{noreply, State}
 	end;
 
@@ -252,11 +252,11 @@ terminate(Reason, State) ->
 		end,
 		State#state.parties),
 	gen_server:cast({global, rtpproxy}, {call_terminated, {self(), {ports, Ports}, Reason}}),
-	?PRINT("terminated due to reason [~p]", [Reason]).
+	?ERR("terminated due to reason [~p]", [Reason]).
 
 % rtp from some port
 handle_info({udp, Fd, Ip, Port, Msg}, State) ->
-%	?PRINT("udp from Fd [~w] [~p:~p]", [Fd, Ip, Port]),
+%	?INFO("udp from Fd [~w] [~p:~p]", [Fd, Ip, Port]),
 	FindFd = fun (F) ->
 		fun	({[], _X}) ->
 				false;
@@ -328,11 +328,11 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 		{OldParty, NewParty1} ->
 			{noreply, State#state{parties=lists:delete(OldParty, State#state.parties) ++ [NewParty1]}};
 		false ->
-%			?PRINT("Probably RTCP to ~p from Ip[~p] Port[~p]", [Fd, Ip, Port]),
+%			?WARN("Probably RTCP to ~p from Ip[~p] Port[~p]", [Fd, Ip, Port]),
 			{noreply, State}
 	end;
 
 handle_info(Info, State) ->
-	?PRINT("Info [~w]", [Info]),
+	?WARN("Info [~w]", [Info]),
 	{noreply, State}.
 
