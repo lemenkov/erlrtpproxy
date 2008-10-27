@@ -1,14 +1,14 @@
 -module(utils).
--export([print/2, print/3]).
+-export([print/3, print/4]).
 -export([y/1]).
 -export([make/0]).
 
-print (Name, Format) ->
-	print (Name, Format, []).
+print (Name, Level, Format) ->
+	print (Name, Level, Format, []).
 
-print (Name, Format, Params) when is_list (Params) ->
+print (Level, Name, Format, Params) when is_list (Params) ->
 %	io:format(Format, Params),
-	syslog:send(Name, syslog:info(), io_lib:format(Format, Params)).
+	syslog:send(Name, Level, io_lib:format(Format, Params)).
 %	ok.
 
 y(M) ->
