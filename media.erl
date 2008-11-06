@@ -106,7 +106,7 @@ code_change(_OldVsn, State, _Extra) ->
 terminate(Reason, State) ->
 	timer:cancel(State#state.tref),
 	lists:map(fun (X) -> case X of null -> ok; _ -> gen_udp:close(X#media.fd) end end, [State#state.from, State#state.fromrtcp, State#state.to, State#state.tortcp]),
-	gen_server:cast(State#state.parent, {stop, self()}),
+%	gen_server:cast(State#state.parent, {stop, self()}),
 	?ERR("terminated due to reason [~p]", [Reason]).
 
 % We received UDP-data on From or To socket, so we must send in from To or From socket respectively

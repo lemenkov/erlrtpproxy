@@ -47,8 +47,20 @@ start_link(Args) ->
 init(_Unused) ->
 	process_flag(trap_exit, true),
 	syslog:start(),
-	?INFO("started with rtphosts [~w]", [?RtpHosts]),
-	{ok, #state{rtphosts=lists:map(fun({Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}) -> {Node, Ip, lists:seq(MinPort, MaxPort, ?PORTS_PER_MEDIA)} end, ?RtpHosts)}}.
+%	?INFO("started with rtphosts [~w]", [?RtpHosts]),
+	RH = lists:map(
+		fun({Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}) ->
+			case net_adm:ping(Node) of
+				pong -> 
+					?INFO("Adding node ~p at ip ~p with port range [~p - ~p]", [Node, Ip, MinPort, MaxPort]),
+					{Node, Ip, lists:seq(MinPort, MaxPort, ?PORTS_PER_MEDIA)};
+				pang ->
+					?ERR("Failed to add node ~p at ip ~p with port range [~p - ~p]", [Node, Ip, MinPort, MaxPort]),
+					[]
+			end 
+		end,
+		?RtpHosts),
+	{ok, #state{rtphosts=RH}}.
 
 handle_call(_Message, _From , State) ->
 	{reply, ?RTPPROXY_ERR_SOFTWARE, State}.
@@ -129,6 +141,7 @@ handle_cast({message, Cmd}, State) ->
 							% TODO
 							?RTPPROXY_OK;
 						?CMD_D ->
+							% Should we use call here
 							gen_server:cast(CallInfo#thread.pid, message_d),
 							case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.players) of
 								{value, PlayerInfo} ->
@@ -325,12 +338,13 @@ handle_cast({message, Cmd}, State) ->
 	{noreply, FinState};
 
 handle_cast({call_terminated, {Pid, {ports, Ports}, Reason}}, State) when is_list(Ports) ->
-	?INFO("received call [~w] closing due to [~w] returned ~p ports", [Pid, Reason, Ports]),
+	?INFO("received call [~w] closing due to [~w] returned ~w ports", [Pid, Reason, Ports]),
 	case lists:keysearch(Pid, #thread.pid, State#state.calls) of
 		{value, CallThread} ->
 			?INFO("call [~w] closed", [Pid]),
 			case find_host_by_node(CallThread#thread.node, State#state.rtphosts) of
 				false ->
+					?WARN("Cannot find node and (therefore) return ports to it", []),
 					{noreply, State#state{calls=lists:delete(CallThread, State#state.calls)}};
 				RtpHost={Node, NodeIp, AvailablePorts} ->
 					{noreply, State#state{
@@ -345,6 +359,7 @@ handle_cast({call_terminated, {Pid, {ports, Ports}, Reason}}, State) when is_lis
 					?INFO("call [~w] closed", [Pid]),
 					{noreply, State#state{players=lists:delete(PlayerThread, State#state.players)}};
 				false ->
+					?WARN("Cannot find Call or Player with such pid", []),
 					{noreply, State}
 			end
 	end;

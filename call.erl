@@ -31,9 +31,10 @@
 -export([terminate/2]).
 
 -include("common.hrl").
+-include("config.hrl").
 
 -record(source, {fd=null, ip=null, port=null, tag=null}).
--record(state, {ip, parties=[]}).
+-record(state, {ip, parties=[], tref}).
 
 -record(party, {from=null,
 		fromrtcp=null,
@@ -57,9 +58,10 @@ start_link(Args) ->
 	gen_server:start_link(?MODULE, Args, []).
 
 init (MainIp) ->
-%	process_flag(trap_exit, true),
-%	?INFO("started at ~s", [inet_parse:ntoa(MainIp)]),
-	{ok, #state{ip=MainIp}}.
+	process_flag(trap_exit, true),
+	{ok, TRef} = timer:send_interval(?CALL_TIME_TO_LIVE, timeout),
+	?INFO("started at ~s", [inet_parse:ntoa(MainIp)]),
+	{ok, #state{ip=MainIp, tref=TRef}}.
 
 % handle originate call leg (new media id possibly)
 % TODO handle Modifiers
@@ -251,6 +253,7 @@ terminate(Reason, State) ->
 			X#party.startport
 		end,
 		State#state.parties),
+	timer:cancel(State#state.tref),
 	gen_server:cast({global, rtpproxy}, {call_terminated, {self(), {ports, Ports}, Reason}}),
 	?ERR("terminated due to reason [~p]", [Reason]).
 
@@ -276,6 +279,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 	end,
 	SafeStart = fun (NP) ->
 		[F,FRtcp,T,TRtcp] = [NP#party.from, NP#party.fromrtcp, NP#party.to, NP#party.tortcp],
+		timer:cancel(State#state.tref),
 		SafeGetAddr = fun(X) ->
 			case X of
 				null -> null;
@@ -332,6 +336,8 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 %			?WARN("Probably RTCP to ~p from Ip[~p] Port[~p]", [Fd, Ip, Port]),
 			{noreply, State}
 	end;
+handle_info(timeout, State) ->
+	{stop, timeout, State};
 
 handle_info(Info, State) ->
 	?WARN("Info [~w]", [Info]),

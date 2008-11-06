@@ -103,9 +103,9 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 		end
 	end,
 
-	ParseModifiers = fun (A) ->
-		{Modifiers, _} = lists:unzip(lists:filter(fun({_, Sym}) -> lists:member(Sym, A) end, ?MOD_LIST)),
-		Modifiers
+	ParseParams = fun (A) ->
+		{Mod, _} = lists:unzip(lists:filter(fun({_, Sym}) -> lists:member(Sym, A) end, ?MOD_LIST)),
+		Mod
 	end,
 
 	case
@@ -118,7 +118,6 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 				#cmd{cookie=Cookie, origin={ser, self(), Ip, Port}, type=?CMD_VF, params=Params};
 			% update/create session
 			[[$U|Args], CallId, OrigIp, OrigPort, FromTag, FromMediaId|To] ->
-				Modifiers = ParseModifiers (Args),
 				case ParseAddr(OrigIp, OrigPort) of
 					{error, ErrMsg} ->
 						?ERR("Error: ~p", [ErrMsg]),
@@ -132,7 +131,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 									callid=CallId,
 									addr={GuessIp, GuessPort},
 									from={FromTag, ParseMediaId(FromMediaId)},
-									params=Modifiers
+									params=ParseParams(Args)
 								};
 							[ToTag,ToMediaId] ->
 								% Reinvite, Hold and Resume
@@ -143,14 +142,13 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 									addr={GuessIp, GuessPort},
 									from={FromTag, ParseMediaId(FromMediaId)},
 									to={ToTag, ParseMediaId(ToMediaId)},
-									params=Modifiers
+									params=ParseParams(Args)
 								}
 						end
 				end;
 			% lookup existing session
 			% TODO should both MediaIds be equal?
 			[[$L|Args], CallId, OrigIp, OrigPort, FromTag, FromMediaId, ToTag, ToMediaId] ->
-				Modifiers = ParseModifiers (Args),
 				case ParseAddr(OrigIp, OrigPort) of
 					{error, ErrMsg} ->
 						?ERR("Error: ~p", [ErrMsg]),
@@ -163,17 +161,16 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 							addr={GuessIp, GuessPort},
 							from={FromTag, ParseMediaId(FromMediaId)},
 							to={ToTag, ParseMediaId(ToMediaId)},
-							params=Modifiers
+							params=ParseParams(Args)
 						}
 				end;
 			% delete session (no MediaIds)
 			[[$D|Args], CallId, FromTag|ToTag] ->
-				Modifiers = ParseModifiers (Args),
 				case ToTag of
 					[] ->
-						#cmd{cookie=Cookie, origin={ser, self(), Ip, Port}, type=?CMD_D, callid=CallId, from={FromTag, 0}, params=Modifiers};
+						#cmd{cookie=Cookie, origin={ser, self(), Ip, Port}, type=?CMD_D, callid=CallId, from={FromTag, 0}, params=ParseParams(Args)};
 					_ ->
-						#cmd{cookie=Cookie, origin={ser, self(), Ip, Port}, type=?CMD_D, callid=CallId, from={FromTag, 0}, to={ToTag, 0}, params=Modifiers}
+						#cmd{cookie=Cookie, origin={ser, self(), Ip, Port}, type=?CMD_D, callid=CallId, from={FromTag, 0}, to={ToTag, 0}, params=ParseParams(Args)}
 				end;
 			% record (obsoleted)
 			% TODO should both MediaIds be equal?
@@ -182,7 +179,6 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 			% playback pre-recorded audio
 			% TODO should both MediaIds be equal?
 			[[$P|Args], CallId, PlayName, Codecs, FromTag, FromMediaId, ToTag, ToMediaId|Addr] ->
-				Modifiers = ParseModifiers (Args),
 				case Addr of
 					[] ->
 						#cmd{	cookie=Cookie,
@@ -191,7 +187,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 							callid=CallId,
 							from={FromTag, ParseMediaId(FromMediaId)},
 							to={ToTag, ParseMediaId(ToMediaId)},
-							params=Modifiers,
+							params=ParseParams(Args),
 							filename=PlayName,
 							codecs=Codecs
 						};
@@ -208,7 +204,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 									callid=CallId,
 									from={FromTag, ParseMediaId(FromMediaId)},
 									to={ToTag, ParseMediaId(ToMediaId)},
-									params=Modifiers,
+									params=ParseParams(Args),
 									filename=PlayName,
 									codecs=Codecs,
 									addr={GuessIp, GuessPort}
