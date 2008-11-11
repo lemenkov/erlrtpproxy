@@ -7,7 +7,7 @@ print (Name, Level, Format) ->
 	print (Name, Level, Format, []).
 
 print (Name, Level, Format, Params) when is_list (Params) ->
-	io:format(Format, Params),
+%	io:format(Format, Params),
 %	syslog:send(Name, Level, io_lib:format(Format, Params)).
 	ok.
 

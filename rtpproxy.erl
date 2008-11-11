@@ -47,7 +47,6 @@ start_link(Args) ->
 init(_Unused) ->
 	process_flag(trap_exit, true),
 	syslog:start(),
-%	?INFO("started with rtphosts [~w]", [?RtpHosts]),
 	RH = lists:map(
 		fun({Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}) ->
 			case net_adm:ping(Node) of
@@ -364,14 +363,14 @@ handle_cast({call_terminated, {Pid, {ports, Ports}, Reason}}, State) when is_lis
 			end
 	end;
 
-handle_cast({node_add, {Node, Ip}}, State) when is_atom(Node), is_atom(Ip) ->
+handle_cast({node_add, {Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}}, State) when is_atom(Node), is_atom(Ip) ->
 	?INFO("add node [~w]", [{Node, Ip}]),
 	% TODO consider do not appending unresponsible hosts
-	{noreply, State#state{rtphosts=lists:append(State#state.rtphosts, [{Node, Ip}])}};
+	{noreply, State#state{rtphosts=lists:append(State#state.rtphosts, [{Node, Ip, lists:seq(MinPort, MaxPort, ?PORTS_PER_MEDIA)}])}};
 
-handle_cast({node_del, {Node, Ip}}, State) when is_atom(Node), is_atom(Ip) ->
+handle_cast({node_del, {Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}}, State) when is_atom(Node), is_atom(Ip) ->
 	?INFO("del node [~w]", [{Node, Ip}]),
-	{noreply, State#state{rtphosts=lists:delete({Node, Ip}, State#state.rtphosts)}};
+	{noreply, State#state{rtphosts=lists:keydelete(Node, 1 , State#state.rtphosts)}};
 
 handle_cast(_Other, State) ->
 	{noreply, State}.

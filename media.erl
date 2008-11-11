@@ -37,8 +37,8 @@
 % * fd - our fd, where we will receive messages from other side
 % * ip - real client's ip
 % * port - real client's port
--record(media, {fd=null, ip=null, port=null}).
--record(state, {parent, tref, from, fromrtcp, to, tortcp, rtpstate=rtp, holdstate=false}).
+-record(media, {fd=null, ip=null, port=null, rtpstate=rtp}).
+-record(state, {parent, tref, from, fromrtcp, to, tortcp, holdstate=false}).
 
 start(Args) ->
 	gen_server:start(?MODULE, Args, []).
@@ -119,12 +119,12 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.from)#media
 	{F, T, Fd1, Ip1, Port1} = if
 		Fd == (State#state.from)#media.fd ->
 			{	State#state.from,
-				(State#state.to)#media{ip=Ip, port=Port},
+				(State#state.to)#media{ip=Ip, port=Port, rtpstate=rtp},
 				(State#state.to)#media.fd,
 				(State#state.from)#media.ip,
 				(State#state.from)#media.port};
 		Fd == (State#state.to)#media.fd ->
-			{	(State#state.from)#media{ip=Ip, port=Port},
+			{	(State#state.from)#media{ip=Ip, port=Port, rtpstate=rtp},
 				State#state.to,
 				(State#state.from)#media.fd,
 				(State#state.to)#media.ip,
@@ -138,7 +138,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.from)#media
 			% TODO check whether message is valid rtp stream
 			gen_udp:send(Fd1, Ip1, Port1, Msg)
 	end,
-	{noreply, State#state{from=F, to=T, rtpstate=rtp}};
+	{noreply, State#state{from=F, to=T}};
 
 handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#media.fd; Fd == (State#state.tortcp)#media.fd ->
 	SafeSendRtcp = fun(F,I,P,M) ->
@@ -151,21 +151,23 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#m
 				gen_udp:send(F, I, P, Msg)
 		end
 	end,
+
+
 	if
 		Fd == (State#state.fromrtcp)#media.fd ->
 			SafeSendRtcp((State#state.to)#media.fd, (State#state.fromrtcp)#media.ip, (State#state.fromrtcp)#media.port, Msg),
-			{noreply, State#state{tortcp=(State#state.tortcp)#media{ip=Ip,port=Port}}};
+			{noreply, State#state{tortcp=(State#state.tortcp)#media{ip=Ip,port=Port,rtpstate=rtp}}};
 		Fd == (State#state.tortcp)#media.fd ->
 			SafeSendRtcp((State#state.from)#media.fd, (State#state.tortcp)#media.ip, (State#state.tortcp)#media.port, Msg),
-			{noreply, State#state{fromrtcp=(State#state.fromrtcp)#media{ip=Ip,port=Port}}}
+			{noreply, State#state{fromrtcp=(State#state.fromrtcp)#media{ip=Ip,port=Port,rtpstate=rtp}}}
 	end;
 
 handle_info(ping, State) ->
-	case State#state.rtpstate of
-		rtp ->
+	case {(State#state.from)#media.rtpstate, (State#state.to)#media.rtpstate} of
+		{rtp, rtp} ->
 			% setting state to 'nortp'
-			{noreply, State#state{rtpstate=nortp}};
-		nortp ->
+			{noreply, State#state{from=(State#state.from)#media{rtpstate=nortp}, to=(State#state.to)#media{rtpstate=nortp}}};
+		_ ->
 			% We didn't get new messages since last ping - we should close this mediastream
 			{stop, nortp, State}
 	end;
