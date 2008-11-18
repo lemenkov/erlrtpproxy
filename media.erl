@@ -169,18 +169,19 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#m
 	end;
 
 handle_info(ping, State) ->
-	case {(State#state.from)#media.rtpstate, (State#state.to)#media.rtpstate} of
-		{rtp, rtp} ->
-			% setting state to 'nortp'
-			{noreply, State#state{from=(State#state.from)#media{rtpstate=nortp}, to=(State#state.to)#media{rtpstate=nortp}}};
-		_ ->
-			case fun(F,T) -> (F#media.ip == null) or (F#media.port == null) or (T#media.ip == null) or (T#media.port == null) end (State#state.fromrtcp, State#state.tortcp) of
-				true ->
+	case fun(F,T) -> ((F#media.ip /= null) and (F#media.port /= null)) or ((T#media.ip /= null) and (T#media.port /= null)) end (State#state.fromrtcp, State#state.tortcp) of
+		true ->
+			% we should rely on rtcp
+			% TODO
+			{noreply, State};
+		false ->
+			case {(State#state.from)#media.rtpstate, (State#state.to)#media.rtpstate} of
+				{rtp, rtp} ->
+					% setting state to 'nortp'
+					{noreply, State#state{from=(State#state.from)#media{rtpstate=nortp}, to=(State#state.to)#media{rtpstate=nortp}}};
+				_ ->
 					% We didn't get new messages since last ping - we should close this mediastream
-					{stop, nortp, State};
-				false ->
-					% Do nothing (we're using rtcp)
-					{noreply, State}
+					{stop, nortp, State}
 			end
 	end;
 

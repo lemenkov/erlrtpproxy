@@ -53,8 +53,8 @@ handle_call(_Other, _From, Fd) ->
 	{noreply, Fd}.
 
 handle_cast({reply, Cmd, Answer}, Fd) ->
-	{ser, Pid, Ip, Port} = Cmd#cmd.origin,
-	gen_udp:send(Fd, Ip, Port, Cmd#cmd.cookie ++ " " ++  Answer ++ "\n"),
+	Origin = Cmd#cmd.origin,
+	gen_udp:send(Fd, Origin#origin.ip, Origin#origin.port, Cmd#cmd.cookie ++ " " ++  Answer ++ "\n"),
 	{noreply, Fd};
 
 handle_cast(_Request, Fd) ->
@@ -112,10 +112,10 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 		case Rest of
 			% Request basic supported rtpproxy protocol version
 			["V"] ->
-				#cmd{cookie=Cookie, origin={ser, self(), Ip, Port}, type=?CMD_V};
+				#cmd{cookie=Cookie, origin=#origin{type=ser,pid=self(),ip=Ip,port=Port}, type=?CMD_V};
 			% Request additional rtpproxy protocol extensions
 			["VF", Params] ->
-				#cmd{cookie=Cookie, origin={ser, self(), Ip, Port}, type=?CMD_VF, params=Params};
+				#cmd{cookie=Cookie, origin=#origin{type=ser,pid=self(),ip=Ip,port=Port}, type=?CMD_VF, params=Params};
 			% update/create session
 			[[$U|Args], CallId, OrigIp, OrigPort, FromTag, FromMediaId|To] ->
 				case ParseAddr(OrigIp, OrigPort) of
@@ -126,7 +126,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 						case To of
 							[] ->
 								#cmd{	cookie=Cookie,
-									origin={ser, self(), Ip, Port},
+									origin=#origin{type=ser,pid=self(),ip=Ip,port=Port},
 									type=?CMD_U,
 									callid=CallId,
 									addr={GuessIp, GuessPort},
@@ -136,7 +136,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 							[ToTag,ToMediaId] ->
 								% Reinvite, Hold and Resume
 								#cmd{	cookie=Cookie,
-									origin={ser, self(), Ip, Port},
+									origin=#origin{type=ser,pid=self(),ip=Ip,port=Port},
 									type=?CMD_U,
 									callid=CallId,
 									addr={GuessIp, GuessPort},
@@ -155,7 +155,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 						error_syntax;
 					{GuessIp, GuessPort} ->
 						#cmd{	cookie=Cookie,
-							origin={ser, self(), Ip, Port},
+							origin=#origin{type=ser,pid=self(),ip=Ip,port=Port},
 							type=?CMD_L,
 							callid=CallId,
 							addr={GuessIp, GuessPort},
@@ -168,21 +168,21 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 			[[$D|Args], CallId, FromTag|ToTag] ->
 				case ToTag of
 					[] ->
-						#cmd{cookie=Cookie, origin={ser, self(), Ip, Port}, type=?CMD_D, callid=CallId, from={FromTag, 0}, params=ParseParams(Args)};
+						#cmd{cookie=Cookie, origin=#origin{type=ser,pid=self(),ip=Ip,port=Port}, type=?CMD_D, callid=CallId, from={FromTag, 0}, params=ParseParams(Args)};
 					_ ->
-						#cmd{cookie=Cookie, origin={ser, self(), Ip, Port}, type=?CMD_D, callid=CallId, from={FromTag, 0}, to={ToTag, 0}, params=ParseParams(Args)}
+						#cmd{cookie=Cookie, origin=#origin{type=ser,pid=self(),ip=Ip,port=Port}, type=?CMD_D, callid=CallId, from={FromTag, 0}, to={ToTag, 0}, params=ParseParams(Args)}
 				end;
 			% record (obsoleted)
 			% TODO should both MediaIds be equal?
 			["R", CallId, FromTag, FromMediaId, ToTag, ToMediaId] ->
-				#cmd{cookie=Cookie, origin={ser, self(), Ip, Port}, type=?CMD_R, callid=CallId, from={FromTag, ParseMediaId(FromMediaId)}, to={ToTag, ParseMediaId(ToMediaId)}};
+				#cmd{cookie=Cookie, origin=#origin{type=ser,pid=self(),ip=Ip,port=Port}, type=?CMD_R, callid=CallId, from={FromTag, ParseMediaId(FromMediaId)}, to={ToTag, ParseMediaId(ToMediaId)}};
 			% playback pre-recorded audio
 			% TODO should both MediaIds be equal?
 			[[$P|Args], CallId, PlayName, Codecs, FromTag, FromMediaId, ToTag, ToMediaId|Addr] ->
 				case Addr of
 					[] ->
 						#cmd{	cookie=Cookie,
-							origin={ser, self(), Ip, Port},
+							origin=#origin{type=ser,pid=self(),ip=Ip,port=Port},
 							type=?CMD_P,
 							callid=CallId,
 							from={FromTag, ParseMediaId(FromMediaId)},
@@ -199,7 +199,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 								error_syntax;
 							{GuessIp, GuessPort} ->
 								#cmd{	cookie=Cookie,
-									origin={ser, self(), Ip, Port},
+									origin=#origin{type=ser,pid=self(),ip=Ip,port=Port},
 									type=?CMD_P,
 									callid=CallId,
 									from={FromTag, ParseMediaId(FromMediaId)},
@@ -214,12 +214,12 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 			% stop playback or record
 			% TODO should both MediaIds be equal?
 			["S", CallId, FromTag, FromMediaId, ToTag, ToMediaId] ->
-				#cmd{cookie=Cookie, origin={ser, self(), Ip, Port}, type=?CMD_S, callid=CallId, from={FromTag, ParseMediaId(FromMediaId)}, to={ToTag, ParseMediaId(ToMediaId)}};
+				#cmd{cookie=Cookie, origin=#origin{type=ser,pid=self(),ip=Ip,port=Port}, type=?CMD_S, callid=CallId, from={FromTag, ParseMediaId(FromMediaId)}, to={ToTag, ParseMediaId(ToMediaId)}};
 			% copy session (same as record?)
 			% TODO should both MediaIds be equal?
 			["C", CallId, RecordName, FromTag, FromMediaId, ToTag, ToMediaId] ->
 				#cmd{	cookie=Cookie,
-					origin={ser, self(), Ip, Port},
+					origin=#origin{type=ser,pid=self(),ip=Ip,port=Port},
 					type=?CMD_C,
 					callid=CallId,
 					from={FromTag, ParseMediaId(FromMediaId)},
@@ -229,12 +229,12 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 			% query
 			% TODO should both MediaIds be equal?
 			["Q", CallId, FromTag, FromMediaId, ToTag, ToMediaId] ->
-				#cmd{cookie=Cookie, origin={ser, self(), Ip, Port}, type=?CMD_Q, callid=CallId, from={FromTag, ParseMediaId(FromMediaId)}, to={ToTag, ParseMediaId(ToMediaId)}};
+				#cmd{cookie=Cookie, origin=#origin{type=ser,pid=self(),ip=Ip,port=Port}, type=?CMD_Q, callid=CallId, from={FromTag, ParseMediaId(FromMediaId)}, to={ToTag, ParseMediaId(ToMediaId)}};
 			% stop all active sessions
 			["X"] ->
-				#cmd{cookie=Cookie, origin={ser, self(), Ip, Port}, type=?CMD_X};
+				#cmd{cookie=Cookie, origin=#origin{type=ser,pid=self(),ip=Ip,port=Port}, type=?CMD_X};
 			["I"] ->
-				#cmd{cookie=Cookie, origin={ser, self(), Ip, Port}, type=?CMD_I};
+				#cmd{cookie=Cookie, origin=#origin{type=ser,pid=self(),ip=Ip,port=Port}, type=?CMD_I};
 			_Other ->
 				error_syntax
 		end

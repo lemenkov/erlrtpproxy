@@ -11,6 +11,8 @@
 		params=null
 	}).
 
+-record(origin, {type, pid, ip, port}).
+
 -define(RTPPROXY_OK, "0").
 
 -define(RTPPROXY_ERR_SYNTAX,    "E1").
