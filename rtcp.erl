@@ -92,17 +92,17 @@ decode(Data) ->
 						(utils:y(DecodeSdes))({Payload, RC, []});
 					?RTCP_BYE ->
 						DecodeBye = fun(F2) ->
-							fun 	({<<>>, 0, Ret}) ->
+							fun	({<<>>, 0, Ret}) ->
 									#bye{params=Ret};
 								({<<L:8, Tail/binary>>, 0, Ret}) ->
-        								<<Text:L/binary, _/binary>> = Tail,
+									<<Text:L/binary, _/binary>> = Tail,
 									#bye{message=binary_to_list(Text), params=Ret};
 								({<<SSRC:32, Tail/binary>>, RC1, Ret}) when RC1>0 ->
 									F2({Tail, RC1-1, Ret ++ [SSRC]})
 							end
 						end,
 						(utils:y(DecodeBye))({Payload, RC, []});
-					_ -> 
+					_ ->
 						{error, unknown_type}
 				end,
 				F1({Next, OldRtcp ++ [Rtcp]})

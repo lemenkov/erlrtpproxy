@@ -151,7 +151,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#m
 		end
 	end,
 
-	Rtcps = rtcp:decode(Msg),
+	Rtcps = try rtcp:decode(Msg) catch E:C -> [] end,
 
 	if
 		Fd == (State#state.fromrtcp)#media.fd ->
