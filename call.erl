@@ -65,7 +65,7 @@ init (MainIp) ->
 
 % handle originate call leg (new media id possibly)
 % TODO handle Modifiers
-handle_call({message_u, {StartPort, {GuessIp, GuessPort}, {FromTag, MediaId}, To, Modifiers}}, _, State) ->
+handle_call({?CMD_U, {StartPort, {GuessIp, GuessPort}, {FromTag, MediaId}, To, Modifiers}}, _, State) ->
 	case To of
 		null ->
 			?INFO("message [U] probably from ~w:~w  MediaId [~b]", [GuessIp, GuessPort, MediaId]);
@@ -111,7 +111,7 @@ handle_call({message_u, {StartPort, {GuessIp, GuessPort}, {FromTag, MediaId}, To
 
 % handle answered call leg
 % Both MediaId's are equal (just guessing)
-handle_call({message_l, {{GuessIp, GuessPort}, {FromTag, MediaId}, {ToTag, MediaId}, Modifiers}}, _, State) ->
+handle_call({?CMD_L, {{GuessIp, GuessPort}, {FromTag, MediaId}, {ToTag, MediaId}, Modifiers}}, _, State) ->
 	?INFO("message [L] probably from ~w:~w  MediaId [~b]", [GuessIp, GuessPort, MediaId]),
 	% search for already  existed
 	case lists:keysearch(MediaId, #party.mediaid, State#state.parties) of
@@ -150,11 +150,11 @@ handle_call({message_l, {{GuessIp, GuessPort}, {FromTag, MediaId}, {ToTag, Media
 			{reply, {error, not_found}, State}
 	end;
 
-handle_call(message_i, _From, State) ->
+handle_call(?CMD_I, _From, State) ->
 	% TODO (acquire information about call state)
 	{reply, {ok, "TODO"}, State};
 
-handle_call({message_p, {Tag, MediaId}}, _From, State) ->
+handle_call({?CMD_P, {Tag, MediaId}}, _From, State) ->
 %	?INFO("Message [P] [~p]", [Parties]),
 	Result = case lists:keysearch(MediaId, #party.mediaid, State#state.parties) of
 		% call already exists
@@ -180,12 +180,12 @@ handle_call({message_p, {Tag, MediaId}}, _From, State) ->
 handle_call(_Other, _From, State) ->
 	{noreply, State}.
 
-handle_cast(message_d, State) ->
+handle_cast(?CMD_D, State) ->
 	% No need to cleanup  list of media-streams here
 	% we'll do it later, at terminate(...)
-	{stop, message_d, State};
+	{stop, ?CMD_D, State};
 
-handle_cast({message_r, Filename}, State) ->
+handle_cast({?CMD_R, Filename}, State) ->
 	_Unused = lists:foreach(
 		fun(X)  ->
 			if
@@ -198,7 +198,7 @@ handle_cast({message_r, Filename}, State) ->
 		State#state.parties),
 	{noreply, State};
 
-handle_cast(message_s, State) ->
+handle_cast(?CMD_S, State) ->
 	_Unused = lists:foreach(
 		fun(X)  ->
 			if
