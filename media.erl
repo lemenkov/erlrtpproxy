@@ -172,8 +172,12 @@ handle_info(ping, State) ->
 	case fun(F,T) -> ((F#media.ip /= null) and (F#media.port /= null)) or ((T#media.ip /= null) and (T#media.port /= null)) end (State#state.fromrtcp, State#state.tortcp) of
 		true ->
 			% we should rely on rtcp
-			% TODO
-			{noreply, State};
+			case ((State#state.fromrtcp)#media.rtpstate == rtp) or ((State#state.tortcp)#media.rtpstate == rtp) of
+				true ->
+					{noreply, State#state{fromrtcp=(State#state.fromrtcp)#media{rtpstate=nortp}, tortcp=(State#state.tortcp)#media{rtpstate=nortp}}};
+				false ->
+					{stop, nortp, State}
+			end;
 		false ->
 			case {(State#state.from)#media.rtpstate, (State#state.to)#media.rtpstate} of
 				{rtp, rtp} ->
