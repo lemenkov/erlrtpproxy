@@ -23,6 +23,7 @@
 -export([decode/1]).
 
 -include("rtcp.hrl").
+-include("common.hrl").
 
 decode(Data) ->
 	DecodeRtcp = fun(F1) ->
@@ -35,6 +36,9 @@ decode(Data) ->
 						<<SSRC:32, NTPSec:32, NTPFrac:32, TimeStamp:32, Packets:32, Octets:32, ReportBlocks/binary>> = Payload,
 						DecodeRblocks = fun(F3) ->
 							fun	({<<>>, 0, Result}) -> Result;
+								({SomethingStrange, 0, Result}) ->
+									?ERR("SR strange Rblock [~p]~n", [SomethingStrange]),
+									Result;
 								({<<SSRC1:32, FL:8, CNPL:24/signed, EHSNR:32, IJ:32, LSR:32, DLSR:32, Rest/binary>>, RC1, Result}) ->
 									F3({Rest, RC1-1, Result ++ [#rblock{ssrc=SSRC1, fraction=FL, lost=CNPL, last_seq=EHSNR, jitter=IJ, lsr=LSR, dlsr=DLSR}]})
 							end
@@ -51,6 +55,9 @@ decode(Data) ->
 						<<SSRC:32, ReportBlocks/binary>> = Payload,
 						DecodeRblocks = fun(F3) ->
 							fun	({<<>>, 0, Result}) -> Result;
+								({SomethingStrange, 0, Result}) ->
+									?ERR("RR strange Rblock [~p]~n", [SomethingStrange]),
+									Result;
 								({<<SSRC1:32, FL:8, CNPL:24/signed, EHSNR:32, IJ:32, LSR:32, DLSR:32, Rest/binary>>, RC1, Result}) ->
 									F3({Rest, RC1-1, Result ++ [#rblock{ssrc=SSRC1, fraction=FL, lost=CNPL, last_seq=EHSNR, jitter=IJ, lsr=LSR, dlsr=DLSR}]})
 							end
@@ -94,8 +101,7 @@ decode(Data) ->
 						DecodeBye = fun(F2) ->
 							fun	({<<>>, 0, Ret}) ->
 									#bye{params=Ret};
-								({<<L:8, Tail/binary>>, 0, Ret}) ->
-									<<Text:L/binary, _/binary>> = Tail,
+								({<<L:8, Text:L/binary, _/binary>>, 0, Ret}) ->
 									#bye{message=binary_to_list(Text), params=Ret};
 								({<<SSRC:32, Tail/binary>>, RC1, Ret}) when RC1>0 ->
 									F2({Tail, RC1-1, Ret ++ [SSRC]})
