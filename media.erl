@@ -186,8 +186,8 @@ handle_info(ping, State) ->
 				true ->
 					{stop, nortp, State};
 				false ->
-					{noreply, State};
-			end;
+					{noreply, State}
+			end
 	end;
 
 handle_info(Other, State) ->
