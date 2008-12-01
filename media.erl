@@ -38,7 +38,7 @@
 % * fd - our fd, where we will receive messages from other side
 % * ip - real client's ip
 % * port - real client's port
--record(media, {fd=null, ip=null, port=null, rtpstate=rtp}).
+-record(media, {fd=null, ip=null, port=null, rtpstate=rtp, lastseen}).
 -record(state, {parent, tref, from, fromrtcp, to, tortcp, holdstate=false}).
 
 start(Args) ->
@@ -50,10 +50,10 @@ start_link(Args) ->
 init ({Parent, From, FromRtcp, To, ToRtcp}) ->
 	?INFO("started ~p ~p", [From, To]),
 %	process_flag(trap_exit, true),
-	{ok, TRef} = timer:send_interval(?MEDIA_TIME_TO_LIVE, ping),
+	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE, ping),
 	SafeMakeMedia = fun(Desc) ->
 		case Desc of
-			{F,I,P} -> #media{fd=F,ip=I,port=P};
+			{F,I,P} -> #media{fd=F,ip=I,port=P,lastseen=now()};
 			_ -> null
 		end
 	end,
@@ -164,35 +164,30 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#m
 			SafeSendRtcp((State#state.to)#media.fd, (State#state.fromrtcp)#media.ip, (State#state.fromrtcp)#media.port, Msg),
 			case lists:keymember(bye, 1, Rtcps) of
 				true -> {stop, stop, State};
-				_ -> {noreply, State#state{tortcp=(State#state.tortcp)#media{ip=Ip,port=Port,rtpstate=rtp}}}
+				_ -> {noreply, State#state{tortcp=(State#state.tortcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
 			end;
 		Fd == (State#state.tortcp)#media.fd ->
 			SafeSendRtcp((State#state.from)#media.fd, (State#state.tortcp)#media.ip, (State#state.tortcp)#media.port, Msg),
 			case lists:keymember(bye, 1, Rtcps) of
 				true -> {stop, stop, State};
-				_ -> {noreply, State#state{fromrtcp=(State#state.fromrtcp)#media{ip=Ip,port=Port,rtpstate=rtp}}}
+				_ -> {noreply, State#state{fromrtcp=(State#state.fromrtcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
 			end
 	end;
 
 handle_info(ping, State) ->
-	case fun(F,T) -> ((F#media.ip /= null) and (F#media.port /= null)) or ((T#media.ip /= null) and (T#media.port /= null)) end (State#state.fromrtcp, State#state.tortcp) of
-		true ->
+	case {(State#state.from)#media.rtpstate, (State#state.to)#media.rtpstate} of
+		{rtp, rtp} ->
+			% setting state to 'nortp'
+			{noreply, State#state{from=(State#state.from)#media{rtpstate=nortp}, to=(State#state.to)#media{rtpstate=nortp}}};
+		_ ->
+			% We didn't get new messages since last ping - we should close this mediastream
 			% we should rely on rtcp
-			case ((State#state.fromrtcp)#media.rtpstate == rtp) or ((State#state.tortcp)#media.rtpstate == rtp) of
+			case (timer:now_diff(now(),(State#state.fromrtcp)#media.lastseen) > ?RTCP_TIME_TO_LIVE) and (timer:now_diff(now(),(State#state.tortcp)#media.lastseen) > ?RTCP_TIME_TO_LIVE) of
 				true ->
-					{noreply, State#state{fromrtcp=(State#state.fromrtcp)#media{rtpstate=nortp}, tortcp=(State#state.tortcp)#media{rtpstate=nortp}}};
+					{stop, nortp, State};
 				false ->
-					{stop, nortp, State}
+					{noreply, State};
 			end;
-		false ->
-			case {(State#state.from)#media.rtpstate, (State#state.to)#media.rtpstate} of
-				{rtp, rtp} ->
-					% setting state to 'nortp'
-					{noreply, State#state{from=(State#state.from)#media{rtpstate=nortp}, to=(State#state.to)#media{rtpstate=nortp}}};
-				_ ->
-					% We didn't get new messages since last ping - we should close this mediastream
-					{stop, nortp, State}
-			end
 	end;
 
 handle_info(Other, State) ->

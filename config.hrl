@@ -14,6 +14,10 @@
 % We need at least 4 ports per each media (2 for RTP and 2 for RTCP)
 -define(PORTS_PER_MEDIA, 4).
 
--define(MEDIA_TIME_TO_LIVE, 2000).
+% Milliseconds
+-define(RTP_TIME_TO_LIVE, 30000).
+
+% Microseconds
+-define(RTCP_TIME_TO_LIVE, 10000000).
 -define(CALL_TIME_TO_LIVE, 30000).
 
