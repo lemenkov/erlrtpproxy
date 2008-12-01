@@ -46,17 +46,18 @@ start_link(Args) ->
 
 init(_Unused) ->
 	process_flag(trap_exit, true),
+	error_logger:tty(false)
 	syslog:start(),
 	RH = lists:map(
 		fun({Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}) ->
 			case net_adm:ping(Node) of
-				pong -> 
+				pong ->
 					?INFO("Adding node ~p at ip ~p with port range [~p - ~p]", [Node, Ip, MinPort, MaxPort]),
 					{Node, Ip, lists:seq(MinPort, MaxPort, ?PORTS_PER_MEDIA)};
 				pang ->
 					?ERR("Failed to add node ~p at ip ~p with port range [~p - ~p]", [Node, Ip, MinPort, MaxPort]),
 					[]
-			end 
+			end
 		end,
 		?RtpHosts),
 	{ok, #state{rtphosts=RH}}.
@@ -392,7 +393,8 @@ terminate({ErrorClass, {Module,Function, [Pid, Message]}}, State) ->
 
 terminate(Reason, State) ->
 	?ERR("RTPPROXY terminated due to reason [~w]", [Reason]),
-	syslog:stop().
+	syslog:stop(),
+	error_logger:tty(true).
 
 find_host_by_node(Node, RtpHosts) ->
 	(utils:y(fun(F) ->
