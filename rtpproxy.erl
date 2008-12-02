@@ -46,7 +46,7 @@ start_link(Args) ->
 
 init(_Unused) ->
 	process_flag(trap_exit, true),
-	error_logger:tty(false)
+	error_logger:tty(false),
 	syslog:start(),
 	RH = lists:map(
 		fun({Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}) ->
