@@ -30,6 +30,8 @@
 -export([code_change/3]).
 -export([terminate/2]).
 
+-export([upgrade/0]).
+
 % include list of hosts
 -include("config.hrl").
 -include("common.hrl").
@@ -53,6 +55,10 @@ init(_Unused) ->
 			case net_adm:ping(Node) of
 				pong ->
 					?INFO("Adding node ~p at ip ~p with port range [~p - ~p]", [Node, Ip, MinPort, MaxPort]),
+					lists:foreach(fun(Mod) ->
+							{Mod, Bin, File} = code:get_object_code(Mod),
+							rpc:call(Node, code, load_binary, [Mod, File, Bin])
+							end, ?SOURCES),
 					{Node, Ip, lists:seq(MinPort, MaxPort, ?PORTS_PER_MEDIA)};
 				pang ->
 					?ERR("Failed to add node ~p at ip ~p with port range [~p - ~p]", [Node, Ip, MinPort, MaxPort]),
@@ -353,12 +359,38 @@ handle_cast({call_terminated, {Pid, {ports, Ports}, Reason}}, State) when is_lis
 
 handle_cast({node_add, {Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}}, State) when is_atom(Node), is_atom(Ip) ->
 	?INFO("add node [~w]", [{Node, Ip}]),
-	% TODO consider do not appending unresponsible hosts
-	{noreply, State#state{rtphosts=lists:append(State#state.rtphosts, [{Node, Ip, lists:seq(MinPort, MaxPort, ?PORTS_PER_MEDIA)}])}};
+	Parent = self(),
+	spawn (fun() ->
+			Ret = net_adm:ping(Node),
+			Parent ! Ret
+		end),
+	receive
+		pong ->
+			?INFO("Adding node ~p at ip ~p with port range [~p - ~p]", [Node, Ip, MinPort, MaxPort]),
+			lists:foreach(fun(Mod) ->
+					{Mod, Bin, File} = code:get_object_code(Mod),
+					rpc:call(Node, code, load_binary, [Mod, File, Bin])
+					end, ?SOURCES),
+			{noreply, State#state{rtphosts=lists:append(State#state.rtphosts, [{Node, Ip, lists:seq(MinPort, MaxPort, ?PORTS_PER_MEDIA)}])}};
+		pang ->
+			?ERR("Failed to add node ~p at ip ~p with port range [~p - ~p] due to pang answer", [Node, Ip, MinPort, MaxPort]),
+			{noreply, State}
+	after ?PING_TIMEOUT ->
+			?ERR("Failed to add node ~p at ip ~p with port range [~p - ~p] due to TIMEOUT", [Node, Ip, MinPort, MaxPort]),
+			{noreply, State}
+	end;
 
 handle_cast({node_del, {Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}}, State) when is_atom(Node), is_atom(Ip) ->
 	?INFO("del node [~w]", [{Node, Ip}]),
 	{noreply, State#state{rtphosts=lists:keydelete(Node, 1 , State#state.rtphosts)}};
+
+handle_cast(upgrade, State) ->
+	lists:foreach(fun(SourceFile) ->
+				compile:file(SourceFile, [verbose, report_errors, report_warnings]),
+				{Mod, Bin, File} = code:get_object_code(SourceFile),
+				rpc:multicall(code, load_binary, [Mod, File, Bin])
+			end, ?SOURCES),
+	{noreply, State};
 
 handle_cast(_Other, State) ->
 	{noreply, State}.
@@ -428,3 +460,6 @@ find_host([{Node,Ip,Ports}|OtherNodes], Acc) ->
 	after ?PING_TIMEOUT ->
 			find_host(OtherNodes, Acc ++ [{Node,Ip,Ports}])
 	end.
+
+upgrade() ->
+	gen_server:cast({global, rtpproxy}, upgrade).

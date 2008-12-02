@@ -38,3 +38,5 @@
 -define(INFO(X, Y), utils:print(?MODULE, syslog:info(),    "[~w]: " ++  X ++ "~n", [self()] ++ Y)).
 -define(WARN(X, Y), utils:print(?MODULE, syslog:warning(), "[~w]: " ++  X ++ "~n", [self()] ++ Y)).
 
+-define(SOURCES, [call, media, player, rtcp, rtpproxy, ser, utils]).
+
