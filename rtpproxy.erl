@@ -56,8 +56,8 @@ init(_Unused) ->
 				pong ->
 					?INFO("Adding node ~p at ip ~p with port range [~p - ~p]", [Node, Ip, MinPort, MaxPort]),
 					lists:foreach(fun(Mod) ->
-							{Mod, Bin, File} = code:get_object_code(Mod),
-							rpc:call(Node, code, load_binary, [Mod, File, Bin])
+								{Mod, Bin, File} = code:get_object_code(Mod),
+								rpc:call(Node, code, load_binary, [Mod, File, Bin])
 							end, ?SOURCES),
 					{Node, Ip, lists:seq(MinPort, MaxPort, ?PORTS_PER_MEDIA)};
 				pang ->
@@ -368,8 +368,8 @@ handle_cast({node_add, {Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}}, St
 		pong ->
 			?INFO("Adding node ~p at ip ~p with port range [~p - ~p]", [Node, Ip, MinPort, MaxPort]),
 			lists:foreach(fun(Mod) ->
-					{Mod, Bin, File} = code:get_object_code(Mod),
-					rpc:call(Node, code, load_binary, [Mod, File, Bin])
+						{Mod, Bin, File} = code:get_object_code(Mod),
+						rpc:call(Node, code, load_binary, [Mod, File, Bin])
 					end, ?SOURCES),
 			{noreply, State#state{rtphosts=lists:append(State#state.rtphosts, [{Node, Ip, lists:seq(MinPort, MaxPort, ?PORTS_PER_MEDIA)}])}};
 		pang ->

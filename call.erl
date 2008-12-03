@@ -186,29 +186,11 @@ handle_cast(?CMD_D, State) ->
 	{stop, ?CMD_D, State};
 
 handle_cast({?CMD_R, Filename}, State) ->
-	_Unused = lists:foreach(
-		fun(X)  ->
-			if
-				X#party.pid /= null ->
-					gen_server:cast(X#party.pid, {recording, {start, Filename}});
-				true ->
-					ok
-			end
-		end,
-		State#state.parties),
+	[gen_server:cast(X#party.pid, {recording, {start, Filename}}) || X <- State#state.parties, X#party.pid /= null],
 	{noreply, State};
 
 handle_cast(?CMD_S, State) ->
-	_Unused = lists:foreach(
-		fun(X)  ->
-			if
-				X#party.pid /= null ->
-					gen_server:cast(X#party.pid, {recording, stop});
-				true ->
-					ok
-			end
-		end,
-		State#state.parties),
+	[gen_server:cast(X#party.pid, {recording, stop}) || X <- State#state.parties, X#party.pid /= null],
 	{noreply, State};
 
 % timeout from media stream
@@ -287,9 +269,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 			end
 		end,
 		{ok, P} = media:start({self(), {F#source.fd, F#source.ip, F#source.port}, SafeGetAddr(FRtcp), {T#source.fd, T#source.ip, T#source.port}, SafeGetAddr(TRtcp)}),
-		gen_udp:controlling_process(F#source.fd, P),
-		gen_udp:controlling_process(T#source.fd, P),
-		lists:foreach(fun(X) -> case X of null -> ok; _ -> gen_udp:controlling_process(X#source.fd, P) end end, [FRtcp, TRtcp]),
+		[gen_udp:controlling_process(X#source.fd, P) || X <- [F, FRtcp, T, TRtcp], X /= null],
 		P
 	end,
 	case

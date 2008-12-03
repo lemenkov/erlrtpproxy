@@ -123,10 +123,7 @@ send_rtp (RtpData, State) ->
 	receive
 		Something ->
 			?WARN("listener RECEIVED [~p]!~n", [Something]),
-			if
-				State#state.myfd == true -> gen_udp:close (Fd);
-				true -> ok
-			end,
+			[gen_udp:close (Fd) || State#state.myfd == true],
 			gen_server:cast({global, rtpproxy}, {call_terminated, {self(), Something}})
 	after Wait  ->
 		send_rtp(RtpData, State#state{
