@@ -49,6 +49,7 @@ start_link(Args) ->
 init(_Unused) ->
 	process_flag(trap_exit, true),
 	error_logger:tty(false),
+	erlang:system_monitor(self(), [{long_gc, 1000}, {large_heap, 1000000}, busy_port, busy_dist_port]),
 	syslog:start(),
 	RH = lists:map(
 		fun({Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}) ->
@@ -331,7 +332,7 @@ handle_cast({message, Cmd}, State) ->
 	{noreply, State};
 
 handle_cast({call_terminated, {Pid, {ports, Ports}, Reason}}, State) when is_list(Ports) ->
-	?INFO("received call [~w] closing due to [~w] returned ~w ports", [Pid, Reason, Ports]),
+	?INFO("received call [~w] closing due to [~w] returned ports: ~w", [Pid, Reason, Ports]),
 	case lists:keysearch(Pid, #thread.pid, State#state.calls) of
 		{value, CallThread} ->
 			?INFO("call [~w] closed", [Pid]),

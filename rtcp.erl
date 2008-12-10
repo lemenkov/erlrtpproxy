@@ -91,6 +91,9 @@ decode(Data) ->
 						end,
 						DecodeSdes = fun (F4) ->
 							fun	({<<>>, 0, Result}) -> #sdes{list=Result};
+								({SomethingStrange, 0, Result}) ->
+									?ERR("SDES strange padding [~p]~n", [SomethingStrange]),
+									#sdes{list=Result};
 								({<<SSRC1:32, SDESItems/binary>>, SC, Result}) when SC>0 ->
 									{Items, Rest} = (utils:y(DecodeSdesItems))({SDESItems, #sdes_items{ssrc=SSRC1}}),
 									F4({Rest, SC-1, Result ++ [Items]})
