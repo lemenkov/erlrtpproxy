@@ -155,23 +155,25 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#m
 	catch
 		E:C ->
 			{H,M,Ms} = now(),
-			file:write_file("./rtcp_err." ++ atom_to_list(node()) ++ "." ++ integer_to_list(H) ++ "_" ++ integer_to_list(M) ++ "_" ++ integer_to_list(Ms) ++ ".bin", Msg),
+			file:write_file("./tmp/rtcp_err." ++ atom_to_list(node()) ++ "." ++ integer_to_list(H) ++ "_" ++ integer_to_list(M) ++ "_" ++ integer_to_list(Ms) ++ ".bin", Msg),
 			[]
 	end,
 
 	if
 		Fd == (State#state.fromrtcp)#media.fd ->
 			SafeSendRtcp((State#state.to)#media.fd, (State#state.fromrtcp)#media.ip, (State#state.fromrtcp)#media.port, Msg),
-			case lists:keymember(bye, 1, Rtcps) of
-				true -> {stop, stop, State};
-				_ -> {noreply, State#state{tortcp=(State#state.tortcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
-			end;
+%			case lists:keymember(bye, 1, Rtcps) of
+%				true -> {stop, stop, State};
+%				_ -> {noreply, State#state{tortcp=(State#state.tortcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
+%			end;
+			{noreply, State#state{tortcp=(State#state.tortcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}};
 		Fd == (State#state.tortcp)#media.fd ->
 			SafeSendRtcp((State#state.from)#media.fd, (State#state.tortcp)#media.ip, (State#state.tortcp)#media.port, Msg),
-			case lists:keymember(bye, 1, Rtcps) of
-				true -> {stop, stop, State};
-				_ -> {noreply, State#state{fromrtcp=(State#state.fromrtcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
-			end
+%			case lists:keymember(bye, 1, Rtcps) of
+%				true -> {stop, stop, State};
+%				_ -> {noreply, State#state{fromrtcp=(State#state.fromrtcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
+%			end
+			{noreply, State#state{fromrtcp=(State#state.fromrtcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
 	end;
 
 handle_info(ping, State) ->
