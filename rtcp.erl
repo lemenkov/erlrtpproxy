@@ -28,7 +28,7 @@
 decode(Data) ->
 	DecodeRtcp = fun(F1) ->
 		fun	({<<>>, Rtcp}) -> Rtcp;
-			({<<Ver:2, Padding:1, RC:5, PacketType:8, Length:16, Tail1/binary>>, OldRtcp}) ->
+			({<<Ver:2, PaddingFlag:1, RC:5, PacketType:8, Length:16, Tail1/binary>>, OldRtcp}) ->
 				Length1 = Length*4,
 				<<Payload:Length1/binary, Next/binary>> = Tail1,
 				Rtcp = case PacketType of
@@ -36,8 +36,8 @@ decode(Data) ->
 						<<SSRC:32, NTPSec:32, NTPFrac:32, TimeStamp:32, Packets:32, Octets:32, ReportBlocks/binary>> = Payload,
 						DecodeRblocks = fun(F3) ->
 							fun	({<<>>, 0, Result}) -> Result;
-								({SomethingStrange, 0, Result}) ->
-									?ERR("SR strange Rblock [~p]~n", [SomethingStrange]),
+								({Padding, 0, Result}) ->
+									?ERR("SR padding [~p]~n", [Padding]),
 									Result;
 								({<<SSRC1:32, FL:8, CNPL:24/signed, EHSNR:32, IJ:32, LSR:32, DLSR:32, Rest/binary>>, RC1, Result}) ->
 									F3({Rest, RC1-1, Result ++ [#rblock{ssrc=SSRC1, fraction=FL, lost=CNPL, last_seq=EHSNR, jitter=IJ, lsr=LSR, dlsr=DLSR}]})
@@ -55,8 +55,8 @@ decode(Data) ->
 						<<SSRC:32, ReportBlocks/binary>> = Payload,
 						DecodeRblocks = fun(F3) ->
 							fun	({<<>>, 0, Result}) -> Result;
-								({SomethingStrange, 0, Result}) ->
-									?ERR("RR strange Rblock [~p]~n", [SomethingStrange]),
+								({Padding, 0, Result}) ->
+									?ERR("RR padding [~p]~n", [Padding]),
 									Result;
 								({<<SSRC1:32, FL:8, CNPL:24/signed, EHSNR:32, IJ:32, LSR:32, DLSR:32, Rest/binary>>, RC1, Result}) ->
 									F3({Rest, RC1-1, Result ++ [#rblock{ssrc=SSRC1, fraction=FL, lost=CNPL, last_seq=EHSNR, jitter=IJ, lsr=LSR, dlsr=DLSR}]})
@@ -91,8 +91,8 @@ decode(Data) ->
 						end,
 						DecodeSdes = fun (F4) ->
 							fun	({<<>>, 0, Result}) -> #sdes{list=Result};
-								({SomethingStrange, 0, Result}) ->
-									?ERR("SDES strange padding [~p]~n", [SomethingStrange]),
+								({Padding, 0, Result}) ->
+									?ERR("SDES padding [~p]~n", [Padding]),
 									#sdes{list=Result};
 								({<<SSRC1:32, SDESItems/binary>>, SC, Result}) when SC>0 ->
 									{Items, Rest} = (utils:y(DecodeSdesItems))({SDESItems, #sdes_items{ssrc=SSRC1}}),
@@ -103,6 +103,9 @@ decode(Data) ->
 					?RTCP_BYE ->
 						DecodeBye = fun(F2) ->
 							fun	({<<>>, 0, Ret}) ->
+									#bye{params=Ret};
+								({Padding, 0, Ret}) ->
+									?ERR("BYE padding [~p]~n", [Padding]),
 									#bye{params=Ret};
 								({<<L:8, Text:L/binary, _/binary>>, 0, Ret}) ->
 									#bye{message=binary_to_list(Text), params=Ret};
