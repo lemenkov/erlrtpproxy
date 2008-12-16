@@ -34,9 +34,9 @@
 -define(CMD_X, message_x).
 -define(CMD_I, message_i).
 
--define(ERR(X, Y),  utils:print(?MODULE, syslog:error(),   "[~w]: " ++  X ++ "~n", [self()] ++ Y)).
--define(INFO(X, Y), utils:print(?MODULE, syslog:info(),    "[~w]: " ++  X ++ "~n", [self()] ++ Y)).
--define(WARN(X, Y), utils:print(?MODULE, syslog:warning(), "[~w]: " ++  X ++ "~n", [self()] ++ Y)).
+-define(ERR(X, Y),  error_logger:error_msg("[~w]: " ++  X ++ "~n", [self()] ++ Y)).
+-define(INFO(X, Y), error_logger:info_msg("[~w]: " ++  X ++ "~n", [self()] ++ Y)).
+-define(WARN(X, Y), error_logger:warning_msg("[~w]: " ++  X ++ "~n", [self()] ++ Y)).
 
 -define(SOURCES, [call, media, player, rtcp, rtpproxy, ser, utils]).
 

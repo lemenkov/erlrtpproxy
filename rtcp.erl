@@ -20,10 +20,13 @@
 -module(rtcp).
 -author('lemenkov@gmail.com').
 
+-export([encode/1]).
 -export([decode/1]).
 
 -include("rtcp.hrl").
--include("common.hrl").
+
+encode(Packets) ->
+	ok.
 
 decode(Data) ->
 	DecodeRtcp = fun(F1) ->
@@ -34,13 +37,13 @@ decode(Data) ->
 				Rtcp = case PacketType of
 					?RTCP_SR ->
 						<<SSRC:32, NTPSec:32, NTPFrac:32, TimeStamp:32, Packets:32, Octets:32, ReportBlocks/binary>> = Payload,
-						DecodeRblocks = fun(F3) ->
+						DecodeRblocks = fun(F) ->
 							fun	({<<>>, 0, Result}) -> Result;
 								({Padding, 0, Result}) ->
-									?ERR("SR padding [~p]~n", [Padding]),
+									error_logger:warning_msg("SR padding [~p]~n", [Padding]),
 									Result;
 								({<<SSRC1:32, FL:8, CNPL:24/signed, EHSNR:32, IJ:32, LSR:32, DLSR:32, Rest/binary>>, RC1, Result}) ->
-									F3({Rest, RC1-1, Result ++ [#rblock{ssrc=SSRC1, fraction=FL, lost=CNPL, last_seq=EHSNR, jitter=IJ, lsr=LSR, dlsr=DLSR}]})
+									F({Rest, RC1-1, Result ++ [#rblock{ssrc=SSRC1, fraction=FL, lost=CNPL, last_seq=EHSNR, jitter=IJ, lsr=LSR, dlsr=DLSR}]})
 							end
 						end,
 						Ntp2Now = fun(NTPSec1, NTPFrac1) ->
@@ -53,13 +56,13 @@ decode(Data) ->
 						#sr{ssrc=SSRC, ntp=Ntp2Now(NTPSec, NTPFrac), timestamp=TimeStamp, packets=Packets, octets=Octets, rblocks=(utils:y(DecodeRblocks))({ReportBlocks, RC, []})};
 					?RTCP_RR ->
 						<<SSRC:32, ReportBlocks/binary>> = Payload,
-						DecodeRblocks = fun(F3) ->
+						DecodeRblocks = fun(F) ->
 							fun	({<<>>, 0, Result}) -> Result;
 								({Padding, 0, Result}) ->
-									?ERR("RR padding [~p]~n", [Padding]),
+									error_logger:warning_msg("RR padding [~p]~n", [Padding]),
 									Result;
 								({<<SSRC1:32, FL:8, CNPL:24/signed, EHSNR:32, IJ:32, LSR:32, DLSR:32, Rest/binary>>, RC1, Result}) ->
-									F3({Rest, RC1-1, Result ++ [#rblock{ssrc=SSRC1, fraction=FL, lost=CNPL, last_seq=EHSNR, jitter=IJ, lsr=LSR, dlsr=DLSR}]})
+									F({Rest, RC1-1, Result ++ [#rblock{ssrc=SSRC1, fraction=FL, lost=CNPL, last_seq=EHSNR, jitter=IJ, lsr=LSR, dlsr=DLSR}]})
 							end
 						end,
 						#rr{ssrc=SSRC, rblocks=(utils:y(DecodeRblocks))({ReportBlocks, RC, []})};
@@ -89,31 +92,29 @@ decode(Data) ->
 									F5({Tail, Items})
 							end
 						end,
-						DecodeSdes = fun (F4) ->
+						(utils:y(fun (F) ->
 							fun	({<<>>, 0, Result}) -> #sdes{list=Result};
 								({Padding, 0, Result}) ->
-									?ERR("SDES padding [~p]~n", [Padding]),
+									error_logger:warning_msg("SDES padding [~p]~n", [Padding]),
 									#sdes{list=Result};
 								({<<SSRC1:32, SDESItems/binary>>, SC, Result}) when SC>0 ->
 									{Items, Rest} = (utils:y(DecodeSdesItems))({SDESItems, #sdes_items{ssrc=SSRC1}}),
-									F4({Rest, SC-1, Result ++ [Items]})
+									F({Rest, SC-1, Result ++ [Items]})
 							end
-						end,
-						(utils:y(DecodeSdes))({Payload, RC, []});
+						end))({Payload, RC, []});
 					?RTCP_BYE ->
-						DecodeBye = fun(F2) ->
+						(utils:y(fun(F) ->
 							fun	({<<>>, 0, Ret}) ->
 									#bye{params=Ret};
 								({Padding, 0, Ret}) ->
-									?ERR("BYE padding [~p]~n", [Padding]),
+									error_logger:warning_msg("BYE padding [~p]~n", [Padding]),
 									#bye{params=Ret};
 								({<<L:8, Text:L/binary, _/binary>>, 0, Ret}) ->
 									#bye{message=binary_to_list(Text), params=Ret};
 								({<<SSRC:32, Tail/binary>>, RC1, Ret}) when RC1>0 ->
-									F2({Tail, RC1-1, Ret ++ [SSRC]})
+									F({Tail, RC1-1, Ret ++ [SSRC]})
 							end
-						end,
-						(utils:y(DecodeBye))({Payload, RC, []});
+						end))({Payload, RC, []});
 					_ ->
 						{error, unknown_type}
 				end,

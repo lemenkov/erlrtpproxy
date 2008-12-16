@@ -104,7 +104,7 @@ handle_call({?CMD_U, {StartPort, {GuessIp, GuessPort}, {FromTag, MediaId}, To, M
 					?INFO("answer [~s]", [Reply]),
 					{reply, {ok, new, Reply}, State#state{parties=lists:append(State#state.parties, [NewParty])}};
 				{error, Reason} ->
-					?ERR("Create new socket FAILED [~p]", [Reason]),
+					?ERR("Create new socket at ~p ~p FAILED [~p]", [State#state.ip, StartPort, Reason]),
 					{reply, {error, udp_error}, State}
 			end
 	end;

@@ -49,7 +49,7 @@ start_link(Args) ->
 
 init ({Parent, From, FromRtcp, To, ToRtcp}) ->
 	?INFO("started ~p ~p", [From, To]),
-%	process_flag(trap_exit, true),
+	process_flag(trap_exit, true),
 	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE, ping),
 	SafeMakeMedia = fun(Desc) ->
 		case Desc of
@@ -151,13 +151,15 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#m
 		end
 	end,
 
-	Rtcps = try rtcp:decode(Msg)
+	Rtcps = try
+		rtcp:decode(Msg)
 	catch
 		E:C ->
 			{H,M,Ms} = now(),
 			file:write_file("./tmp/rtcp_err." ++ atom_to_list(node()) ++ "." ++ integer_to_list(H) ++ "_" ++ integer_to_list(M) ++ "_" ++ integer_to_list(Ms) ++ ".bin", Msg),
 			[]
 	end,
+	?INFO("RTCP: ~p", [Rtcps]),
 
 	if
 		Fd == (State#state.fromrtcp)#media.fd ->
@@ -184,12 +186,13 @@ handle_info(ping, State) ->
 		_ ->
 			% We didn't get new messages since last ping - we should close this mediastream
 			% we should rely on rtcp
-			case (timer:now_diff(now(),(State#state.fromrtcp)#media.lastseen) > ?RTCP_TIME_TO_LIVE) and (timer:now_diff(now(),(State#state.tortcp)#media.lastseen) > ?RTCP_TIME_TO_LIVE) of
-				true ->
-					{stop, nortp, State};
-				false ->
-					{noreply, State}
-			end
+%			case (timer:now_diff(now(),(State#state.fromrtcp)#media.lastseen) > ?RTCP_TIME_TO_LIVE) and (timer:now_diff(now(),(State#state.tortcp)#media.lastseen) > ?RTCP_TIME_TO_LIVE) of
+%				true ->
+%					{stop, nortp, State};
+%				false ->
+%					{noreply, State}
+%			end
+			{stop, nortp, State}
 	end;
 
 handle_info(Other, State) ->
