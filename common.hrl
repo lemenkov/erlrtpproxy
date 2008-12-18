@@ -34,9 +34,15 @@
 -define(CMD_X, message_x).
 -define(CMD_I, message_i).
 
--define(ERR(X, Y),  error_logger:error_msg("[~w]: " ++  X ++ "~n", [self()] ++ Y)).
--define(INFO(X, Y), error_logger:info_msg("[~w]: " ++  X ++ "~n", [self()] ++ Y)).
--define(WARN(X, Y), error_logger:warning_msg("[~w]: " ++  X ++ "~n", [self()] ++ Y)).
+%-define(ERR(X, Y),  error_logger:error_msg("[~w]: " ++  X ++ "~n", [self()] ++ Y)).
+%-define(INFO(X, Y), error_logger:info_msg("[~w]: " ++  X ++ "~n", [self()] ++ Y)).
+%-define(WARN(X, Y), error_logger:warning_msg("[~w]: " ++  X ++ "~n", [self()] ++ Y)).
+
+-record(report, {name, facility=(1 bsl 3), format, data}).
+
+-define(ERR(X,Y), error_logger:error_report(#report{name=?MODULE, format=X, data=Y})).
+-define(WARN(X,Y), error_logger:warning_report(#report{name=?MODULE, format=X, data=Y})).
+-define(INFO(X,Y), error_logger:info_report(#report{name=?MODULE, format=X, data=Y})).
 
 -define(SOURCES, [call, media, player, rtcp, rtpproxy, ser, utils]).
 

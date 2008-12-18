@@ -159,7 +159,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#m
 			file:write_file("./tmp/rtcp_err." ++ atom_to_list(node()) ++ "." ++ integer_to_list(H) ++ "_" ++ integer_to_list(M) ++ "_" ++ integer_to_list(Ms) ++ ".bin", Msg),
 			[]
 	end,
-	?INFO("RTCP: ~p", [Rtcps]),
+%	?INFO("RTCP: ~p", [Rtcps]),
 
 	if
 		Fd == (State#state.fromrtcp)#media.fd ->

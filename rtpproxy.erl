@@ -49,8 +49,8 @@ start_link(Args) ->
 init(_Unused) ->
 	process_flag(trap_exit, true),
 	error_logger:tty(false),
+	error_logger:add_report_handler(erlsyslog, {0, "localhost", 514}),
 	erlang:system_monitor(self(), [{long_gc, 1000}, {large_heap, 1000000}, busy_port, busy_dist_port]),
-	syslog:start(),
 	RH = lists:map(
 		fun({Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}) ->
 			case net_adm:ping(Node) of
@@ -422,11 +422,12 @@ code_change(_OldVsn, State, _Extra) ->
 
 terminate({ErrorClass, {Module,Function, [Pid, Message]}}, State) ->
 	?ERR("RTPPROXY terminated due to Error [~p] in ~p:~p(...) with Msg[~p] from Pid ~p", [ErrorClass, Module, Function, Message, Pid]),
-	syslog:stop();
+	error_logger:delete_report_handler(erlsyslog),
+	error_logger:tty(true);
 
 terminate(Reason, State) ->
 	?ERR("RTPPROXY terminated due to reason [~w]", [Reason]),
-	syslog:stop(),
+	error_logger:delete_report_handler(erlsyslog),
 	error_logger:tty(true).
 
 find_host_by_node(Node, RtpHosts) ->
