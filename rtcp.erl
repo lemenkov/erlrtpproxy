@@ -53,7 +53,7 @@ decode(Data) ->
 							MicroSecs = trunc(1000000*R),
 							{MegaSecs, Secs, MicroSecs}
 						end,
-						#sr{ssrc=SSRC, ntp=Ntp2Now(NTPSec, NTPFrac), timestamp=TimeStamp, packets=Packets, octets=Octets, rblocks=(utils:y(DecodeRblocks))({ReportBlocks, RC, []})};
+						#sr{ssrc=SSRC, ntp=Ntp2Now(NTPSec, NTPFrac), timestamp=TimeStamp, packets=Packets, octets=Octets, rblocks=(y:y(DecodeRblocks))({ReportBlocks, RC, []})};
 					?RTCP_RR ->
 						<<SSRC:32, ReportBlocks/binary>> = Payload,
 						DecodeRblocks = fun(F) ->
@@ -65,7 +65,7 @@ decode(Data) ->
 									F({Rest, RC1-1, Result ++ [#rblock{ssrc=SSRC1, fraction=FL, lost=CNPL, last_seq=EHSNR, jitter=IJ, lsr=LSR, dlsr=DLSR}]})
 							end
 						end,
-						#rr{ssrc=SSRC, rblocks=(utils:y(DecodeRblocks))({ReportBlocks, RC, []})};
+						#rr{ssrc=SSRC, rblocks=(y:y(DecodeRblocks))({ReportBlocks, RC, []})};
 					?RTCP_SDES ->
 						DecodeSdesItems = fun (F5) ->
 							fun	({<<?SDES_CNAME:8, L:8, V:L/binary, Tail/binary>>, Items}) ->
@@ -92,18 +92,18 @@ decode(Data) ->
 									F5({Tail, Items})
 							end
 						end,
-						(utils:y(fun (F) ->
+						(y:y(fun (F) ->
 							fun	({<<>>, 0, Result}) -> #sdes{list=Result};
 								({Padding, 0, Result}) ->
 									error_logger:warning_msg("SDES padding [~p]~n", [Padding]),
 									#sdes{list=Result};
 								({<<SSRC1:32, SDESItems/binary>>, SC, Result}) when SC>0 ->
-									{Items, Rest} = (utils:y(DecodeSdesItems))({SDESItems, #sdes_items{ssrc=SSRC1}}),
+									{Items, Rest} = (y:y(DecodeSdesItems))({SDESItems, #sdes_items{ssrc=SSRC1}}),
 									F({Rest, SC-1, Result ++ [Items]})
 							end
 						end))({Payload, RC, []});
 					?RTCP_BYE ->
-						(utils:y(fun(F) ->
+						(y:y(fun(F) ->
 							fun	({<<>>, 0, Ret}) ->
 									#bye{params=Ret};
 								({Padding, 0, Ret}) ->
@@ -121,5 +121,5 @@ decode(Data) ->
 				F1({Next, OldRtcp ++ [Rtcp]})
 		end
 	end,
-	(utils:y(DecodeRtcp))({Data, []}).
+	(y:y(DecodeRtcp))({Data, []}).
 

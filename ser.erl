@@ -68,7 +68,7 @@ terminate(Reason, Fd) ->
 	?ERR("thread terminated due to reason [~p]", [Reason]).
 
 % Fd from which message arrived must be equal to Fd from our state
-% Brief introbuction of protocol is here: http://rtpproxy.org/wiki/RTPproxyProtocol
+% Brief introduction of protocol is here: http://rtpproxy.org/wiki/RTPproxyProtocol
 handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 	% TODO fix issue with missing Cookie
 	% TODO pass modifiers as atoms (not as string)

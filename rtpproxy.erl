@@ -21,6 +21,7 @@
 -author('lemenkov@gmail.com').
 
 -behaviour(gen_server).
+-export([start/0]).
 -export([start/1]).
 -export([start_link/1]).
 -export([init/1]).
@@ -39,6 +40,9 @@
 % description of call thread
 -record(thread, {pid=null, callid=null, node=null}).
 -record(state, {calls=[], rtphosts=null, players=[]}).
+
+start() ->
+	gen_server:start({global, ?MODULE}, ?MODULE, [], []).
 
 start(Args) ->
 	gen_server:start({global, ?MODULE}, ?MODULE, Args, []).
@@ -385,6 +389,20 @@ handle_cast({node_del, {Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}}, St
 	?INFO("del node [~w]", [{Node, Ip}]),
 	{noreply, State#state{rtphosts=lists:keydelete(Node, 1 , State#state.rtphosts)}};
 
+handle_cast(status, State) ->
+	io:format("Current state:~n"),
+	lists:foreach(fun(X) ->
+		{ok, Reply} = gen_server:call(X#thread.pid, ?CMD_I),
+		io:format("* Node: ~p, CallID: ~p, State:~n", [X#thread.node, X#thread.callid]),
+		lists:foreach( fun(X) -> lists:foreach( fun(Y) -> io:format("---> ~s~n", [Y]) end, X) end, Reply) end, State#state.calls),
+	{noreply, State};
+
+handle_cast(close_all, State) ->
+	% stop all active sessions
+	lists:foreach(fun(X) -> gen_server:cast(X#thread.pid, message_d) end, State#state.calls),
+	lists:foreach(fun(X) -> gen_server:cast(X#thread.pid, message_d) end, State#state.players),
+	{noreply, State};
+
 handle_cast(upgrade, State) ->
 	lists:foreach(fun(SourceFile) ->
 				compile:file(SourceFile, [verbose, report_errors, report_warnings]),
@@ -431,7 +449,7 @@ terminate(Reason, State) ->
 	error_logger:tty(true).
 
 find_host_by_node(Node, RtpHosts) ->
-	(utils:y(fun(F) ->
+	(y:y(fun(F) ->
 			fun	({N, []}) ->
 					false;
 				({N, [{N,I,P}|_Rest]}) ->

@@ -38,8 +38,8 @@
 % * fd - our fd, where we will receive messages from other side
 % * ip - real client's ip
 % * port - real client's port
--record(media, {fd=null, ip=null, port=null, rtpstate=rtp, lastseen}).
--record(state, {parent, tref, from, fromrtcp, to, tortcp, holdstate=false}).
+-record(media, {fd=null, ip=null, port=null, rtpstate=nortp, lastseen}).
+-record(state, {parent, tref, from, fromrtcp, to, tortcp, holdstate=false, started=null}).
 
 start(Args) ->
 	gen_server:start(?MODULE, Args, []).
@@ -67,6 +67,13 @@ init ({Parent, From, FromRtcp, To, ToRtcp}) ->
 			tortcp	=SafeMakeMedia(ToRtcp)
 		}
 	}.
+
+handle_call(?CMD_I, _From, State) ->
+	% TODO (acquire information about call state)
+%-record(media, {fd=null, ip=null, port=null, rtpstate=rtp, lastseen}).
+%-record(state, {parent, tref, from, fromrtcp, to, tortcp, holdstate=false, started}).
+	Reply = io_lib:format("CallDuration: ~w", [case State#state.started of null -> 0; _ -> trunc(0.5 + timer:now_diff(erlang:now(), State#state.started) / 1000000) end]),
+	{reply, {ok, Reply}, State};
 
 handle_call(_Other, _From, State) ->
 	{noreply, State}.
@@ -105,7 +112,7 @@ code_change(_OldVsn, State, _Extra) ->
 terminate(Reason, State) ->
 	timer:cancel(State#state.tref),
 	lists:map(fun (X) -> case X of null -> ok; _ -> gen_udp:close(X#media.fd) end end, [State#state.from, State#state.fromrtcp, State#state.to, State#state.tortcp]),
-%	gen_server:cast(State#state.parent, {stop, self()}),
+	gen_server:cast(State#state.parent, {stop, self()}),
 	?ERR("terminated due to reason [~p]", [Reason]).
 
 % We received UDP-data on From or To socket, so we must send in from To or From socket respectively
@@ -137,7 +144,18 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.from)#media
 			% TODO check whether message is valid rtp stream
 			gen_udp:send(Fd1, Ip1, Port1, Msg)
 	end,
-	{noreply, State#state{from=F, to=T}};
+
+	case State#state.started of
+		null ->
+			case {(State#state.from)#media.rtpstate, (State#state.to)#media.rtpstate} of
+				{rtp, rtp} ->
+					{noreply, State#state{from=F, to=T, started=now()}};
+				_ ->
+					{noreply, State#state{from=F, to=T}}
+			end;
+		_ ->
+			{noreply, State#state{from=F, to=T}}
+	end;
 
 handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#media.fd; Fd == (State#state.tortcp)#media.fd ->
 	SafeSendRtcp = fun(F,I,P,M) ->
@@ -166,18 +184,18 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#m
 	if
 		Fd == (State#state.fromrtcp)#media.fd ->
 			SafeSendRtcp((State#state.to)#media.fd, (State#state.fromrtcp)#media.ip, (State#state.fromrtcp)#media.port, Msg),
-%			case lists:keymember(bye, 1, Rtcps) of
-%				true -> {stop, stop, State};
-%				_ -> {noreply, State#state{tortcp=(State#state.tortcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
-%			end;
-			{noreply, State#state{tortcp=(State#state.tortcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}};
+			case lists:keymember(bye, 1, Rtcps) of
+				true -> {stop, stop, State};
+				_ -> {noreply, State#state{tortcp=(State#state.tortcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
+			end;
+%			{noreply, State#state{tortcp=(State#state.tortcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}};
 		Fd == (State#state.tortcp)#media.fd ->
 			SafeSendRtcp((State#state.from)#media.fd, (State#state.tortcp)#media.ip, (State#state.tortcp)#media.port, Msg),
-%			case lists:keymember(bye, 1, Rtcps) of
-%				true -> {stop, stop, State};
-%				_ -> {noreply, State#state{fromrtcp=(State#state.fromrtcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
-%			end
-			{noreply, State#state{fromrtcp=(State#state.fromrtcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
+			case lists:keymember(bye, 1, Rtcps) of
+				true -> {stop, stop, State};
+				_ -> {noreply, State#state{fromrtcp=(State#state.fromrtcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
+			end
+%			{noreply, State#state{fromrtcp=(State#state.fromrtcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
 	end;
 
 handle_info(ping, State) ->

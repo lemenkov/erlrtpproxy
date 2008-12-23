@@ -43,7 +43,6 @@
 		startport=0,
 		mediaid=null,
 		pid=null,
-		answered=false,
 		mod_e=false,
 		mod_i=false,
 		mod_ipv6=false,
@@ -93,7 +92,9 @@ handle_call({?CMD_U, {StartPort, {GuessIp, GuessPort}, {FromTag, MediaId}, To, M
 							_ -> null
 						end
 					end,
-					NewParty = #party{	from	=#source{fd=Fd, ip=GuessIp, port=GuessPort, tag=FromTag},
+					NewParty = #party{	% TODO add Ip and Port only on demand
+								from	=#source{fd=Fd, tag=FromTag},
+%								from	=#source{fd=Fd, ip=GuessIp, port=GuessPort, tag=FromTag},
 								fromrtcp=#source{fd=SafeOpenFd (StartPort+1, [binary, {ip, State#state.ip}, {active, true}])},
 								to	=#source{fd=SafeOpenFd (StartPort+2, [binary, {ip, State#state.ip}, {active, true}])},
 								tortcp	=#source{fd=SafeOpenFd (StartPort+3, [binary, {ip, State#state.ip}, {active, true}])},
@@ -133,7 +134,7 @@ handle_call({?CMD_L, {{GuessIp, GuessPort}, {FromTag, MediaId}, {ToTag, MediaId}
 			of
 				{ok, Fd} ->
 					NewParty = case (Party#party.to)#source.tag of
-						null -> Party#party{to=#source{fd=Fd, ip=GuessIp, port=GuessPort, tag=ToTag}, answered=true};
+						null -> Party#party{to=#source{fd=Fd, ip=GuessIp, port=GuessPort, tag=ToTag}};
 						_ -> Party
 					end,
 					{ok, {LocalIp, LocalPort}} = inet:sockname(Fd),
@@ -151,8 +152,17 @@ handle_call({?CMD_L, {{GuessIp, GuessPort}, {FromTag, MediaId}, {ToTag, MediaId}
 	end;
 
 handle_call(?CMD_I, _From, State) ->
-	% TODO (acquire information about call state)
-	{reply, {ok, "TODO"}, State};
+	PrintSource = fun(S) ->
+		io_lib:format("Rtp: ~s:~p Tag:~s", [case S#source.ip of null -> "null"; _ -> inet_parse:ntoa(S#source.ip) end, S#source.port, S#source.tag])
+	end,
+	Reply = lists:map(fun (X) ->
+				case X#party.pid of
+					null -> ["CallDuration: not started yet"] ++ lists:map(fun(Y) -> PrintSource(Y) end, [X#party.from, X#party.fromrtcp, X#party.to, X#party.tortcp]);
+					_ -> {ok, R} = gen_server:call(X#party.pid, ?CMD_I), [R]
+				end
+			end,
+			State#state.parties),
+	{reply, {ok, Reply}, State};
 
 handle_call({?CMD_P, {Tag, MediaId}}, _From, State) ->
 %	?INFO("Message [P] [~p]", [Parties]),
@@ -273,15 +283,14 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 		P
 	end,
 	case
-		case (utils:y(FindFd))({State#state.parties, Fd}) of
+		case (y:y(FindFd))({State#state.parties, Fd}) of
 			% RTP from Caller to Callee
 			{value, to, Party} when
 						(Party#party.to)#source.ip /= null,
 						(Party#party.to)#source.port /= null,
 						% We don't need to check FdFrom for existence since it's no doubt exists
 						% (Party#party.from)#source.fd /= null,
-						Party#party.pid == null,
-						Party#party.answered == true
+						Party#party.pid == null
 							->
 				NewParty = Party#party{from=(Party#party.from)#source{ip=Ip, port=Port}},
 				% FIXME send Msg here - we created Media server and we need to pass Msg to him
@@ -291,8 +300,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 						(Party#party.from)#source.ip /= null,
 						(Party#party.from)#source.port /= null,
 						(Party#party.to)#source.fd /= null,
-						Party#party.pid == null,
-						Party#party.answered == true
+						Party#party.pid == null
 							->
 				NewParty = Party#party{to=(Party#party.to)#source{ip=Ip, port=Port}},
 				% FIXME send Msg here - we created Media server and we need to pass Msg to him
