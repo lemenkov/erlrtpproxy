@@ -271,6 +271,9 @@ handle_cast({message, Cmd}, State) when	Cmd#cmd.type == ?CMD_U ->
 								{Reply, State#state{rtphosts=lists:delete(RtpHost, State#state.rtphosts) ++ [{Node, NodeIp, AvailablePorts}]}};
 							{ok, old, Reply} ->
 								Reply;
+							{error, not_found} ->
+								?ERR("Session does not exists.", []),
+								?RTPPROXY_ERR_NOSESSION;
 							{error, udp_error} ->
 								?ERR("error in udp while CMD_U!", []),
 								?RTPPROXY_ERR_SOFTWARE

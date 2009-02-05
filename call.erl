@@ -75,13 +75,25 @@ handle_call({?CMD_U, {StartPort, {GuessIp, GuessPort}, {FromTag, MediaId}, To, M
 	case lists:keysearch(MediaId, #party.mediaid, State#state.parties) of
 		% call already exists
 		{value, Party} ->
-			{ok, {LocalIp, LocalPort}} = if
-				FromTag == (Party#party.from)#source.tag -> inet:sockname((Party#party.from)#source.fd);
-				FromTag == (Party#party.to)#source.tag   -> inet:sockname((Party#party.to)#source.fd)
-			end,
-			Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
-			?INFO("answer [~s] (already exists!)", [Reply]),
-			{reply, {ok, old, Reply}, State};
+			case
+				try
+					if
+						FromTag == (Party#party.from)#source.tag -> inet:sockname((Party#party.from)#source.fd);
+						FromTag == (Party#party.to)#source.tag   -> inet:sockname((Party#party.to)#source.fd)
+					end
+				catch
+					_:_ ->
+						% TODO probably re-invite?
+						{error, not_found}
+				end
+			of
+				{ok, {LocalIp, LocalPort}} ->
+					Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
+					?INFO("answer [~s] (already exists!)", [Reply]),
+					{reply, {ok, old, Reply}, State};
+				{error, not_found} ->
+					{reply, {error, not_found}, State}
+			end;
 		false ->
 			% open new FdFrom and attach it
 			case gen_udp:open(StartPort, [binary, {ip, State#state.ip}, {active, true}]) of
