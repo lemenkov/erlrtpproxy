@@ -1,5 +1,12 @@
 all:
-	erlc call.erl media.erl rtpproxy.erl ser.erl utils.erl player.erl rtcp.erl
+	erlc -o ebin src/call.erl
+	erlc -o ebin src/media.erl
+	erlc -o ebin src/player.erl
+	erlc -o ebin src/rtcp.erl
+	erlc -o ebin src/rtpproxy.erl
+	erlc -o ebin src/rtpproxy_app.erl
+	erlc -o ebin src/rtpproxy_sup.erl
+	erlc -o ebin src/ser.erl
 
 clean:
-	rm -f *.beam *~
+	rm -f ebin/*.beam src/*~ *~
