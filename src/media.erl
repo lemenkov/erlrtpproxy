@@ -30,7 +30,7 @@
 -export([code_change/3]).
 -export([terminate/2]).
 
--include("common.hrl").
+-include("../include/common.hrl").
 -include("config.hrl").
 -include("rtcp.hrl").
 

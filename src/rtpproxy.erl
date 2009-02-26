@@ -35,11 +35,11 @@
 
 % include list of hosts
 -include("config.hrl").
--include("common.hrl").
+-include("../include/common.hrl").
 
 % description of call thread
 -record(thread, {pid=null, callid=null, node=null}).
--record(state, {calls=[], rtphosts=null, players=[]}).
+-record(state, {calls=[], rtphosts=null, players=[], sources, ports_per_media, ping_timeout}).
 
 start() ->
 	gen_server:start({global, ?MODULE}, ?MODULE, [], []).
@@ -52,9 +52,19 @@ start_link(Args) ->
 
 init(_Unused) ->
 	process_flag(trap_exit, true),
+
+	% Load parameters
+	{ok, {SyslogHost, SyslogPort}} = application:get_env(?MODULE, syslog_address),
+	{ok, RtpHosts} = application:get_env(?MODULE, rtphosts),
+	{ok, PortsPerMedia} = application:get_env(?MODULE, ports_per_media),
+	{ok, PingTimeout} = application:get_env(?MODULE, ping_timeout),
+	{ok, Sources} = application:get_env(?MODULE, sources),
+
+	error_logger:add_report_handler(erlsyslog, {0, SyslogHost, SyslogPort}),
 	error_logger:tty(false),
-	error_logger:add_report_handler(erlsyslog, {0, "localhost", 514}),
 	erlang:system_monitor(self(), [{long_gc, 1000}, {large_heap, 1000000}, busy_port, busy_dist_port]),
+	% TODO we should add app-file for eradius
+	eradius_acc:start(),
 	RH = lists:map(
 		fun({Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}) ->
 			case net_adm:ping(Node) of
@@ -63,15 +73,15 @@ init(_Unused) ->
 					lists:foreach(fun(Mod) ->
 								{Mod, Bin, File} = code:get_object_code(Mod),
 								rpc:call(Node, code, load_binary, [Mod, File, Bin])
-							end, ?SOURCES),
-					{Node, Ip, lists:seq(MinPort, MaxPort, ?PORTS_PER_MEDIA)};
+							end, Sources),
+					{Node, Ip, lists:seq(MinPort, MaxPort, PortsPerMedia)};
 				pang ->
 					?ERR("Failed to add node ~p at ip ~p with port range [~p - ~p]", [Node, Ip, MinPort, MaxPort]),
 					[]
 			end
 		end,
-		?RtpHosts),
-	{ok, #state{rtphosts=RH}}.
+		RtpHosts),
+	{ok, #state{rtphosts=RH, sources=Sources, ports_per_media=PortsPerMedia, ping_timeout=PingTimeout}}.
 
 handle_call(_Message, _From , State) ->
 	{reply, ?RTPPROXY_ERR_SOFTWARE, State}.
@@ -287,7 +297,7 @@ handle_cast({message, Cmd}, State) when	Cmd#cmd.type == ?CMD_U ->
 						{?RTPPROXY_ERR_SOFTWARE, State#state{rtphosts=RtpHosts++[{Node, NodeIp, []}]}};
 					{RtpHost={Node, NodeIp, [NewPort|AvailablePorts]}, RtpHosts} ->
 						?INFO("Session not exists. Creating new at ~w.", [Node]),
-						try rpc:call(Node, call, start, [NodeIp]) of
+						try rpc:call(Node, call, start, [{Cmd#cmd.callid, NodeIp}]) of
 							{ok, CallPid} ->
 								NewCallThread = #thread{pid=CallPid, callid=Cmd#cmd.callid, node=Node},
 								case gen_server:call(CallPid, {Cmd#cmd.type, {NewPort, Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.params}}) of
@@ -378,12 +388,12 @@ handle_cast({node_add, {Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}}, St
 			lists:foreach(fun(Mod) ->
 						{Mod, Bin, File} = code:get_object_code(Mod),
 						rpc:call(Node, code, load_binary, [Mod, File, Bin])
-					end, ?SOURCES),
-			{noreply, State#state{rtphosts=lists:append(State#state.rtphosts, [{Node, Ip, lists:seq(MinPort, MaxPort, ?PORTS_PER_MEDIA)}])}};
+					end, State#state.sources),
+			{noreply, State#state{rtphosts=lists:append(State#state.rtphosts, [{Node, Ip, lists:seq(MinPort, MaxPort, State#state.ports_per_media)}])}};
 		pang ->
 			?ERR("Failed to add node ~p at ip ~p with port range [~p - ~p] due to pang answer", [Node, Ip, MinPort, MaxPort]),
 			{noreply, State}
-	after ?PING_TIMEOUT ->
+	after State#state.ping_timeout ->
 			?ERR("Failed to add node ~p at ip ~p with port range [~p - ~p] due to TIMEOUT", [Node, Ip, MinPort, MaxPort]),
 			{noreply, State}
 	end;
@@ -411,7 +421,7 @@ handle_cast(upgrade, State) ->
 				compile:file(SourceFile, [verbose, report_errors, report_warnings]),
 				{Mod, Bin, File} = code:get_object_code(SourceFile),
 				rpc:multicall(code, load_binary, [Mod, File, Bin])
-			end, ?SOURCES),
+			end, State#state.sources),
 	{noreply, State};
 
 handle_cast(_Other, State) ->
@@ -480,7 +490,9 @@ find_host([{Node,Ip,Ports}|OtherNodes], Acc) ->
 			{{Node,Ip,Ports},OtherNodes ++ Acc};
 		pang ->
 			find_host(OtherNodes, Acc ++ [{Node,Ip,Ports}])
-	after ?PING_TIMEOUT ->
+	% TODO
+%	after State#state.ping_timeout ->
+	after 100 ->
 			find_host(OtherNodes, Acc ++ [{Node,Ip,Ports}])
 	end.
 

@@ -30,7 +30,7 @@
 -export([code_change/3]).
 -export([terminate/2]).
 
--include("common.hrl").
+-include("../include/common.hrl").
 
 start(Args) ->
 	gen_server:start(?MODULE, Args, []).
@@ -38,8 +38,19 @@ start(Args) ->
 start_link(Args) ->
 	gen_server:start_link(?MODULE, Args, []).
 
-init ({Ip, Port}) ->
+init (_Unused) ->
 	process_flag(trap_exit, true),
+
+	% Load parameters
+	{ok, {Ip, Port}} = application:get_env(?MODULE, listen_address),
+	{ok, RtpproxyNode} = application:get_env(?MODULE, rtpproxy_node),
+	{ok, {SyslogHost, SyslogPort}} = application:get_env(?MODULE, syslog_address),
+
+	error_logger:add_report_handler(erlsyslog, {0, SyslogHost, SyslogPort}),
+	error_logger:tty(false),
+
+	net_adm:ping(RtpproxyNode),
+
 	case gen_udp:open(Port, [{ip, Ip}, {active, true}, list]) of
 		{ok, Fd} ->
 			?INFO("started at [~s:~w]", [inet_parse:ntoa(Ip), Port]),

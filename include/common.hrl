@@ -44,5 +44,3 @@
 -define(WARN(X,Y), error_logger:warning_report(#report{name=?MODULE, format=X, data=Y})).
 -define(INFO(X,Y), error_logger:info_report(#report{name=?MODULE, format=X, data=Y})).
 
--define(SOURCES, [call, media, player, rtcp, rtpproxy, ser]).
-

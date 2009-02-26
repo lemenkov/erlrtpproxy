@@ -23,7 +23,7 @@
 -export([start/3]).
 -export([send_rtp/2]).
 
--include("common.hrl").
+-include("../include/common.hrl").
 
 % http://en.wikipedia.org/wiki/RTP_Audio_Video_Profiles
 -define(RTP_PCMU, 0).

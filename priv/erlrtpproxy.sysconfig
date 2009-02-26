@@ -1,0 +1,4 @@
+CONFIG_FILE=/etc/erlrtpproxy.config
+ERL_PARAMETERS="+K true +W w"
+ERL_NODE="127.0.0.1"
+ERL_COOKIE="testcookie"
