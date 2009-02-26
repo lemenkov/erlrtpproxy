@@ -7,6 +7,8 @@ all:
 	erlc -o ebin src/rtpproxy_app.erl
 	erlc -o ebin src/rtpproxy_sup.erl
 	erlc -o ebin src/ser.erl
+	erlc -o ebin src/ser_app.erl
+	erlc -o ebin src/ser_sup.erl
 
 clean:
-	rm -f ebin/*.beam src/*~ *~
+	rm -f ebin/*.beam priv/*~ src/*~ *~
