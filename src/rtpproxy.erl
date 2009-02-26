@@ -63,8 +63,6 @@ init(_Unused) ->
 	error_logger:add_report_handler(erlsyslog, {0, SyslogHost, SyslogPort}),
 	error_logger:tty(false),
 	erlang:system_monitor(self(), [{long_gc, 1000}, {large_heap, 1000000}, busy_port, busy_dist_port]),
-	% TODO we should add app-file for eradius
-	eradius_acc:start(),
 	RH = lists:map(
 		fun({Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}) ->
 			case net_adm:ping(Node) of
