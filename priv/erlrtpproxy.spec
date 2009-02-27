@@ -4,7 +4,7 @@
 
 Name:		erlrtpproxy
 Version:	0.1
-Release:	0.1.svn%{?dist}
+Release:	0.2.svn%{?dist}
 Summary:	RTP proxying daemon
 Group:		Applications/Internet
 License:	GPLv3+
