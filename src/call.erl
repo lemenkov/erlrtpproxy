@@ -273,8 +273,13 @@ terminate(Reason, State) ->
 			X#party.startport
 		end,
 		State#state.parties),
-	Req = eradius_acc:set_logout_time(State#state.radius),
-	eradius_acc:acc_stop(Req),
+	case (State#state.radius)#rad_accreq.login_time of
+		undefined ->
+			ok;
+		_ ->
+			Req = eradius_acc:set_logout_time(State#state.radius),
+			eradius_acc:acc_stop(Req)
+	end,
 	timer:cancel(State#state.tref),
 	gen_server:cast({global, rtpproxy}, {call_terminated, {self(), {ports, Ports}, Reason}}),
 	?ERR("terminated due to reason [~p]", [Reason]).
