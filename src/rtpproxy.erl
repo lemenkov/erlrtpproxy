@@ -401,10 +401,19 @@ handle_cast({node_del, {Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}}, St
 
 handle_cast(status, State) ->
 	?INFO("Current state:", []),
-	lists:foreach(fun(X) ->
-		{ok, Reply} = gen_server:call(X#thread.pid, ?CMD_I),
-		?INFO("* Node: ~p, CallID: ~p, State:~n", [X#thread.node, X#thread.callid]),
-		lists:foreach( fun(X) -> lists:foreach( fun(Y) -> ?INFO("---> ~s~n", [Y]) end, X) end, Reply) end, State#state.calls),
+	lists:foreach(	fun(X) ->
+				% TODO fix this strange situation
+				{ok, Reply} = try gen_server:call(X#thread.pid, ?CMD_I) catch E:C -> [["died (shouldn't happend)"]] end,
+				?INFO("* Node: ~p, CallID: ~p, State:~n", [X#thread.node, X#thread.callid]),
+				lists:foreach(	fun(X) ->
+							lists:foreach(	fun(Y) ->
+										?INFO("---> ~s~n", [Y])
+									end,
+								X)
+							end,
+					Reply)
+			end,
+		State#state.calls),
 	?INFO("Current state: END.", []),
 	{noreply, State};
 
