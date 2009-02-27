@@ -405,7 +405,7 @@ handle_cast(status, State) ->
 	?INFO("Current state:", []),
 	lists:foreach(	fun(X) ->
 				% TODO fix this strange situation
-				{ok, Reply} = try gen_server:call(X#thread.pid, ?CMD_I) catch E:C -> [["died (shouldn't happend)"]] end,
+				{ok, Reply} = try gen_server:call(X#thread.pid, ?CMD_I) catch E:C -> {ok, [["died (shouldn't happend)"]]} end,
 				?INFO("* Node: ~p, CallID: ~p, State:~n", [X#thread.node, X#thread.callid]),
 				lists:foreach(	fun(X) ->
 							lists:foreach(	fun(Y) ->
