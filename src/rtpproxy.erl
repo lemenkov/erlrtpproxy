@@ -250,7 +250,7 @@ handle_cast({message, Cmd}, State) when Cmd#cmd.type == ?CMD_L ->
 					gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_ERR_SOFTWARE})
 			catch
 				Error:ErrorClass ->
-					?ERR("Exception {~p,~p} in udp while CMD_L!", [Error,ErrorClass]),
+					?ERR("Exception {~p,~p} while CMD_L!", [Error,ErrorClass]),
 					gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_ERR_SOFTWARE})
 			end;
 		NotFound ->
@@ -266,16 +266,15 @@ handle_cast({message, Cmd}, State) when	Cmd#cmd.type == ?CMD_U ->
 			% Already created session
 			{value, CallInfo} ->
 %				?INFO("Session exists. Update/create existing session.", []),
-				case find_host_by_node(CallInfo#thread.node, State#state.rtphosts) of
-					false ->
+				% TODO get rid of hardcoded number "1"
+				case lists:keytake(CallInfo#thread.node, 1, State#state.rtphosts) of
+					{value, {Node, NodeIp, []}, OtherRtpHosts} ->
+						?ERR("cannot start session on node [~p] - no available ports", [Node]),
 						?RTPPROXY_ERR_SOFTWARE;
-					{Node, NodeIp, []} ->
-						% cannot start session on that node - no available ports
-						?RTPPROXY_ERR_SOFTWARE;
-					RtpHost={Node, NodeIp, [NewPort|AvailablePorts]} ->
-						case gen_server:call(CallInfo#thread.pid, {Cmd#cmd.type, {NewPort, Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.params}}) of
+					{value, {Node, NodeIp, [NewPort|AvailablePorts]}, OtherRtpHosts} ->
+						try gen_server:call(CallInfo#thread.pid, {Cmd#cmd.type, {NewPort, Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.params}}) of
 							{ok, new, Reply} ->
-								{Reply, State#state{rtphosts=lists:delete(RtpHost, State#state.rtphosts) ++ [{Node, NodeIp, AvailablePorts}]}};
+								{Reply, State#state{rtphosts=OtherRtpHosts ++ [{Node, NodeIp, AvailablePorts}]}};
 							{ok, old, Reply} ->
 								Reply;
 							{error, not_found} ->
@@ -284,7 +283,13 @@ handle_cast({message, Cmd}, State) when	Cmd#cmd.type == ?CMD_U ->
 							{error, udp_error} ->
 								?ERR("error in udp while CMD_U!", []),
 								?RTPPROXY_ERR_SOFTWARE
-						end
+						catch
+							Error:ErrorClass ->
+								?ERR("Exception {~p,~p} while CMD_U!", [Error,ErrorClass]),
+								?RTPPROXY_ERR_SOFTWARE
+						end;
+					false ->
+						?RTPPROXY_ERR_SOFTWARE
 				end;
 			NoSessionFound ->
 				% New session
@@ -347,25 +352,22 @@ handle_cast({message, Cmd}, State) ->
 
 handle_cast({call_terminated, {Pid, {ports, Ports}, Reason}}, State) when is_list(Ports) ->
 	?INFO("received call [~w] closing due to [~w] returned ports: ~w", [Pid, Reason, Ports]),
-	case lists:keysearch(Pid, #thread.pid, State#state.calls) of
-		{value, CallThread} ->
+	case lists:keytake(Pid, #thread.pid, State#state.calls) of
+		{value, CallThread, OtherCalls} ->
 			?INFO("call [~w] closed", [Pid]),
-			case find_host_by_node(CallThread#thread.node, State#state.rtphosts) of
+			% TODO get rid of hardcoded number "1"
+			case lists:keytake(CallThread#thread.node, 1, State#state.rtphosts) of
+				{value, {Node, NodeIp, AvailablePorts}, OtherRtpHosts} ->
+					{noreply, State#state{calls=OtherCalls, rtphosts=OtherRtpHosts ++ [{Node, NodeIp, AvailablePorts ++ Ports}]}};
 				false ->
 					?WARN("Cannot find node and (therefore) return ports to it", []),
-					{noreply, State#state{calls=lists:delete(CallThread, State#state.calls)}};
-				RtpHost={Node, NodeIp, AvailablePorts} ->
-					{noreply, State#state{
-							calls=lists:delete(CallThread, State#state.calls),
-							rtphosts=lists:delete(RtpHost, State#state.rtphosts) ++ [{Node, NodeIp, AvailablePorts ++ Ports}]
-							}
-					}
+					{noreply, State#state{calls=OtherCalls}}
 			end;
 		false ->
-			case lists:keysearch(Pid, #thread.pid, State#state.players) of
-				{value, PlayerThread} ->
+			case lists:keytake(Pid, #thread.pid, State#state.players) of
+				{value, PlayerThread, OtherPlayers} ->
 					?INFO("call [~w] closed", [Pid]),
-					{noreply, State#state{players=lists:delete(PlayerThread, State#state.players)}};
+					{noreply, State#state{players=OtherPlayers}};
 				false ->
 					?WARN("Cannot find Call or Player with such pid", []),
 					{noreply, State}
@@ -467,18 +469,6 @@ terminate(Reason, State) ->
 	?ERR("RTPPROXY terminated due to reason [~w]", [Reason]),
 	error_logger:delete_report_handler(erlsyslog),
 	error_logger:tty(true).
-
-find_host_by_node(Node, RtpHosts) ->
-	(y:y(fun(F) ->
-			fun	({N, []}) ->
-					false;
-				({N, [{N,I,P}|_Rest]}) ->
-					{N,I,P};
-				({N, [_Head|Tail]}) ->
-					F({N,Tail})
-			end
-		end)
-	)({Node, RtpHosts}).
 
 find_host(Nodes) ->
 	find_host(Nodes, []).
