@@ -198,6 +198,9 @@ rm -rf $RPM_BUILD_ROOT
 
 
 %changelog
+* Fri Feb 27 2009 Peter Lemenkov <lemenkov@gmail.com> 0.1-0.2.svn
+- Rebuild
+
 * Fri Feb 20 2009 Peter Lemenkov <lemenkov@gmail.com> 0.1-0.1.svn
 - Initial package
 
