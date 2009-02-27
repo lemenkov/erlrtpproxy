@@ -33,13 +33,11 @@
 
 -export([upgrade/0]).
 
-% include list of hosts
--include("config.hrl").
 -include("../include/common.hrl").
 
 % description of call thread
 -record(thread, {pid=null, callid=null, node=null}).
--record(state, {calls=[], rtphosts=null, players=[], sources, ports_per_media, ping_timeout}).
+-record(state, {calls=[], rtphosts=null, players=[], sources, ports_per_media, ping_timeout, radacct_servers}).
 
 start() ->
 	gen_server:start({global, ?MODULE}, ?MODULE, [], []).
@@ -59,6 +57,7 @@ init(_Unused) ->
 	{ok, PortsPerMedia} = application:get_env(?MODULE, ports_per_media),
 	{ok, PingTimeout} = application:get_env(?MODULE, ping_timeout),
 	{ok, Sources} = application:get_env(?MODULE, sources),
+	{ok, RadAcctServers} = application:get_env(?MODULE, radacct_servers),
 
 	error_logger:add_report_handler(erlsyslog, {0, SyslogHost, SyslogPort}),
 	error_logger:tty(false),
@@ -79,7 +78,7 @@ init(_Unused) ->
 			end
 		end,
 		RtpHosts),
-	{ok, #state{rtphosts=RH, sources=Sources, ports_per_media=PortsPerMedia, ping_timeout=PingTimeout}}.
+	{ok, #state{rtphosts=RH, sources=Sources, ports_per_media=PortsPerMedia, ping_timeout=PingTimeout, radacct_servers=RadAcctServers}}.
 
 handle_call(_Message, _From , State) ->
 	{reply, ?RTPPROXY_ERR_SOFTWARE, State}.
@@ -295,7 +294,7 @@ handle_cast({message, Cmd}, State) when	Cmd#cmd.type == ?CMD_U ->
 						{?RTPPROXY_ERR_SOFTWARE, State#state{rtphosts=RtpHosts++[{Node, NodeIp, []}]}};
 					{RtpHost={Node, NodeIp, [NewPort|AvailablePorts]}, RtpHosts} ->
 						?INFO("Session not exists. Creating new at ~w.", [Node]),
-						try rpc:call(Node, call, start, [{Cmd#cmd.callid, NodeIp}]) of
+						try rpc:call(Node, call, start, [{Cmd#cmd.callid, NodeIp, State#state.radacct_servers}]) of
 							{ok, CallPid} ->
 								NewCallThread = #thread{pid=CallPid, callid=Cmd#cmd.callid, node=Node},
 								case gen_server:call(CallPid, {Cmd#cmd.type, {NewPort, Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.params}}) of
@@ -401,11 +400,12 @@ handle_cast({node_del, {Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}}, St
 	{noreply, State#state{rtphosts=lists:keydelete(Node, 1 , State#state.rtphosts)}};
 
 handle_cast(status, State) ->
-	io:format("Current state:~n"),
+	?INFO("Current state:", []),
 	lists:foreach(fun(X) ->
 		{ok, Reply} = gen_server:call(X#thread.pid, ?CMD_I),
-		io:format("* Node: ~p, CallID: ~p, State:~n", [X#thread.node, X#thread.callid]),
-		lists:foreach( fun(X) -> lists:foreach( fun(Y) -> io:format("---> ~s~n", [Y]) end, X) end, Reply) end, State#state.calls),
+		?INFO("* Node: ~p, CallID: ~p, State:~n", [X#thread.node, X#thread.callid]),
+		lists:foreach( fun(X) -> lists:foreach( fun(Y) -> ?INFO("---> ~s~n", [Y]) end, X) end, Reply) end, State#state.calls),
+	?INFO("Current state: END.", []),
 	{noreply, State};
 
 handle_cast(close_all, State) ->

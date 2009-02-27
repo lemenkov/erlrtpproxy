@@ -5,5 +5,3 @@
 -define(RTCP_TIME_TO_LIVE, 10000000).
 
 -define(CALL_TIME_TO_LIVE, 30000).
-
--define(RADACCT_SERVERS, [[{127,0,0,1},1813,"test"]]).

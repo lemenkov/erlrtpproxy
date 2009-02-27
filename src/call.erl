@@ -57,13 +57,13 @@ start(Args) ->
 start_link(Args) ->
 	gen_server:start_link(?MODULE, Args, []).
 
-init ({CallID, MainIp}) ->
+init ({CallID, MainIp, RadAcctServers}) ->
 	process_flag(trap_exit, true),
 	% TODO we should add app-file for eradius
 	eradius_acc:start(),
 	{ok, TRef} = timer:send_interval(?CALL_TIME_TO_LIVE, timeout),
 	?INFO("started at ~s", [inet_parse:ntoa(MainIp)]),
-	{ok, #state{ip=MainIp, callid=CallID, radius=#rad_accreq{servers=?RADACCT_SERVERS}, tref=TRef}}.
+	{ok, #state{ip=MainIp, callid=CallID, radius=#rad_accreq{servers=RadAcctServers}, tref=TRef}}.
 
 % handle originate call leg (new media id possibly)
 % TODO handle Modifiers
