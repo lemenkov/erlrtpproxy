@@ -225,10 +225,23 @@ handle_cast({stop, Pid}, State) ->
 	case lists:keytake (Pid, #party.pid, State#state.parties) of
 		{value, Party, []} ->
 %			?INFO("It was the last mediastream - exiting", []),
-			{stop, stop, State#state{parties=[]}};
+			{stop, stop, State#state{parties=[Party#party{pid=null}]}};
 		{value, Party, NewParties} ->
 %			?INFO("It was NOT the last mediastream", []),
-			{noreply, State#state{parties=NewParties}};
+			AlivePids = fun(X) ->
+				case X#party.pid of
+					null ->
+						false;
+					_ ->
+						true
+				end
+			end,
+			case lists:any(AlivePids, NewParties) of
+				true ->
+					{noreply, State#state{parties=NewParties++[Party#party{pid=null}]}};
+				_ ->
+					{stop, stop, State#state{parties=NewParties++[Party#party{pid=null}]}}
+			end;
 		false ->
 			?ERR("Cannot find such Pid", []),
 			{noreply, State}
