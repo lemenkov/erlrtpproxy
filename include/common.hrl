@@ -36,11 +36,3 @@
 
 -include_lib("erlsyslog/include/erlsyslog.hrl").
 
-%-define(ERR(X, Y),  error_logger:error_msg("[~w]: " ++  X ++ "~n", [self()] ++ Y)).
-%-define(INFO(X, Y), error_logger:info_msg("[~w]: " ++  X ++ "~n", [self()] ++ Y)).
-%-define(WARN(X, Y), error_logger:warning_msg("[~w]: " ++  X ++ "~n", [self()] ++ Y)).
-
--define(ERR(X,Y), error_logger:error_report(#report{name=?MODULE, format=X, data=Y})).
--define(WARN(X,Y), error_logger:warning_report(#report{name=?MODULE, format=X, data=Y})).
--define(INFO(X,Y), error_logger:info_report(#report{name=?MODULE, format=X, data=Y})).
-
