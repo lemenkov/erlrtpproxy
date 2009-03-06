@@ -32,6 +32,7 @@
 -export([terminate/2]).
 
 -export([upgrade/0]).
+-export([stop/0]).
 
 -include("../include/common.hrl").
 
@@ -495,3 +496,24 @@ find_host([{Node,Ip,Ports}|OtherNodes], Acc) ->
 
 upgrade() ->
 	gen_server:cast({global, rtpproxy}, upgrade).
+
+stop() ->
+	case init:get_plain_arguments() of
+		[NodeStr] ->
+			Node = list_to_atom(NodeStr),
+			Status = case rpc:call(Node, application, stop, [hangupd]) of
+				{badrpc, Reason} ->
+					2;
+				_ ->
+					case rpc:call(Node, init, stop, []) of
+						{badrpc, Reason} ->
+							2;
+						_ ->
+							0
+					end
+			end,
+			halt(Status);
+		_ ->
+			halt(1)
+	end.
+

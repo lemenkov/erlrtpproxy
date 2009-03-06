@@ -43,20 +43,6 @@ Requires(postun): /sbin/service
 An OpenSER-compatible interface for %{name}.
 
 
-%package nodes
-Summary:	Additional nodes for %{name}
-Group:		Applications/Internet
-Requires:	erlang
-Requires:	erlang-erlsyslog
-#Requires:	erlang-eradius
-Requires(post): /sbin/chkconfig
-Requires(preun): /sbin/chkconfig
-Requires(preun): /sbin/service
-Requires(postun): /sbin/service
-
-%description nodes
-Additional nodes for %{name}.
-
 %prep
 %setup -q -n %{name}
 
@@ -89,8 +75,6 @@ install -D -m 755 priv/%{name}-ser.init $RPM_BUILD_ROOT%{_initrddir}/%{name}-ser
 install -D -m 644 priv/%{name}-ser.config $RPM_BUILD_ROOT%{_sysconfdir}/%{name}-ser.config
 install -D -m 644 priv/%{name}-ser.sysconfig $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig/%{name}-ser
 
-install -D -m 755 priv/%{name}-nodes.init $RPM_BUILD_ROOT%{_initrddir}/%{name}-nodes
-install -D -m 644 priv/%{name}-nodes.sysconfig $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig/%{name}-nodes
 
 %pre
 getent group %{erlname} >/dev/null || groupadd -r %{erlname}
@@ -138,29 +122,6 @@ if [ "$1" -ge "1" ]; then
 fi
 
 
-%pre nodes
-getent group %{erlname} >/dev/null || groupadd -r %{erlname}
-getent passwd %{erlname} >/dev/null || useradd -r -g %{erlname} -d / -s /sbin/nologin -c "RTP proxying daemon" %{erlname}
-exit 0
-
-
-%post nodes
-/sbin/chkconfig --add %{name}-nodes
-
-
-%preun nodes
-if [ $1 = 0 ]; then
-        /sbin/service %{name}-nodes stop >/dev/null 2>&1
-        /sbin/chkconfig --del %{name}-nodes
-fi
-
-
-%postun nodes
-if [ "$1" -ge "1" ]; then
-        /sbin/service %{name}-nodes condrestart >/dev/null 2>&1
-fi
-
-
 %clean
 rm -rf $RPM_BUILD_ROOT
 
@@ -190,12 +151,6 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/erlang/lib/%{erlname}-%{version}/ebin/ser.beam
 %{_libdir}/erlang/lib/%{erlname}-%{version}/ebin/ser_app.beam
 %{_libdir}/erlang/lib/%{erlname}-%{version}/ebin/ser_sup.beam
-
-%files nodes
-%defattr(-,root,root,-)
-%{_initrddir}/%{name}-nodes
-%config(noreplace) %{_sysconfdir}/sysconfig/%{name}-nodes
-
 
 %changelog
 * Fri Feb 27 2009 Peter Lemenkov <lemenkov@gmail.com> 0.1-0.2.svn
