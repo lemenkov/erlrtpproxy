@@ -44,7 +44,14 @@ lockfile=/var/lock/subsys/$prog
 
 start() {
     echo -n $"Starting $prog: "
-    daemon --user rtpproxy "erl $ERL_PARAMETERS -name $prog@$ERL_NODE -setcookie $ERL_COOKIE -config $CONFIG_FILE -detached -s rtpproxy_app"
+    daemon --user rtpproxy \
+	"erl"  "$ERL_PARAMETERS \
+		-name $prog@$ERL_NODE \
+		-setcookie $ERL_COOKIE \
+		-config $CONFIG_FILE \
+		-mnesia dir \\\"/var/lib/rtpproxy/spool\\\" \
+		-detached \
+		-s rtpproxy_app"
     retval=$?
     echo
     [ $retval -eq 0 ] && touch $lockfile

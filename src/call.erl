@@ -33,6 +33,7 @@
 -include("../include/common.hrl").
 -include("config.hrl").
 -include_lib("eradius/src/eradius_lib.hrl").
+-include_lib("eradius/include/dictionary.hrl").
 
 -record(source, {fd=null, ip=null, port=null, tag=null}).
 -record(state, {ip, callid, parties=[], radius, tref}).
@@ -60,10 +61,18 @@ start_link(Args) ->
 init ({CallID, MainIp, RadAcctServers}) ->
 	process_flag(trap_exit, true),
 	% TODO we should add app-file for eradius
-	eradius_acc:start(),
-	{ok, TRef} = timer:send_interval(?CALL_TIME_TO_LIVE, timeout),
-	?INFO("started at ~s", [inet_parse:ntoa(MainIp)]),
-	{ok, #state{ip=MainIp, callid=CallID, radius=#rad_accreq{servers=RadAcctServers}, tref=TRef}}.
+	eradius_dict:start(),
+	eradius_dict:load_tables(["dictionary"]),
+	case eradius_dict:lookup(?Acct_Session_Id) of
+		[] ->
+			?ERR("Can't load dictionary", []),
+			{stop, "Can't load dictionary"};
+		_ ->
+			eradius_acc:start(),
+			{ok, TRef} = timer:send_interval(?CALL_TIME_TO_LIVE, timeout),
+			?INFO("started at ~s", [inet_parse:ntoa(MainIp)]),
+			{ok, #state{ip=MainIp, callid=CallID, radius=#rad_accreq{servers=RadAcctServers,std_attrs=[{?Acct_Session_Id, CallID}]}, tref=TRef}}
+	end.
 
 % handle originate call leg (new media id possibly)
 % TODO handle Modifiers
@@ -128,7 +137,7 @@ handle_call({?CMD_U, {StartPort, {GuessIp, GuessPort}, {FromTag, MediaId}, To, M
 % handle answered call leg
 % Both MediaId's are equal (just guessing)
 handle_call({?CMD_L, {{GuessIp, GuessPort}, {FromTag, MediaId}, {ToTag, MediaId}, Modifiers}}, _, State) ->
-	?INFO("message [L] probably from ~w:~w  MediaId [~b]", [GuessIp, GuessPort, MediaId]),
+	?INFO("message [L] probably from ~w:~w  MediaId [~b] with modifiers: ~p", [GuessIp, GuessPort, MediaId, Modifiers]),
 	% search for already  existed
 	case lists:keysearch(MediaId, #party.mediaid, State#state.parties) of
 		{value, Party} ->
@@ -155,7 +164,20 @@ handle_call({?CMD_L, {{GuessIp, GuessPort}, {FromTag, MediaId}, {ToTag, MediaId}
 					{ok, {LocalIp, LocalPort}} = inet:sockname(Fd),
 					Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 					?INFO("answer [~s]", [Reply]),
-					{reply, {ok, Reply}, State#state{parties=lists:keyreplace(MediaId, #party.mediaid, State#state.parties, NewParty)}};
+					% TODO use some other flag
+					case lists:member(mod_i, Modifiers) of
+						true ->
+							case (State#state.radius)#rad_accreq.login_time of
+								undefined ->
+									Req = eradius_acc:set_login_time(State#state.radius),
+									eradius_acc:acc_start(Req),
+									{reply, {ok, Reply}, State#state{parties=lists:keyreplace(MediaId, #party.mediaid, State#state.parties, NewParty), radius=Req}};
+								_ ->
+									{reply, {ok, Reply}, State#state{parties=lists:keyreplace(MediaId, #party.mediaid, State#state.parties, NewParty)}}
+							end;
+						_ ->
+							{reply, {ok, Reply}, State#state{parties=lists:keyreplace(MediaId, #party.mediaid, State#state.parties, NewParty)}}
+					end;
 				{error, Reason} ->
 					?ERR("FAILED [~p]", [Reason]),
 					{reply, {error, udp_error}, State}
@@ -334,7 +356,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 							->
 				NewParty = Party#party{from=(Party#party.from)#source{ip=Ip, port=Port}},
 				% FIXME send Msg here - we created Media server and we need to pass Msg to him
-				{Party, NewParty#party{pid=SafeStart(NewParty)}, started};
+				{Party, NewParty#party{pid=SafeStart(NewParty)}};
 			% RTP to Caller from Callee
 			{value, from, Party} when
 						(Party#party.from)#source.ip /= null,
@@ -344,25 +366,21 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 							->
 				NewParty = Party#party{to=(Party#party.to)#source{ip=Ip, port=Port}},
 				% FIXME send Msg here - we created Media server and we need to pass Msg to him
-				{Party, NewParty#party{pid=SafeStart(NewParty)}, started};
+				{Party, NewParty#party{pid=SafeStart(NewParty)}};
 			% RTP to Caller from Callee
 			{value, from, Party} ->
 				% TODO guess that Caller has uPnP - we know Ip and Port for Callee, and we got GuessIp and GuessPort for Caller
 				%      so we should try to start this session here (in any case 'мы ничем не рискуем')
-				{Party, Party#party{to=(Party#party.to)#source{ip=Ip, port=Port}}, notstarted};
+				{Party, Party#party{to=(Party#party.to)#source{ip=Ip, port=Port}}};
 			% RTP from Caller to Callee
 			{value, to, Party} ->
 				% we should dismiss this Msg since we don't know all necessary data about Callee
-				{Party, Party#party{from=(Party#party.from)#source{ip=Ip, port=Port}}, notstarted};
+				{Party, Party#party{from=(Party#party.from)#source{ip=Ip, port=Port}}};
 			false ->
 				false
 		end
 	of
-		{OldParty, NewParty1, started} ->
-			Req = eradius_acc:set_login_time(State#state.radius),
-			eradius_acc:acc_start(Req),
-			{noreply, State#state{radius=Req, parties=lists:delete(OldParty, State#state.parties) ++ [NewParty1]}};
-		{OldParty, NewParty1, notstarted} ->
+		{OldParty, NewParty1} ->
 			{noreply, State#state{parties=lists:delete(OldParty, State#state.parties) ++ [NewParty1]}};
 		false ->
 %			?WARN("Probably RTCP to ~p from Ip[~p] Port[~p]", [Fd, Ip, Port]),
