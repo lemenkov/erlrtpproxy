@@ -36,7 +36,7 @@
 -include_lib("eradius/include/dictionary.hrl").
 
 -record(source, {fd=null, ip=null, port=null, tag=null}).
--record(state, {ip, callid, parties=[], radius, tref}).
+-record(state, {ip, callid, parties=[], radius, tref, status=notstarted}).
 
 -record(party, {from=null,
 		fromrtcp=null,
@@ -333,7 +333,6 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 	end,
 	SafeStart = fun (NP) ->
 		[F,FRtcp,T,TRtcp] = [NP#party.from, NP#party.fromrtcp, NP#party.to, NP#party.tortcp],
-		timer:cancel(State#state.tref),
 		SafeGetAddr = fun(X) ->
 			case X of
 				null -> null;
@@ -356,7 +355,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 							->
 				NewParty = Party#party{from=(Party#party.from)#source{ip=Ip, port=Port}},
 				% FIXME send Msg here - we created Media server and we need to pass Msg to him
-				{Party, NewParty#party{pid=SafeStart(NewParty)}};
+				{Party, NewParty#party{pid=SafeStart(NewParty)}, started};
 			% RTP to Caller from Callee
 			{value, from, Party} when
 						(Party#party.from)#source.ip /= null,
@@ -366,28 +365,32 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 							->
 				NewParty = Party#party{to=(Party#party.to)#source{ip=Ip, port=Port}},
 				% FIXME send Msg here - we created Media server and we need to pass Msg to him
-				{Party, NewParty#party{pid=SafeStart(NewParty)}};
+				{Party, NewParty#party{pid=SafeStart(NewParty)}, started};
 			% RTP to Caller from Callee
 			{value, from, Party} ->
 				% TODO guess that Caller has uPnP - we know Ip and Port for Callee, and we got GuessIp and GuessPort for Caller
 				%      so we should try to start this session here (in any case 'мы ничем не рискуем')
-				{Party, Party#party{to=(Party#party.to)#source{ip=Ip, port=Port}}};
+				{Party, Party#party{to=(Party#party.to)#source{ip=Ip, port=Port}}, notstarted};
 			% RTP from Caller to Callee
 			{value, to, Party} ->
 				% we should dismiss this Msg since we don't know all necessary data about Callee
-				{Party, Party#party{from=(Party#party.from)#source{ip=Ip, port=Port}}};
+				{Party, Party#party{from=(Party#party.from)#source{ip=Ip, port=Port}}, notstarted};
 			false ->
 				false
 		end
 	of
-		{OldParty, NewParty1} ->
-			{noreply, State#state{parties=lists:delete(OldParty, State#state.parties) ++ [NewParty1]}};
+		{OldParty, NewParty1, Status} ->
+			{noreply, State#state{status=Status, parties=lists:delete(OldParty, State#state.parties) ++ [NewParty1]}};
 		false ->
 %			?WARN("Probably RTCP to ~p from Ip[~p] Port[~p]", [Fd, Ip, Port]),
 			{noreply, State}
 	end;
-handle_info(timeout, State) ->
+handle_info(timeout, State) when State#state.status == notstarted ->
 	{stop, timeout, State};
+
+handle_info(timeout, State) when State#state.status == started ->
+	eradius_acc:acc_update(State#state.radius),
+	{noreply, State};
 
 handle_info(Info, State) ->
 	?WARN("Info [~w]", [Info]),
