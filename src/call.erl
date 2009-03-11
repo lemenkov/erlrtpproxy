@@ -34,6 +34,7 @@
 -include("config.hrl").
 -include_lib("eradius/src/eradius_lib.hrl").
 -include_lib("eradius/include/dictionary.hrl").
+-include_lib("eradius/include/dictionary_cisco.hrl").
 
 -record(source, {fd=null, ip=null, port=null, tag=null}).
 -record(state, {ip, callid, parties=[], radius, tref, status=notstarted}).
@@ -62,7 +63,7 @@ init ({CallID, MainIp, RadAcctServers}) ->
 	process_flag(trap_exit, true),
 	% TODO we should add app-file for eradius
 	eradius_dict:start(),
-	eradius_dict:load_tables(["dictionary"]),
+	eradius_dict:load_tables(["dictionary", "dictionary_cisco"]),
 	case eradius_dict:lookup(?Acct_Session_Id) of
 		[] ->
 			?ERR("Can't load dictionary", []),
@@ -71,7 +72,11 @@ init ({CallID, MainIp, RadAcctServers}) ->
 			eradius_acc:start(),
 			{ok, TRef} = timer:send_interval(?CALL_TIME_TO_LIVE, timeout),
 			?INFO("started at ~s", [inet_parse:ntoa(MainIp)]),
-			{ok, #state{ip=MainIp, callid=CallID, radius=#rad_accreq{servers=RadAcctServers,std_attrs=[{?Acct_Session_Id, CallID}]}, tref=TRef}}
+			{ok, #state{	ip=MainIp,
+					callid=CallID,
+					radius=#rad_accreq{	servers=RadAcctServers,
+								std_attrs=[{?Acct_Session_Id, CallID}]},
+					tref=TRef}}
 	end.
 
 % handle originate call leg (new media id possibly)
@@ -169,7 +174,9 @@ handle_call({?CMD_L, {{GuessIp, GuessPort}, {FromTag, MediaId}, {ToTag, MediaId}
 						true ->
 							case (State#state.radius)#rad_accreq.login_time of
 								undefined ->
-									Req = eradius_acc:set_login_time(State#state.radius),
+									Req = (State#state.radius)#rad_accreq{
+											login_time = erlang:now(),
+											vend_attrs = [{?Cisco, [{?h323_connect_time, iso_8601_fmt(erlang:localtime())}]}]},
 									eradius_acc:acc_start(Req),
 									{reply, {ok, Reply}, State#state{parties=lists:keyreplace(MediaId, #party.mediaid, State#state.parties, NewParty), radius=Req}};
 								_ ->
@@ -303,8 +310,9 @@ terminate(Reason, State) ->
 				undefined ->
 					ok;
 				_ ->
-					Req = eradius_acc:set_logout_time(State#state.radius),
-					eradius_acc:acc_stop(Req)
+					Req0 = eradius_acc:set_logout_time(State#state.radius),
+					Req1 = Req0#rad_accreq{vend_attrs = [{?Cisco, [{?h323_disconnect_time, iso_8601_fmt(erlang:localtime())}]}]},
+					eradius_acc:acc_stop(Req1)
 			end
 	end,
 	timer:cancel(State#state.tref),
@@ -395,4 +403,8 @@ handle_info(timeout, State) when State#state.status == started ->
 handle_info(Info, State) ->
 	?WARN("Info [~w]", [Info]),
 	{noreply, State}.
+
+iso_8601_fmt(DateTime) ->
+	{{Year,Month,Day},{Hour,Min,Sec}} = DateTime,
+	io_lib:format("~4.10.0B-~2.10.0B-~2.10.0B ~2.10.0B:~2.10.0B:~2.10.0B", [Year, Month, Day, Hour, Min, Sec]).
 
