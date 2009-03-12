@@ -176,7 +176,7 @@ handle_call({?CMD_L, {{GuessIp, GuessPort}, {FromTag, MediaId}, {ToTag, MediaId}
 								undefined ->
 									Req = (State#state.radius)#rad_accreq{
 											login_time = erlang:now(),
-											vend_attrs = [{?Cisco, [{?h323_connect_time, iso_8601_fmt(erlang:localtime())}]}]},
+											vend_attrs = [{?Cisco, [{?h323_connect_time, date_time_fmt()}]}]},
 									eradius_acc:acc_start(Req),
 									{reply, {ok, Reply}, State#state{parties=lists:keyreplace(MediaId, #party.mediaid, State#state.parties, NewParty), radius=Req}};
 								_ ->
@@ -311,7 +311,7 @@ terminate(Reason, State) ->
 					ok;
 				_ ->
 					Req0 = eradius_acc:set_logout_time(State#state.radius),
-					Req1 = Req0#rad_accreq{vend_attrs = [{?Cisco, [{?h323_disconnect_time, iso_8601_fmt(erlang:localtime())}]}]},
+					Req1 = Req0#rad_accreq{vend_attrs = [{?Cisco, [{?h323_disconnect_time, date_time_fmt()}]}]},
 					eradius_acc:acc_stop(Req1)
 			end
 	end,
@@ -404,7 +404,8 @@ handle_info(Info, State) ->
 	?WARN("Info [~w]", [Info]),
 	{noreply, State}.
 
-iso_8601_fmt(DateTime) ->
-	{{Year,Month,Day},{Hour,Min,Sec}} = DateTime,
-	io_lib:format("~4.10.0B-~2.10.0B-~2.10.0B ~2.10.0B:~2.10.0B:~2.10.0B", [Year, Month, Day, Hour, Min, Sec]).
+date_time_fmt() ->
+	{{YYYY,MM,DD},{Hour,Min,Sec}} = erlang:localtime(),
+	DayNumber = calendar:day_of_the_week({YYYY,MM,DD}),
+	lists:flatten(io_lib:format("~s ~3s ~2.2.0w ~2.2.0w:~2.2.0w:~2.2.0w ~4.4.0w",[httpd_util:day(DayNumber),httpd_util:month(MM),DD,Hour,Min,Sec,YYYY])).
 
