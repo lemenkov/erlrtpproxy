@@ -115,6 +115,11 @@ terminate(Reason, State) ->
 	gen_server:cast(State#state.parent, {stop, self()}),
 	?ERR("terminated due to reason [~p]", [Reason]).
 
+
+% We received UDP-data on From or To socket, but we in in HOLD state
+handle_info({udp, Fd, Ip, Port, Msg}, State) when State#state.holdstate == true ->
+	{noreply, State};
+
 % We received UDP-data on From or To socket, so we must send in from To or From socket respectively
 % (if we not in HOLD state)
 % (symmetric NAT from the client's PoV)
@@ -136,14 +141,9 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.from)#media
 				(State#state.to)#media.ip,
 				(State#state.to)#media.port}
 	end,
-	case State#state.holdstate of
-		true ->
-			% do nothing
-			ok;
-		false ->
-			% TODO check whether message is valid rtp stream
-			gen_udp:send(Fd1, Ip1, Port1, Msg)
-	end,
+
+	% TODO check whether message is valid rtp stream
+	gen_udp:send(Fd1, Ip1, Port1, Msg),
 
 	case State#state.started of
 		null ->
