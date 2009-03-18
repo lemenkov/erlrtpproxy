@@ -96,7 +96,8 @@ handle_call({?CMD_U, {StartPort, {GuessIp, GuessPort}, {FromTag, MediaId}, To, M
 				try
 					if
 						FromTag == (Party#party.from)#source.tag -> inet:sockname((Party#party.from)#source.fd);
-						FromTag == (Party#party.to)#source.tag   -> inet:sockname((Party#party.to)#source.fd)
+						FromTag == (Party#party.to)#source.tag   -> inet:sockname((Party#party.to)#source.fd);
+						true -> {error, not_found}
 					end
 				catch
 					_:_ ->

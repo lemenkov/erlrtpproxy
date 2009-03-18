@@ -81,8 +81,8 @@ force_reload() {
 }
 
 rh_status() {
-    # run checks to determine if the service is running or use generic status
-    status $prog
+    /sbin/runuser -s /bin/bash - rtpproxy -c "erl -noinput $ERL_PARAMETERS -name status@$ERL_NODE  -setcookie $ERL_COOKIE  -s rtpproxy status -extra $prog@$ERL_NODE"
+    return $?
 }
 
 rh_status_q() {

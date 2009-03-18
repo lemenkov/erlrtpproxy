@@ -30,6 +30,10 @@
 -export([code_change/3]).
 -export([terminate/2]).
 
+-export([stop/0]).
+-export([status/0]).
+-export([test/0]).
+
 -include("../include/common.hrl").
 
 start(Args) ->
@@ -262,3 +266,47 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 handle_info(Info, Fd) ->
 	?WARN("Info [~w]", [Info]),
 	{noreply, Fd}.
+
+stop() ->
+	Status = case init:get_plain_arguments() of
+		[NodeStr] ->
+			Node = list_to_atom(NodeStr),
+			try rpc:call(Node, application, stop, [ser]) of
+				{badrpc, Reason} ->
+					2;
+				_ ->
+					case rpc:call(Node, init, stop, []) of
+						{badrpc, Reason} ->
+							2;
+						_ ->
+							0
+					end
+			catch _:_ ->
+				2
+			end;
+		_ ->
+			1
+	end,
+	halt(Status).
+
+status() ->
+	Status = case init:get_plain_arguments() of
+		[NodeStr] ->
+			Node = list_to_atom(NodeStr),
+			try rpc:call(Node, application, get_application, [ser]) of
+				{badrpc, Reason} ->
+					4;
+				{ok, ser} ->
+					0;
+				undefined ->
+					3
+			catch _:_ ->
+				4
+			end;
+		_ ->
+			4
+	end,
+	halt(Status).
+
+test() ->
+	io:format("Done!~n").
