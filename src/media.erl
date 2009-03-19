@@ -115,22 +115,32 @@ terminate(Reason, State) ->
 	gen_server:cast(State#state.parent, {stop, self()}),
 	?ERR("terminated due to reason [~p]", [Reason]).
 
-% We received UDP-data on From or To socket, so we must send in from To or From socket respectively
-% (if we not in HOLD state)
-% (symmetric NAT from the client's PoV)
-% We must ignore previous state ('rtp' or 'nortp') and set it to 'rtp'
-% We use Ip and Port as address for future messages to FdTo or FdFrom
-handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.from)#media.fd; Fd == (State#state.to)#media.fd ->
+handle_info({udp, Fd, Ip, Port, Msg}, State) when State#state.started == null ->
+	{F, T} = if
+		Fd == (State#state.from)#media.fd ->
+			{State#state.from, (State#state.to)#media{ip=Ip, port=Port, rtpstate=rtp}};
+		Fd == (State#state.to)#media.fd ->
+			{(State#state.from)#media{ip=Ip, port=Port, rtpstate=rtp}, State#state.to}
+	end,
+
+	case {(State#state.from)#media.rtpstate, (State#state.to)#media.rtpstate} of
+		{rtp, rtp} ->
+			{noreply, State#state{from=F, to=T, started=now()}};
+		_ ->
+			{noreply, State#state{from=F, to=T}}
+	end;
+
+handle_info({udp, Fd, Ip, Port, Msg}, State) when (State#state.from)#media.rtpstate == nortp; (State#state.to)#media.rtpstate == nortp ->
 	% TODO check that message was arrived from valid {Ip, Port}
-	{F, T, Fd1, Ip1, Port1} = if
+	{From, To, F, I, P} = if
 		Fd == (State#state.from)#media.fd ->
 			{	State#state.from,
-				(State#state.to)#media{ip=Ip, port=Port, rtpstate=rtp},
+				(State#state.to)#media{rtpstate=rtp},
 				(State#state.to)#media.fd,
 				(State#state.from)#media.ip,
 				(State#state.from)#media.port};
 		Fd == (State#state.to)#media.fd ->
-			{	(State#state.from)#media{ip=Ip, port=Port, rtpstate=rtp},
+			{	(State#state.from)#media{rtpstate=rtp},
 				State#state.to,
 				(State#state.from)#media.fd,
 				(State#state.to)#media.ip,
@@ -142,20 +152,34 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.from)#media
 			ok;
 		false ->
 			% TODO check whether message is valid rtp stream
-			gen_udp:send(Fd1, Ip1, Port1, Msg)
+			gen_udp:send(F, I, P, Msg)
 	end,
 
-	case State#state.started of
-		null ->
-			case {(State#state.from)#media.rtpstate, (State#state.to)#media.rtpstate} of
-				{rtp, rtp} ->
-					{noreply, State#state{from=F, to=T, started=now()}};
-				_ ->
-					{noreply, State#state{from=F, to=T}}
-			end;
-		_ ->
-			{noreply, State#state{from=F, to=T}}
-	end;
+	{noreply, State#state{from=From, to=To}};
+
+handle_info({udp, Fd, Ip, Port, Msg}, State) when State#state.holdstate == true ->
+	{noreply, State};
+
+% We received UDP-data on From or To socket, so we must send in from To or From socket respectively
+% (if we not in HOLD state)
+% (symmetric NAT from the client's PoV)
+% We must ignore previous state ('rtp' or 'nortp') and set it to 'rtp'
+% We use Ip and Port as address for future messages to FdTo or FdFrom
+handle_info({udp, Fd, Ip, Port, Msg}, State)  when Fd == (State#state.from)#media.fd; Fd == (State#state.to)#media.fd->
+	% TODO check that message was arrived from valid {Ip, Port}
+	{F, I, P} = if
+		Fd == (State#state.from)#media.fd ->
+			{	(State#state.to)#media.fd,
+				(State#state.from)#media.ip,
+				(State#state.from)#media.port};
+		Fd == (State#state.to)#media.fd ->
+			{	(State#state.from)#media.fd,
+				(State#state.to)#media.ip,
+				(State#state.to)#media.port}
+	end,
+	% TODO check whether message is valid rtp stream
+	gen_udp:send(F, I, P, Msg),
+	{noreply, State};
 
 handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#media.fd; Fd == (State#state.tortcp)#media.fd ->
 	SafeSendRtcp = fun(F,I,P,M) ->
@@ -177,6 +201,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#m
 			% later we may try to decode these rtcp packets and to fix decoding errors:
 			% lists:map(fun(X) -> {ok, Rtcp} = file:read_file(X), rtcp:decode(Rtcp) end, filelib:wildcard("./tmp/rtcp_err.*.bin")).
 			file:write_file("/tmp/rtcp_err." ++ atom_to_list(node()) ++ "." ++ integer_to_list(H) ++ "_" ++ integer_to_list(M) ++ "_" ++ integer_to_list(Ms) ++ ".bin", Msg),
+%			file:write_file(["/tmp/rtcp_err."|[atom_to_list(node())|["."|[integer_to_list(H)|["_"|[integer_to_list(M)|["_"|[integer_to_list(Ms)|".bin"]]]]]]]], Msg),
 			[]
 	end,
 %	?INFO("RTCP: ~p", [Rtcps]),
