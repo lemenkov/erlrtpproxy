@@ -139,7 +139,8 @@ handle_cast({message, Cmd}, State) when Cmd#cmd.type == ?CMD_D; Cmd#cmd.type == 
 			gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_OK});
 		true ->
 			?ERR("CANNOT find thread(s) to stop.", []),
-			gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_ERR_NOSESSION})
+			gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_OK})
+%			gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_ERR_NOSESSION})
 	end,
 	{noreply, State};
 

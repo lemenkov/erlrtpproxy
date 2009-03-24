@@ -115,6 +115,48 @@ terminate(Reason, State) ->
 	gen_server:cast(State#state.parent, {stop, self()}),
 	?ERR("terminated due to reason [~p]", [Reason]).
 
+handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#media.fd; Fd == (State#state.tortcp)#media.fd ->
+	SafeSendRtcp = fun(F,I,P,M) ->
+		if
+			I == null; P == null ->
+%				?WARN("Probably RTCP to ~p from Ip[~p] Port[~p] but we CANNOT send", [Fd, Ip, Port]),
+				ok;
+			true ->
+%				?INFO("Probably RTCP to ~p from Ip[~p] Port[~p]", [Fd, Ip, Port]),
+				gen_udp:send(F, I, P, Msg)
+		end
+	end,
+
+	Rtcps = try
+		rtcp:decode(Msg)
+	catch
+		E:C ->
+			{H,M,Ms} = now(),
+			% later we may try to decode these rtcp packets and to fix decoding errors:
+			% lists:map(fun(X) -> {ok, Rtcp} = file:read_file(X), rtcp:decode(Rtcp) end, filelib:wildcard("./tmp/rtcp_err.*.bin")).
+			file:write_file("/tmp/rtcp_err." ++ atom_to_list(node()) ++ "." ++ integer_to_list(H) ++ "_" ++ integer_to_list(M) ++ "_" ++ integer_to_list(Ms) ++ ".bin", Msg),
+%			file:write_file(["/tmp/rtcp_err."|[atom_to_list(node())|["."|[integer_to_list(H)|["_"|[integer_to_list(M)|["_"|[integer_to_list(Ms)|".bin"]]]]]]]], Msg),
+			[]
+	end,
+%	?INFO("RTCP: ~p", [Rtcps]),
+
+	if
+		Fd == (State#state.fromrtcp)#media.fd ->
+			SafeSendRtcp((State#state.to)#media.fd, (State#state.fromrtcp)#media.ip, (State#state.fromrtcp)#media.port, Msg),
+			case lists:keymember(bye, 1, Rtcps) of
+				true -> {stop, stop, State};
+				_ -> {noreply, State#state{tortcp=(State#state.tortcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
+			end;
+%			{noreply, State#state{tortcp=(State#state.tortcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}};
+		Fd == (State#state.tortcp)#media.fd ->
+			SafeSendRtcp((State#state.from)#media.fd, (State#state.tortcp)#media.ip, (State#state.tortcp)#media.port, Msg),
+			case lists:keymember(bye, 1, Rtcps) of
+				true -> {stop, stop, State};
+				_ -> {noreply, State#state{fromrtcp=(State#state.fromrtcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
+			end
+%			{noreply, State#state{fromrtcp=(State#state.fromrtcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
+	end;
+
 handle_info({udp, Fd, Ip, Port, Msg}, State) when State#state.started == null ->
 	{F, T} = if
 		Fd == (State#state.from)#media.fd ->
@@ -165,7 +207,8 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when State#state.holdstate == true 
 % (symmetric NAT from the client's PoV)
 % We must ignore previous state ('rtp' or 'nortp') and set it to 'rtp'
 % We use Ip and Port as address for future messages to FdTo or FdFrom
-handle_info({udp, Fd, Ip, Port, Msg}, State)  when Fd == (State#state.from)#media.fd; Fd == (State#state.to)#media.fd->
+handle_info({udp, Fd, Ip, Port, Msg}, State) ->
+%handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.from)#media.fd; Fd == (State#state.to)#media.fd ->
 	% TODO check that message was arrived from valid {Ip, Port}
 	{F, I, P} = if
 		Fd == (State#state.from)#media.fd ->
@@ -180,48 +223,6 @@ handle_info({udp, Fd, Ip, Port, Msg}, State)  when Fd == (State#state.from)#medi
 	% TODO check whether message is valid rtp stream
 	gen_udp:send(F, I, P, Msg),
 	{noreply, State};
-
-handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#media.fd; Fd == (State#state.tortcp)#media.fd ->
-	SafeSendRtcp = fun(F,I,P,M) ->
-		if
-			I == null; P == null ->
-				?WARN("Probably RTCP to ~p from Ip[~p] Port[~p] but we CANNOT send", [Fd, Ip, Port]),
-				ok;
-			true ->
-				?INFO("Probably RTCP to ~p from Ip[~p] Port[~p]", [Fd, Ip, Port]),
-				gen_udp:send(F, I, P, Msg)
-		end
-	end,
-
-	Rtcps = try
-		rtcp:decode(Msg)
-	catch
-		E:C ->
-			{H,M,Ms} = now(),
-			% later we may try to decode these rtcp packets and to fix decoding errors:
-			% lists:map(fun(X) -> {ok, Rtcp} = file:read_file(X), rtcp:decode(Rtcp) end, filelib:wildcard("./tmp/rtcp_err.*.bin")).
-			file:write_file("/tmp/rtcp_err." ++ atom_to_list(node()) ++ "." ++ integer_to_list(H) ++ "_" ++ integer_to_list(M) ++ "_" ++ integer_to_list(Ms) ++ ".bin", Msg),
-%			file:write_file(["/tmp/rtcp_err."|[atom_to_list(node())|["."|[integer_to_list(H)|["_"|[integer_to_list(M)|["_"|[integer_to_list(Ms)|".bin"]]]]]]]], Msg),
-			[]
-	end,
-%	?INFO("RTCP: ~p", [Rtcps]),
-
-	if
-		Fd == (State#state.fromrtcp)#media.fd ->
-			SafeSendRtcp((State#state.to)#media.fd, (State#state.fromrtcp)#media.ip, (State#state.fromrtcp)#media.port, Msg),
-			case lists:keymember(bye, 1, Rtcps) of
-				true -> {stop, stop, State};
-				_ -> {noreply, State#state{tortcp=(State#state.tortcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
-			end;
-%			{noreply, State#state{tortcp=(State#state.tortcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}};
-		Fd == (State#state.tortcp)#media.fd ->
-			SafeSendRtcp((State#state.from)#media.fd, (State#state.tortcp)#media.ip, (State#state.tortcp)#media.port, Msg),
-			case lists:keymember(bye, 1, Rtcps) of
-				true -> {stop, stop, State};
-				_ -> {noreply, State#state{fromrtcp=(State#state.fromrtcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
-			end
-%			{noreply, State#state{fromrtcp=(State#state.fromrtcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
-	end;
 
 handle_info(ping, State) ->
 	case {(State#state.from)#media.rtpstate, (State#state.to)#media.rtpstate} of
