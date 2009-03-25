@@ -9,6 +9,8 @@ Summary:	RTP proxying daemon
 Group:		Applications/Internet
 License:	GPLv3+
 URL:		http://code.google.com/p/erlrtpproxy/
+# svn co http://erlrtpproxy.googlecode.com/svn/trunk erlrtpproxy
+# tar cjf erlrtpproxy-0.1.tar.bz2 erlrtpproxy
 Source0:	%{name}-%{version}.tar.bz2
 BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
