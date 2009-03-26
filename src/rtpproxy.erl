@@ -534,6 +534,7 @@ status() ->
 				{badrpc, Reason} ->
 					4;
 				{ok, rtpproxy} ->
+					gen_server:cast({global,rtpproxy}, status),
 					0;
 				undefined ->
 					3
