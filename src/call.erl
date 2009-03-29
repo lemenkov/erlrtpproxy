@@ -75,6 +75,7 @@ init ({CallID, MainIp, RadAcctServers}) ->
 			{ok, #state{	ip=MainIp,
 					callid=CallID,
 					radius=#rad_accreq{	servers=RadAcctServers,
+								login_time = undefined,
 								std_attrs=[{?Acct_Session_Id, CallID}]},
 					tref=TRef}}
 	end.
@@ -285,6 +286,9 @@ code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 terminate(Reason, State) ->
+
+	% if some media pids are still aive, then we just send message to them (media thread will close ports by himself)
+	% if media pids == null, then we'll try to close ports by ourselves (it's possible that media thread wasn't even started)
 	Ports = lists:map(
 		fun(X)  ->
 			if
@@ -303,21 +307,22 @@ terminate(Reason, State) ->
 			X#party.startport
 		end,
 		State#state.parties),
-	case Reason of
-		timeout ->
+
+	% we'll send  (if login_time was defined before) 'STOP' radius accounting message
+	case (State#state.radius)#rad_accreq.login_time of
+		undefined ->
 			ok;
 		_ ->
-			case (State#state.radius)#rad_accreq.login_time of
-				undefined ->
-					ok;
-				_ ->
-					Req0 = eradius_acc:set_logout_time(State#state.radius),
-					Req1 = Req0#rad_accreq{vend_attrs = [{?Cisco, [{?h323_disconnect_time, date_time_fmt()}]}]},
-					eradius_acc:acc_stop(Req1)
-			end
+			Req0 = eradius_acc:set_logout_time(State#state.radius),
+			Req1 = Req0#rad_accreq{vend_attrs = [{?Cisco, [{?h323_disconnect_time, date_time_fmt()}]}]},
+			eradius_acc:acc_stop(Req1)
 	end,
+
 	timer:cancel(State#state.tref),
+
+	% We'll notify rtpproxy about our termination
 	gen_server:cast({global, rtpproxy}, {call_terminated, {self(), {ports, Ports}, Reason}}),
+
 	?ERR("terminated due to reason [~p]", [Reason]).
 
 % rtp from some port
