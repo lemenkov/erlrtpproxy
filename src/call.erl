@@ -340,7 +340,7 @@ terminate(Reason, State) ->
 
 % rtp from some port
 handle_info({udp, Fd, Ip, Port, Msg}, State) ->
-	?INFO("udp from Fd [~w] [~p:~p]", [Fd, Ip, Port]),
+%	?INFO("udp from Fd [~w] [~p:~p]", [Fd, Ip, Port]),
 	FindFd = fun (F) ->
 		fun	({[], _X}) ->
 				false;
