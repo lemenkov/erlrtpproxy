@@ -251,12 +251,15 @@ handle_cast(?CMD_S, State) ->
 
 % timeout from media stream
 % TODO consider to stop all other media streams
-handle_cast({stop, Pid}, State) ->
+handle_cast({stop, Reason, Pid}, State) ->
 %	?INFO("TIMEOUT when state is [~p]", [Parties]),
 	case lists:keytake (Pid, #party.pid, State#state.parties) of
 		{value, Party, []} ->
 %			?INFO("It was the last mediastream - exiting", []),
-			{stop, stop, State#state{parties=[Party#party{pid=null}]}};
+			case Reason of
+				timeout -> {stop, timeout, State#state{parties=[Party#party{pid=null}]}};
+				_ ->  {stop, stop, State#state{parties=[Party#party{pid=null}]}}
+			end;
 		{value, Party, NewParties} ->
 %			?INFO("It was NOT the last mediastream", []),
 			AlivePids = fun(X) ->
@@ -271,7 +274,10 @@ handle_cast({stop, Pid}, State) ->
 				true ->
 					{noreply, State#state{parties=NewParties++[Party#party{pid=null}]}};
 				_ ->
-					{stop, stop, State#state{parties=NewParties++[Party#party{pid=null}]}}
+					case Reason of
+						timeout -> {stop, timeout, State#state{parties=NewParties++[Party#party{pid=null}]}};
+						_ ->  {stop, stop, State#state{parties=NewParties++[Party#party{pid=null}]}}
+					end
 			end;
 		false ->
 			?ERR("Cannot find such Pid", []),
@@ -323,11 +329,18 @@ terminate(Reason, State) ->
 	% We'll notify rtpproxy about our termination
 	gen_server:cast({global, rtpproxy}, {call_terminated, {self(), {ports, Ports}, Reason}}),
 
+	case Reason of
+		timeout ->
+			gen_server:cast({global, hangupd}, {callid, State#state.callid});
+		_ ->
+			ok
+	end,
+
 	?ERR("terminated due to reason [~p]", [Reason]).
 
 % rtp from some port
 handle_info({udp, Fd, Ip, Port, Msg}, State) ->
-%	?INFO("udp from Fd [~w] [~p:~p]", [Fd, Ip, Port]),
+	?INFO("udp from Fd [~w] [~p:~p]", [Fd, Ip, Port]),
 	FindFd = fun (F) ->
 		fun	({[], _X}) ->
 				false;

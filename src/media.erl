@@ -112,7 +112,10 @@ code_change(_OldVsn, State, _Extra) ->
 terminate(Reason, State) ->
 	timer:cancel(State#state.tref),
 	lists:map(fun (X) -> case X of null -> ok; _ -> gen_udp:close(X#media.fd) end end, [State#state.from, State#state.fromrtcp, State#state.to, State#state.tortcp]),
-	gen_server:cast(State#state.parent, {stop, self()}),
+	case Reason of
+		nortp -> gen_server:cast(State#state.parent, {stop, timeout, self()});
+		_ -> gen_server:cast(State#state.parent, {stop, stop, self()})
+	end,
 	?ERR("terminated due to reason [~p]", [Reason]).
 
 handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#media.fd; Fd == (State#state.tortcp)#media.fd ->
