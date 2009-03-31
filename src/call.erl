@@ -37,7 +37,7 @@
 -include_lib("eradius/include/dictionary_cisco.hrl").
 
 -record(source, {fd=null, ip=null, port=null, tag=null}).
--record(state, {ip, callid, parties=[], radius, tref, status=notstarted}).
+-record(state, {ip, callid, parties=[], radius, tref, tref2, status=notstarted}).
 
 -record(party, {from=null,
 		fromrtcp=null,
@@ -70,14 +70,16 @@ init ({CallID, MainIp, RadAcctServers}) ->
 			{stop, "Can't load dictionary"};
 		_ ->
 			eradius_acc:start(),
-			{ok, TRef} = timer:send_interval(?CALL_TIME_TO_LIVE, timeout),
+			{ok, TRef} = timer:send_interval(?CALL_TIME_TO_LIVE*5, timeout),
+			{ok, TRef2} = timer:send_interval(?CALL_TIME_TO_LIVE, interim_update),
 			?INFO("started at ~s", [inet_parse:ntoa(MainIp)]),
 			{ok, #state{	ip=MainIp,
 					callid=CallID,
 					radius=#rad_accreq{	servers=RadAcctServers,
 								login_time = undefined,
 								std_attrs=[{?Acct_Session_Id, CallID}]},
-					tref=TRef}}
+					tref=TRef,
+					tref2=TRef2}}
 	end.
 
 % handle originate call leg (new media id possibly)
@@ -115,7 +117,7 @@ handle_call({?CMD_U, {StartPort, {GuessIp, GuessPort}, {FromTag, MediaId}, To, M
 			end;
 		false ->
 			% open new FdFrom and attach it
-			case gen_udp:open(StartPort, [binary, {ip, State#state.ip}, {active, true}]) of
+			case gen_udp:open(StartPort, [binary, {ip, State#state.ip}, {active, true}, {raw,1,11,<<1:32/native>>}]) of
 				{ok, Fd} ->
 					SafeOpenFd = fun(Port, Params) when is_list (Params) ->
 						case gen_udp:open(Port, Params) of
@@ -126,9 +128,9 @@ handle_call({?CMD_U, {StartPort, {GuessIp, GuessPort}, {FromTag, MediaId}, To, M
 					NewParty = #party{	% TODO add Ip and Port only on demand
 								from	=#source{fd=Fd, tag=FromTag},
 %								from	=#source{fd=Fd, ip=GuessIp, port=GuessPort, tag=FromTag},
-								fromrtcp=#source{fd=SafeOpenFd (StartPort+1, [binary, {ip, State#state.ip}, {active, true}])},
-								to	=#source{fd=SafeOpenFd (StartPort+2, [binary, {ip, State#state.ip}, {active, true}])},
-								tortcp	=#source{fd=SafeOpenFd (StartPort+3, [binary, {ip, State#state.ip}, {active, true}])},
+								fromrtcp=#source{fd=SafeOpenFd (StartPort+1, [binary, {ip, State#state.ip}, {active, true}, {raw,1,11,<<1:32/native>>}])},
+								to	=#source{fd=SafeOpenFd (StartPort+2, [binary, {ip, State#state.ip}, {active, true}, {raw,1,11,<<1:32/native>>}])},
+								tortcp	=#source{fd=SafeOpenFd (StartPort+3, [binary, {ip, State#state.ip}, {active, true}, {raw,1,11,<<1:32/native>>}])},
 								startport=StartPort,
 								mediaid=MediaId},
 					{ok, {LocalIp, LocalPort}} = inet:sockname(Fd),
@@ -325,6 +327,7 @@ terminate(Reason, State) ->
 	end,
 
 	timer:cancel(State#state.tref),
+	timer:cancel(State#state.tref2),
 
 	% We'll notify rtpproxy about our termination
 	gen_server:cast({global, rtpproxy}, {call_terminated, {self(), {ports, Ports}, Reason}}),
@@ -416,6 +419,10 @@ handle_info(timeout, State) when State#state.status == notstarted ->
 	{stop, timeout, State};
 
 handle_info(timeout, State) when State#state.status == started ->
+	eradius_acc:acc_update(State#state.radius),
+	{noreply, State};
+
+handle_info(interim_update, State) when State#state.status == started ->
 	eradius_acc:acc_update(State#state.radius),
 	{noreply, State};
 
