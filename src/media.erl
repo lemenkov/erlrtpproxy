@@ -148,7 +148,8 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#m
 			SafeSendRtcp((State#state.to)#media.fd, (State#state.fromrtcp)#media.ip, (State#state.fromrtcp)#media.port, Msg),
 			case lists:keymember(bye, 1, Rtcps) of
 				true ->
-					?ERR("We SHOULD terminate this call due to RTCP BYE", []);
+					?ERR("We SHOULD terminate this call due to RTCP BYE", []),
+					{noreply, State#state{tortcp=(State#state.tortcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}};
 %					{stop, rtcp_bye, State};
 				_ -> {noreply, State#state{tortcp=(State#state.tortcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
 			end;
@@ -157,7 +158,8 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#m
 			SafeSendRtcp((State#state.from)#media.fd, (State#state.tortcp)#media.ip, (State#state.tortcp)#media.port, Msg),
 			case lists:keymember(bye, 1, Rtcps) of
 				true ->
-					?ERR("We SHOULD terminate this call due to RTCP BYE", []);
+					?ERR("We SHOULD terminate this call due to RTCP BYE", []),
+					{noreply, State#state{tortcp=(State#state.tortcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}};
 %					{stop, rtcp_bye, State};
 				_ -> {noreply, State#state{fromrtcp=(State#state.fromrtcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
 			end
