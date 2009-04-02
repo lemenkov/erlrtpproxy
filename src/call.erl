@@ -418,11 +418,11 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 handle_info(timeout, State) when State#state.status == notstarted ->
 	{stop, timeout, State};
 
-handle_info(timeout, State) when State#state.status == started ->
+handle_info(timeout, State) when (State#state.radius)#rad_accreq.login_time /= undefined ->
 	eradius_acc:acc_update(State#state.radius),
 	{noreply, State};
 
-handle_info(interim_update, State) when State#state.status == started ->
+handle_info(interim_update, State) when (State#state.radius)#rad_accreq.login_time /= undefined ->
 	eradius_acc:acc_update(State#state.radius),
 	{noreply, State};
 
