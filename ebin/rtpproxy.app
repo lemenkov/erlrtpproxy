@@ -22,7 +22,7 @@
 						{'rtpproxy8@example.com', {192,168,1,2}, {min_port, 17000}, {max_port, 17900}}
 					]},
 				{syslog_address, {"localhost", 514}},
-				{sources, [call, media, player, rtcp, rtpproxy, ser]}
+				{sources, [call, media, player, rtcp, rtpproxy, ser, y]}
 			]},
 		{mod, {rtpproxy_app, []}}
 	    ]
