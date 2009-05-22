@@ -126,8 +126,8 @@ handle_call({?CMD_U, {StartPort, {GuessIp, GuessPort}, {FromTag, MediaId}, To, M
 						end
 					end,
 					NewParty = #party{	% TODO add Ip and Port only on demand
-								from	=#source{fd=Fd, tag=FromTag},
-%								from	=#source{fd=Fd, ip=GuessIp, port=GuessPort, tag=FromTag},
+%								from	=#source{fd=Fd, tag=FromTag},
+								from	=#source{fd=Fd, ip=GuessIp, port=GuessPort, tag=FromTag},
 								fromrtcp=#source{fd=SafeOpenFd (StartPort+1, [binary, {ip, State#state.ip}, {active, true}, {raw,1,11,<<1:32/native>>}])},
 								to	=#source{fd=SafeOpenFd (StartPort+2, [binary, {ip, State#state.ip}, {active, true}, {raw,1,11,<<1:32/native>>}])},
 								tortcp	=#source{fd=SafeOpenFd (StartPort+3, [binary, {ip, State#state.ip}, {active, true}, {raw,1,11,<<1:32/native>>}])},
