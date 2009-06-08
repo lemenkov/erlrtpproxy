@@ -434,5 +434,5 @@ date_time_fmt() ->
 	{{YYYY,MM,DD},{Hour,Min,Sec}} = erlang:localtime(),
 %	DayNumber = calendar:day_of_the_week({YYYY,MM,DD}),
 %	lists:flatten(io_lib:format("~s ~3s ~2.2.0w ~2.2.0w:~2.2.0w:~2.2.0w ~4.4.0w",[httpd_util:day(DayNumber),httpd_util:month(MM),DD,Hour,Min,Sec,YYYY])).
-	lists:flatten(io_lib:format("~4.4.0w-~2.2.0w-~2.2.0w ~2.2.0w:~2.2.0w:~2.2.0w", [YYYY, MM, DD, Hour,Min,Sec])).
+	lists:flatten(io_lib:format("~4.4.0w:~2.2.0w:~2.2.0w ~2.2.0w:~2.2.0w:~2.2.0w", [YYYY, MM, DD, Hour,Min,Sec])).
 
