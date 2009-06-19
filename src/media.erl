@@ -50,7 +50,7 @@ start_link(Args) ->
 init ({Parent, From, FromRtcp, To, ToRtcp}) ->
 	?INFO("started ~p ~p", [From, To]),
 	process_flag(trap_exit, true),
-	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE, ping),
+	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE*5, ping),
 	SafeMakeMedia = fun(Desc) ->
 		case Desc of
 			{F,I,P} -> #media{fd=F,ip=I,port=P,lastseen=now()};

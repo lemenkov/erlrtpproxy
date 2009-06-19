@@ -332,13 +332,6 @@ terminate(Reason, State) ->
 	% We'll notify rtpproxy about our termination
 	gen_server:cast({global, rtpproxy}, {call_terminated, {self(), {ports, Ports}, Reason}}),
 
-	case Reason of
-		timeout ->
-			gen_server:cast({global, hangupd}, {callid, State#state.callid});
-		_ ->
-			ok
-	end,
-
 	?ERR("terminated due to reason [~p]", [Reason]).
 
 % rtp from some port

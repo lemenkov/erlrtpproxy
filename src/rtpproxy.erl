@@ -62,9 +62,6 @@ init(_Unused) ->
 	{ok, Sources} = application:get_env(?MODULE, sources),
 	{ok, RadAcctServers} = application:get_env(?MODULE, radacct_servers),
 
-	{ok, HangupdNode} = application:get_env(?MODULE, hangupd_node),
-	net_adm:ping(HangupdNode),
-
 	error_logger:add_report_handler(erlsyslog, {0, SyslogHost, SyslogPort}),
 	error_logger:tty(false),
 %	erlang:system_monitor(self(), [{long_gc, 1000}, {large_heap, 1000000}, busy_port, busy_dist_port]),
@@ -359,17 +356,6 @@ handle_cast({message, Cmd}, State) when	Cmd#cmd.type == ?CMD_U ->
 handle_cast({message, Cmd}, State) ->
 	% Unknown command
 	gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_ERR_SOFTWARE}),
-	{noreply, State};
-
-% TODO
-handle_cast({hangup, {callid, CallID}}, State) ->
-	?WARN("Received message from hangupd (with callid ~s).", [CallID]),
-	case lists:keysearch(CallID, #thread.callid, State#state.calls) of
-		{value, CallInfo} ->
-			gen_server:cast(CallInfo#thread.pid, ?CMD_D);
-		NotFound ->
-			ok
-	end,
 	{noreply, State};
 
 handle_cast({call_terminated, {Pid, {ports, Ports}, Reason}}, State) when is_list(Ports) ->
