@@ -4,19 +4,17 @@
 
 Name:		erlrtpproxy
 Version:	0.1
-Release:	0.3.svn%{?dist}
+Release:	1%{?dist}
 Summary:	RTP proxying daemon
 Group:		Applications/Internet
 License:	GPLv3+
 URL:		http://code.google.com/p/erlrtpproxy/
-# svn co http://erlrtpproxy.googlecode.com/svn/trunk erlrtpproxy
-# tar cjf erlrtpproxy-0.1.tar.bz2 erlrtpproxy
-Source0:	%{name}-%{version}.tar.bz2
+Source0:	http://erlsyslog.googlecode.com/files/%{name}-%{version}.tar.bz2
 BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 BuildRequires:	erlang
-BuildRequires:	erlang-erlsyslog-devel
-BuildRequires:	erlang-eradius-devel
+BuildRequires:	erlang-erlsyslog
+BuildRequires:	erlang-eradius
 Requires:	erlang
 Requires:	erlang-erlsyslog
 Requires:	erlang-eradius
@@ -155,6 +153,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/erlang/lib/%{erlname}-%{version}/ebin/ser_sup.beam
 
 %changelog
+* Sun Jun 28 2009 Peter Lemenkov <lemenkov@gmail.com> 0.1-1
+- Ver. 0.1
+
 * Wed Mar 25 2009 Peter Lemenkov <lemenkov@gmail.com> 0.1-0.3.svn
 - Enabled necessary BuildRequires
 
