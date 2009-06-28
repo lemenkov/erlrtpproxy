@@ -3,8 +3,8 @@
 
 
 Name:		erlrtpproxy
-Version:	0.1
-Release:	0.3.svn%{?dist}
+Version:	0.2
+Release:	0.1.svn%{?dist}
 Summary:	RTP proxying daemon
 Group:		Applications/Internet
 License:	GPLv3+
@@ -155,6 +155,12 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/erlang/lib/%{erlname}-%{version}/ebin/ser_sup.beam
 
 %changelog
+* Sun Jun 28 2009 Peter Lemenkov <lemenkov@gmail.com> 0.2-0.1.svn
+- Nex svn ver.
+
+* Sun Jun 28 2009 Peter Lemenkov <lemenkov@gmail.com> 0.1-1
+- Ver. 0.1
+
 * Wed Mar 25 2009 Peter Lemenkov <lemenkov@gmail.com> 0.1-0.3.svn
 - Enabled necessary BuildRequires
 
