@@ -434,10 +434,14 @@ handle_cast(close_all, State) ->
 	{noreply, State};
 
 handle_cast(upgrade, State) ->
+	?WARN("UPGRADING beam-files on every node", []),
 	lists:foreach(fun(SourceFile) ->
 				compile:file(SourceFile, [verbose, report_errors, report_warnings]),
 				{Mod, Bin, File} = code:get_object_code(SourceFile),
-				rpc:multicall(code, load_binary, [Mod, File, Bin])
+				lists:foreach(fun({Node, _, _}) ->
+						?WARN("UPGRADING on node ~w beam-file '~w'", [Node, Mod]),
+						rpc:call(Node, code, load_binary, [Mod, File, Bin], 5000)
+						end, State#state.rtphosts ++ [{node(), unused, unused}])
 			end, State#state.sources),
 	{noreply, State};
 
@@ -502,17 +506,31 @@ find_host([{Node,Ip,Ports}|OtherNodes], Acc) ->
 	end.
 
 upgrade() ->
-	gen_server:cast({global, rtpproxy}, upgrade).
+	Status = case init:get_plain_arguments() of
+		[NodeStr] ->
+			Node = list_to_atom(NodeStr),
+			try rpc:call(Node, gen_server, cast, [{global, rtpproxy}, upgrade], 5000) of
+				{badrpc, Reason} ->
+					2;
+				_ ->
+					0
+			catch _:_ ->
+				2
+			end;
+		_ ->
+			1
+	end,
+	halt(Status).
 
 stop() ->
 	Status = case init:get_plain_arguments() of
 		[NodeStr] ->
 			Node = list_to_atom(NodeStr),
-			try rpc:call(Node, application, stop, [rtpproxy]) of
+			try rpc:call(Node, application, stop, [rtpproxy], 5000) of
 				{badrpc, Reason} ->
 					2;
 				_ ->
-					case rpc:call(Node, init, stop, []) of
+					case rpc:call(Node, init, stop, [], 5000) of
 						{badrpc, Reason} ->
 							2;
 						_ ->
@@ -530,11 +548,11 @@ status() ->
 	Status = case init:get_plain_arguments() of
 		[NodeStr] ->
 			Node = list_to_atom(NodeStr),
-			try rpc:call(Node, application, get_application, [rtpproxy]) of
+			try rpc:call(Node, application, get_application, [rtpproxy], 5000) of
 				{badrpc, Reason} ->
 					4;
 				{ok, rtpproxy} ->
-					rpc:call(Node, gen_server, cast, [{global,rtpproxy}, status]),
+					rpc:call(Node, gen_server, cast, [{global,rtpproxy}, status], 5000),
 					0;
 				undefined ->
 					3
