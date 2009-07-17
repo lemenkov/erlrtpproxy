@@ -32,7 +32,7 @@
 
 -include("../include/common.hrl").
 -include("config.hrl").
--include_lib("eradius/src/eradius_lib.hrl").
+-include_lib("eradius/include/eradius_lib.hrl").
 -include_lib("eradius/include/dictionary.hrl").
 -include_lib("eradius/include/dictionary_cisco.hrl").
 
