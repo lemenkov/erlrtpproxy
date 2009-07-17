@@ -74,7 +74,7 @@ force_reload() {
 }
 
 rh_status() {
-    /sbin/runuser -s /bin/bash - rtpproxy -c "erl -noinput $ERL_PARAMETERS -name status@$ERL_NODE  -setcookie $ERL_COOKIE  -s ser status -extra $prog@$ERL_NODE"
+    daemon --user rtpproxy "erl -noinput $ERL_PARAMETERS -name status@$ERL_NODE  -setcookie $ERL_COOKIE  -s ser status -extra $prog@$ERL_NODE"
     return $?
 }
 
@@ -85,15 +85,13 @@ rh_status_q() {
 
 case "$1" in
     start)
-        rh_status_q && exit 0
-        $1
+        start
         ;;
     stop)
-#        rh_status_q || exit 0
-        $1
+    	stop
         ;;
     restart)
-        $1
+        restart
         ;;
     reload)
         rh_status_q || exit 7

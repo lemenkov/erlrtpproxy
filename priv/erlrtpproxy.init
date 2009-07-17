@@ -43,50 +43,53 @@ fi
 lockfile=/var/lock/subsys/$prog
 
 start() {
-    echo -n $"Starting $prog: "
-    daemon --user rtpproxy \
-	"erl"  "$ERL_PARAMETERS \
+	echo -n $"Starting $prog: "
+	daemon --user rtpproxy \
+		"erl"  "$ERL_PARAMETERS \
 		-name $prog@$ERL_NODE \
 		-setcookie $ERL_COOKIE \
 		-config $CONFIG_FILE \
 		-mnesia dir \\\"/var/lib/rtpproxy/spool\\\" \
 		-detached \
 		-s rtpproxy_app"
-    retval=$?
-    echo
-    [ $retval -eq 0 ] && touch $lockfile
-    return $retval
+	retval=$?
+	echo
+	[ $retval -eq 0 ] && touch $lockfile
+	return $retval
 }
 
 stop() {
-    echo -n $"Stopping $prog: "
-    daemon --user rtpproxy "erl -noinput $ERL_PARAMETERS -name close@$ERL_NODE  -setcookie $ERL_COOKIE  -s rtpproxy stop -extra $prog@$ERL_NODE"
-    retval=$?
-    echo
-    [ $retval -eq 0 ] && rm -f $lockfile
-    return $retval
+	echo -n $"Stopping $prog: "
+	daemon --user rtpproxy "erl -noinput $ERL_PARAMETERS -name close@$ERL_NODE  -setcookie $ERL_COOKIE  -s rtpproxy stop -extra $prog@$ERL_NODE"
+	retval=$?
+	echo
+	[ $retval -eq 0 ] && rm -f $lockfile
+	return $retval
 }
 
 restart() {
-    stop
-    start
+	stop
+	start
 }
 
 reload() {
-    restart
+	echo -n $"Reloading beam-files for $prog: "
+	daemon --user rtpproxy "erl -noinput $ERL_PARAMETERS -name reload@$ERL_NODE  -setcookie $ERL_COOKIE  -s rtpproxy upgrade -extra $prog@$ERL_NODE"
+	retval=$?
+	return $retval
 }
 
 force_reload() {
-    restart
+	restart
 }
 
 rh_status() {
-    /sbin/runuser -s /bin/bash - rtpproxy -c "erl -noinput $ERL_PARAMETERS -name status@$ERL_NODE  -setcookie $ERL_COOKIE  -s rtpproxy status -extra $prog@$ERL_NODE"
-    return $?
+	daemon --user rtpproxy "erl -noinput $ERL_PARAMETERS -name status@$ERL_NODE  -setcookie $ERL_COOKIE  -s rtpproxy status -extra $prog@$ERL_NODE"
+	return $?
 }
 
 rh_status_q() {
-    rh_status >/dev/null 2>&1
+	rh_status >/dev/null 2>&1
 }
 
 
@@ -103,7 +106,7 @@ case "$1" in
         $1
         ;;
     reload)
-        rh_status_q || exit 7
+        reload
         $1
         ;;
     force-reload)
