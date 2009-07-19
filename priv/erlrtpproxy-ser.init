@@ -74,8 +74,10 @@ force_reload() {
 }
 
 rh_status() {
-    daemon --user rtpproxy "erl -noinput $ERL_PARAMETERS -name status@$ERL_NODE  -setcookie $ERL_COOKIE  -s ser status -extra $prog@$ERL_NODE"
-    return $?
+	echo -n $"Getting $prog status (see in syslog): "
+	daemon --user rtpproxy "erl -noinput $ERL_PARAMETERS -name status@$ERL_NODE  -setcookie $ERL_COOKIE  -s ser status -extra $prog@$ERL_NODE"
+	echo
+	return $?
 }
 
 rh_status_q() {
