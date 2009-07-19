@@ -4,14 +4,12 @@
 
 Name:		erlrtpproxy
 Version:	0.2
-Release:	0.1.svn%{?dist}
+Release:	1%{?dist}
 Summary:	RTP proxying daemon
 Group:		Applications/Internet
 License:	GPLv3+
 URL:		http://code.google.com/p/erlrtpproxy/
-# svn co http://erlrtpproxy.googlecode.com/svn/trunk erlrtpproxy
-# tar cjf erlrtpproxy-0.1.tar.bz2 erlrtpproxy
-Source0:	%{name}-%{version}.tar.bz2
+Source0:	http://erlrtpproxy.googlecode.com/files/%{name}-%{version}.tar.bz2
 BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 BuildRequires:	erlang
@@ -155,6 +153,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/erlang/lib/%{erlname}-%{version}/ebin/ser_sup.beam
 
 %changelog
+* Sun Jul 19 2009 Peter Lemenkov <lemenkov@gmail.com> 0.2-1
+- Ver. 0.2
+
 * Sun Jun 28 2009 Peter Lemenkov <lemenkov@gmail.com> 0.2-0.1.svn
 - Nex svn ver.
 
