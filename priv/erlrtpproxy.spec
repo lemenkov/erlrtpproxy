@@ -15,8 +15,8 @@ Source0:	%{name}-%{version}.tar.bz2
 BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 BuildRequires:	erlang
-BuildRequires:	erlang-erlsyslog-devel
-BuildRequires:	erlang-eradius-devel
+BuildRequires:	erlang-erlsyslog
+BuildRequires:	erlang-eradius
 Requires:	erlang
 Requires:	erlang-erlsyslog
 Requires:	erlang-eradius
