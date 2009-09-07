@@ -92,13 +92,9 @@ handle_call(_Message, _From , State) ->
 
 handle_cast({message, Cmd}, State) when Cmd#cmd.type == ?CMD_V ->
 	% Request basic supported rtpproxy protocol version
-%	{ "20040107", "Basic RTP proxy functionality" },
-%	{ "20050322", "Support for multiple RTP streams and MOH" },
-%	{ "20060704", "Support for extra parameter in the V command" },
-%	{ "20071116", "Support for RTP re-packetization" },
-%	{ "20071218", "Support for forking (copying) RTP stream" },
-%	{ "20080403", "Support for RTP statistics querying" },
-%	{ "20081102", "Support for setting codecs in the update/lookup commend" },
+	% see available versions here:
+	% http://cvs.berlios.de/cgi-bin/viewcvs.cgi/ser/rtpproxy/rtpp_command.c?view=markup
+	% We, curently, providing only basic functional;ity
 	gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, "20040107"}),
 	{noreply, State};
 
