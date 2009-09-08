@@ -73,7 +73,9 @@ decode(Data) ->
 						#rr{ssrc=SSRC, rblocks=(y:y(DecodeRblocks))({ReportBlocks, RC, []})};
 					?RTCP_SDES ->
 						DecodeSdesItems = fun (F5) ->
-							fun	({<<?SDES_CNAME:8, L:8, 16#DE:8, 16#AD:8, V:L/binary, Tail/binary>>, Items}) ->
+							fun	({<<>>, Items}) ->
+									{Items, <<>>};
+								({<<?SDES_CNAME:8, L:8, 16#DE:8, 16#AD:8, V:L/binary, Tail/binary>>, Items}) ->
 									error_logger:warning_msg("SDES_CNAME, padding from AddPac (0xDE, 0xAD)~n", []),
 									F5({Tail, Items#sdes_items{cname=binary_to_list(V)}});
 								({<<?SDES_CNAME:8, L:8, 16#79:8, 16#00:8, V:L/binary, Tail/binary>>, Items}) ->
@@ -116,7 +118,7 @@ decode(Data) ->
 							end
 						end,
 						(y:y(fun (F) ->
-							fun	({<<>>, 0, Result}) -> #sdes{list=Result};
+							fun	({<<>>, _, Result}) -> #sdes{list=Result};
 								({Padding, 0, Result}) ->
 									error_logger:warning_msg("SDES padding [~p]~n", [Padding]),
 									#sdes{list=Result};
