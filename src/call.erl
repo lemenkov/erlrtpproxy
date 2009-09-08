@@ -341,13 +341,16 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 		fun	({[], _X}) ->
 				false;
 			({[Elem|Rest], X}) ->
-				case X of
-					(Elem#party.from)#source.fd ->
+				case (Elem#party.from)#source.fd of
+					X ->
 						{value, from, Elem};
-					(Elem#party.to)#source.fd ->
-						{value, to, Elem};
 					_ ->
-						F({Rest, X})
+						case (Elem#party.to)#source.fd of
+							X ->
+								{value, to, Elem};
+							_ ->
+								F({Rest, X})
+						end
 				end
 		end
 	end,
