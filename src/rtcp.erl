@@ -79,6 +79,18 @@ decode(Data) ->
 								({<<?SDES_CNAME:8, L:8, 16#79:8, 16#00:8, V:L/binary, Tail/binary>>, Items}) ->
 									error_logger:warning_msg("SDES_CNAME, padding from AddPac (0x79, 0x00)~n", []),
 									F5({Tail, Items#sdes_items{cname=binary_to_list(V)}});
+								({<<?SDES_CNAME:8, L:8, 16#00:8, 16#00:8, V:L/binary, Tail/binary>>, Items}) ->
+									error_logger:warning_msg("SDES_CNAME, padding from AddPac (0x00, 0x00)~n", []),
+									F5({Tail, Items#sdes_items{cname=binary_to_list(V)}});
+								({<<?SDES_CNAME:8, L:8, 16#00:8, 16#07:8, V:L/binary, Tail/binary>>, Items}) ->
+									error_logger:warning_msg("SDES_CNAME, padding from AddPac (0x00, 0x07)~n", []),
+									F5({Tail, Items#sdes_items{cname=binary_to_list(V)}});
+								({<<?SDES_CNAME:8, L:8, 16#00:8, 16#05:8, V:L/binary, Tail/binary>>, Items}) ->
+									error_logger:warning_msg("SDES_CNAME, padding from AddPac (0x00, 0x05)~n", []),
+									F5({Tail, Items#sdes_items{cname=binary_to_list(V)}});
+								({<<?SDES_CNAME:8, L:8, 16#00:8, 16#0D:8, V:L/binary, Tail/binary>>, Items}) ->
+									error_logger:warning_msg("SDES_CNAME, padding from AddPac (0x00, 0x0D)~n", []),
+									F5({Tail, Items#sdes_items{cname=binary_to_list(V)}});
 								({<<?SDES_CNAME:8, L:8, V:L/binary, Tail/binary>>, Items}) ->
 									F5({Tail, Items#sdes_items{cname=binary_to_list(V)}});
 								({<<?SDES_NAME:8, L:8, V:L/binary, Tail/binary>>, Items}) ->
