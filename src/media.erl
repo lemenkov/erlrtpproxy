@@ -136,9 +136,8 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#m
 		E:C ->
 			{H,M,Ms} = now(),
 			% later we may try to decode these rtcp packets and to fix decoding errors:
-			% lists:map(fun(X) -> {ok, Rtcp} = file:read_file(X), rtcp:decode(Rtcp) end, filelib:wildcard("./tmp/rtcp_err.*.bin")).
+			% lists:map(fun(X) -> io:format("FILE: ~p~n", [X]), {ok, Rtcp} = file:read_file(X), rtcp:decode(Rtcp) end, filelib:wildcard("/tmp/rtcp_err.*.bin")).
 			file:write_file("/tmp/rtcp_err." ++ atom_to_list(node()) ++ "." ++ integer_to_list(H) ++ "_" ++ integer_to_list(M) ++ "_" ++ integer_to_list(Ms) ++ ".bin", Msg),
-%			file:write_file(["/tmp/rtcp_err."|[atom_to_list(node())|["."|[integer_to_list(H)|["_"|[integer_to_list(M)|["_"|[integer_to_list(Ms)|".bin"]]]]]]]], Msg),
 			[]
 	end,
 %	?INFO("RTCP: ~p", [Rtcps]),
