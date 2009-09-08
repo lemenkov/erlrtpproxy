@@ -31,7 +31,8 @@ encode(Packets) ->
 decode(Data) ->
 	DecodeRtcp = fun(F1) ->
 		fun	({<<>>, Rtcp}) -> Rtcp;
-			({<<Ver:2, PaddingFlag:1, RC:5, PacketType:8, Length:16, Tail1/binary>>, OldRtcp}) ->
+			% Version is always 2
+			({<<?RTCP_VERSION:2, PaddingFlag:1, RC:5, PacketType:8, Length:16, Tail1/binary>>, OldRtcp}) ->
 				Length1 = Length*4,
 				<<Payload:Length1/binary, Next/binary>> = Tail1,
 				Rtcp = case PacketType of

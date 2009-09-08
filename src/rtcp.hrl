@@ -1,3 +1,5 @@
+-define(RTCP_VERSION, 2).
+
 -define(RTCP_SR,   200).
 -define(RTCP_RR,   201).
 -define(RTCP_SDES, 202).
