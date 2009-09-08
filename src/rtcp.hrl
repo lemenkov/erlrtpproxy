@@ -1,10 +1,16 @@
 -define(RTCP_VERSION, 2).
 
--define(RTCP_SR,   200).
--define(RTCP_RR,   201).
--define(RTCP_SDES, 202).
--define(RTCP_BYE,  203).
--define(RTCP_APP,  204).
+-define(RTCP_FIR,  192). % RFC 2032
+-define(RTCP_NACK, 193). % RFC 2032
+-define(RTCP_SR,   200). % RFC 3550
+-define(RTCP_RR,   201). % RFC 3550
+-define(RTCP_SDES, 202). % RFC 3550
+-define(RTCP_BYE,  203). % RFC 3550
+-define(RTCP_APP,  204). % RFC 3550
+-define(RTCP_RTPFB,205). % RFC 4585
+-define(RTCP_PSFB, 206). % RFC 4585
+-define(RTCP_XR,   207). % RFC 3611
+
 
 -define(SDES_NULL,  0).
 -define(SDES_CNAME, 1).
