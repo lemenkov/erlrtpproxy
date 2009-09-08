@@ -17,6 +17,9 @@
 %%%
 %%%----------------------------------------------------------------------
 
+% see this RFC for further details:
+% http://www.ietf.org/rfc/rfc3550.txt
+
 -module(rtcp).
 -author('lemenkov@gmail.com').
 
@@ -26,6 +29,7 @@
 -include("rtcp.hrl").
 
 encode(Packets) ->
+	% TODO
 	ok.
 
 decode(Data) ->
