@@ -45,7 +45,7 @@ An OpenSER-compatible interface for %{name}.
 
 
 %prep
-%setup -q -n %{name}
+%setup -q
 
 
 %build
