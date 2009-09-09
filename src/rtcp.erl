@@ -43,7 +43,7 @@ decode(Data) ->
 					?RTCP_SR ->
 						<<SSRC:32, NTPSec:32, NTPFrac:32, TimeStamp:32, Packets:32, Octets:32, ReportBlocks/binary>> = Payload,
 						DecodeRblocks = fun(F) ->
-							fun	({<<>>, _, Result}) -> Result; 
+							fun	({<<>>, _, Result}) -> Result;
 								({Padding, 0, Result}) ->
 									error_logger:warning_msg("SR padding [~p]~n", [Padding]),
 									Result;
