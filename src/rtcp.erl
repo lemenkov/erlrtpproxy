@@ -76,7 +76,6 @@ decode(Data) ->
 					?RTCP_SDES ->
 						% There may be RC number of chunks (we call them Chunks), containing of their own SSRC 32-bit identificator
 						% and arbitrary number of SDES-items.
-						io:format("PaddingFlag ~p, RC ~p, PacketType ~p, Length ~p~n", [PaddingFlag, RC, PacketType, Length1]),
 
 						% Recursively process each chunk and return list of SDES-items
 						DecodeSdesItems = fun (F5) ->
