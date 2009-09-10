@@ -28,5 +28,5 @@
 -record(bye, {message=[], params}).
 
 -record(rblock, {ssrc, fraction, lost, last_seq, jitter, lsr, dlsr}).
--record(sdes_items, {ssrc, cname, name=null, email=null, phone=null, loc=null, tool=null, note=null, priv=null}).
+-record(sdes_items, {ssrc, cname, name=null, email=null, phone=null, loc=null, tool=null, note=null, priv=null, eof=false}).
 

@@ -26,6 +26,8 @@
 -export([encode/1]).
 -export([decode/1]).
 
+-export([version/0]).
+
 -include("rtcp.hrl").
 
 encode(Packets) ->
@@ -72,28 +74,17 @@ decode(Data) ->
 						end,
 						#rr{ssrc=SSRC, rblocks=(y:y(DecodeRblocks))({ReportBlocks, RC, []})};
 					?RTCP_SDES ->
+						% There may be RC number of chunks (we call them Chunks), containing of their own SSRC 32-bit identificator
+						% and arbitrary number of SDES-items.
+						io:format("PaddingFlag ~p, RC ~p, PacketType ~p, Length ~p~n", [PaddingFlag, RC, PacketType, Length1]),
+
+						% Recursively process each chunk and return list of SDES-items
 						DecodeSdesItems = fun (F5) ->
-							fun	({<<>>, Items}) ->
-									{Items, <<>>};
-								({<<?SDES_CNAME:8, L:8, 16#DE:8, 16#AD:8, V:L/binary, Tail/binary>>, Items}) ->
-									error_logger:warning_msg("SDES_CNAME, padding from AddPac (0xDE, 0xAD)~n", []),
-									F5({Tail, Items#sdes_items{cname=binary_to_list(V)}});
-								({<<?SDES_CNAME:8, L:8, 16#79:8, 16#00:8, V:L/binary, Tail/binary>>, Items}) ->
-									error_logger:warning_msg("SDES_CNAME, padding from AddPac (0x79, 0x00)~n", []),
-									F5({Tail, Items#sdes_items{cname=binary_to_list(V)}});
-								({<<?SDES_CNAME:8, L:8, 16#00:8, 16#00:8, V:L/binary, Tail/binary>>, Items}) ->
-									error_logger:warning_msg("SDES_CNAME, padding from AddPac (0x00, 0x00)~n", []),
-									F5({Tail, Items#sdes_items{cname=binary_to_list(V)}});
-								({<<?SDES_CNAME:8, L:8, 16#00:8, 16#07:8, V:L/binary, Tail/binary>>, Items}) ->
-									error_logger:warning_msg("SDES_CNAME, padding from AddPac (0x00, 0x07)~n", []),
-									F5({Tail, Items#sdes_items{cname=binary_to_list(V)}});
-								({<<?SDES_CNAME:8, L:8, 16#00:8, 16#05:8, V:L/binary, Tail/binary>>, Items}) ->
-									error_logger:warning_msg("SDES_CNAME, padding from AddPac (0x00, 0x05)~n", []),
-									F5({Tail, Items#sdes_items{cname=binary_to_list(V)}});
-								({<<?SDES_CNAME:8, L:8, 16#00:8, 16#0D:8, V:L/binary, Tail/binary>>, Items}) ->
-									error_logger:warning_msg("SDES_CNAME, padding from AddPac (0x00, 0x0D)~n", []),
-									F5({Tail, Items#sdes_items{cname=binary_to_list(V)}});
-								({<<?SDES_CNAME:8, L:8, V:L/binary, Tail/binary>>, Items}) ->
+								% All items are ItemID:8_bit, Lenght:8_bit, ItemData:Length_bit
+							fun	({<<?SDES_CNAME:8, L:8, V:L/binary, Tail/binary>>, Items}) ->
+									% AddPac sends us wrongly produced CNAME item (with 2-byte arbitrary padding inserted):
+									% <<?SDES_CNAME:8, 19:8, ArbitraryPadding:16, "AddPac VoIP Gateway":(19*8)/binary>>
+									% I don't think that we need to fix it.
 									F5({Tail, Items#sdes_items{cname=binary_to_list(V)}});
 								({<<?SDES_NAME:8, L:8, V:L/binary, Tail/binary>>, Items}) ->
 									F5({Tail, Items#sdes_items{name=binary_to_list(V)}});
@@ -110,21 +101,47 @@ decode(Data) ->
 								({<<?SDES_PRIV:8, L:8, V:L/binary, Tail/binary>>, Items}) ->
 									F5({Tail, Items#sdes_items{priv=V}});
 								({<<?SDES_NULL:8, Tail/binary>>, Items}) ->
+									% This is NULL terminator
+									% LEt's calculate how many bits we need to skip (padding up to 32-bit boundaries)
 									R = 8*(size(Tail) rem 4),
-									<<_:R, NextSDESItems/binary>> = Tail,
-									{Items, NextSDESItems};
+									<<_PaddingBits:R, Rest/binary>> = Tail,
+									% mark this SDES chunk as null-terminated properly and return
+									{Items#sdes_items{eof=true}, Rest};
 								({<<_:8, L:8, _:L/binary, Tail/binary>>, Items}) ->
-									F5({Tail, Items})
+									% unknown SDES item - skip it and proceed to the next one
+									F5({Tail, Items});
+								({Rest, Items}) ->
+									% possibly, next SDES chunk - just stop and return what was already decoded
+									{Items, Rest}
 							end
 						end,
+
+						% Recursively process package for SSRC+SDES chunks
 						(y:y(fun (F) ->
-							fun	({<<>>, _, Result}) -> #sdes{list=Result};
+							fun
+								% Disregard SDES items count (SC) if no data remaining
+								% simply construct #sdes{} from the  resulting list of SDES-items (Result)
+								% and return
+								({<<>>, _SC, Result}) ->
+									#sdes{list=Result};
+
+								% SDES may contain padding (should be noted by PaddingFlag)
+								% Likewise.
 								({Padding, 0, Result}) ->
 									error_logger:warning_msg("SDES padding [~p]~n", [Padding]),
 									#sdes{list=Result};
-								({<<SSRC1:32, SDESItems/binary>>, SC, Result}) when SC>0 ->
-									{Items, Rest} = (y:y(DecodeSdesItems))({SDESItems, #sdes_items{ssrc=SSRC1}}),
-									F({Rest, SC-1, Result ++ [Items]})
+
+								% Each SDES-item followed by their own SSRC value (they are not necessary the same)
+								% and the arbitrary raw data
+								({<<SSRC1:32, RawData/binary>>, SC, Result}) when SC>0 ->
+									{Items, RawDataRest} = (y:y(DecodeSdesItems))({RawData, #sdes_items{ssrc=SSRC1}}),
+
+									% We processing next possible SDES chunk
+									% - We decrease SDES count (SC) by one, since we already proccesses one SDES chunk
+									% - We added previously decoded and packed into #sdes{} SDES-items to the list of 
+									%   already processed SDES chunks
+									F({RawDataRest, SC-1, Result ++ [Items]})
+
 							end
 						end))({Payload, RC, []});
 					?RTCP_BYE ->
@@ -148,3 +165,5 @@ decode(Data) ->
 	end,
 	(y:y(DecodeRtcp))({Data, []}).
 
+version() ->
+	io:format("version 0.1.2~n").
