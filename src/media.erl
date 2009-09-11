@@ -138,9 +138,9 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#m
 			% later we may try to decode these rtcp packets and to fix decoding errors:
 			% lists:map(fun(X) -> io:format("FILE: ~p~n", [X]), {ok, Rtcp} = file:read_file(X), rtcp:decode(Rtcp) end, filelib:wildcard("/tmp/rtcp_err.*.bin")).
 			file:write_file("/tmp/rtcp_err." ++ atom_to_list(node()) ++ "." ++ integer_to_list(H) ++ "_" ++ integer_to_list(M) ++ "_" ++ integer_to_list(Ms) ++ ".bin", Msg),
+			?ERR("rtcp:decode(...) error ~p:~p", [E,C]),
 			[]
 	end,
-%	?INFO("RTCP: ~p", [Rtcps]),
 
 	if
 		Fd == (State#state.fromrtcp)#media.fd ->
@@ -165,21 +165,6 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#m
 %			{noreply, State#state{fromrtcp=(State#state.fromrtcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
 	end;
 
-handle_info({udp, Fd, Ip, Port, Msg}, State) when State#state.started == null ->
-	{F, T} = if
-		Fd == (State#state.from)#media.fd ->
-			{State#state.from, (State#state.to)#media{ip=Ip, port=Port, rtpstate=rtp}};
-		Fd == (State#state.to)#media.fd ->
-			{(State#state.from)#media{ip=Ip, port=Port, rtpstate=rtp}, State#state.to}
-	end,
-
-	case {(State#state.from)#media.rtpstate, (State#state.to)#media.rtpstate} of
-		{rtp, rtp} ->
-			{noreply, State#state{from=F, to=T, started=now()}};
-		_ ->
-			{noreply, State#state{from=F, to=T}}
-	end;
-
 handle_info({udp, Fd, Ip, Port, Msg}, State) when (State#state.from)#media.rtpstate == nortp; (State#state.to)#media.rtpstate == nortp ->
 	% TODO check that message was arrived from valid {Ip, Port}
 	{From, To, F, I, P} = if
@@ -196,6 +181,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when (State#state.from)#media.rtpst
 				(State#state.to)#media.ip,
 				(State#state.to)#media.port}
 	end,
+
 	case State#state.holdstate of
 		true ->
 			% do nothing
@@ -228,9 +214,16 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 				(State#state.to)#media.ip,
 				(State#state.to)#media.port}
 	end,
+
 	% TODO check whether message is valid rtp stream
 	gen_udp:send(F, I, P, Msg),
-	{noreply, State};
+
+	case {State#state.started, (State#state.from)#media.rtpstate, (State#state.to)#media.rtpstate} of
+		{null, rtp, rtp} ->
+			{noreply, State#state{ started=now()}};
+		_ ->
+			{noreply, State}
+	end;
 
 handle_info(ping, State) ->
 	case {(State#state.from)#media.rtpstate, (State#state.to)#media.rtpstate} of
