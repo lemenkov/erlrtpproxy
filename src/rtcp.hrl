@@ -1,3 +1,4 @@
+% Version is always 2
 -define(RTCP_VERSION, 2).
 
 -define(RTCP_FIR,  192). % RFC 2032
@@ -10,7 +11,6 @@
 -define(RTCP_RTPFB,205). % RFC 4585
 -define(RTCP_PSFB, 206). % RFC 4585
 -define(RTCP_XR,   207). % RFC 3611
-
 
 -define(SDES_NULL,  0).
 -define(SDES_CNAME, 1).
@@ -25,7 +25,7 @@
 -record(sr, {ssrc, ntp, timestamp, packets, octets, rblocks}).
 -record(rr, {ssrc, rblocks}).
 -record(sdes, {list}).
--record(bye, {message=[], params}).
+-record(bye, {message=[], ssrc=[]}).
 
 -record(rblock, {ssrc, fraction, lost, last_seq, jitter, lsr, dlsr}).
 -record(sdes_items, {ssrc, cname, name=null, email=null, phone=null, loc=null, tool=null, note=null, priv=null, eof=false}).
