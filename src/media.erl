@@ -137,7 +137,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#m
 	SafeSendAndUpdate = fun(Var1, Var2) ->
 		if
 			Var2#media.ip == null; Var2#media.port == null ->
-%				?WARN("Probably RTCP to ~p from Ip[~p] Port[~p] but we CANNOT send", [Fd, Ip, Port]),
+				% Probably RTCP, but we CANNOT send yet.
 				ok;
 			true ->
 				% From the Var2 point of view, it looks like Var1 sends him RTCP from his socket
@@ -163,21 +163,6 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#m
 			{noreply, State#state{fromrtcp=SafeSendAndUpdate(State#state.fromrtcp, State#state.tortcp)}}
 	end;
 
-handle_info({udp, Fd, Ip, Port, Msg}, State) when State#state.started == null ->
-	{F, T} = if
-		Fd == (State#state.from)#media.fd ->
-			{State#state.from, (State#state.to)#media{ip=Ip, port=Port, rtpstate=rtp}};
-		Fd == (State#state.to)#media.fd ->
-			{(State#state.from)#media{ip=Ip, port=Port, rtpstate=rtp}, State#state.to}
-	end,
-
-	case {(State#state.from)#media.rtpstate, (State#state.to)#media.rtpstate} of
-		{rtp, rtp} ->
-			{noreply, State#state{from=F, to=T, started=now()}};
-		_ ->
-			{noreply, State#state{from=F, to=T}}
-	end;
-
 % We received UDP-data on From or To socket, so we must send in from To or From socket respectively
 % (if we not in HOLD state)
 % (symmetric NAT from the client's PoV)
@@ -189,12 +174,12 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 	{From, To, F, I, P} = if
 		Fd == (State#state.from)#media.fd ->
 			{	State#state.from,
-				(State#state.to)#media{rtpstate=rtp},
+				(State#state.to)#media{ip=Ip, port=Port, rtpstate=rtp},
 				(State#state.to)#media.fd,
 				(State#state.from)#media.ip,
 				(State#state.from)#media.port};
 		Fd == (State#state.to)#media.fd ->
-			{	(State#state.from)#media{rtpstate=rtp},
+			{	(State#state.from)#media{ip=Ip, port=Port, rtpstate=rtp},
 				State#state.to,
 				(State#state.from)#media.fd,
 				(State#state.to)#media.ip,
@@ -207,10 +192,21 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 			ok;
 		false ->
 			% TODO check whether message is valid rtp stream
-			gen_udp:send(F, I, P, Msg)
+			if
+				I == null; P == null ->
+					% Probably RTP, but we CANNOT send yet.
+					ok;
+				true ->
+					gen_udp:send(F, I, P, Msg)
+			end
 	end,
 
-	{noreply, State#state{from=From, to=To}};
+	case {State#state.started, (State#state.from)#media.rtpstate, (State#state.to)#media.rtpstate} of
+		{null, rtp, rtp} ->
+			{noreply, State#state{from=From, to=To, started=now()}};
+		_ ->
+			{noreply, State#state{from=From, to=To}}
+	end;
 
 handle_info(ping, State) ->
 	case {(State#state.from)#media.rtpstate, (State#state.to)#media.rtpstate} of
