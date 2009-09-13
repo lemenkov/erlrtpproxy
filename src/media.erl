@@ -140,6 +140,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#m
 %				?WARN("Probably RTCP to ~p from Ip[~p] Port[~p] but we CANNOT send", [Fd, Ip, Port]),
 				ok;
 			true ->
+				% From the Var2 point of view, it looks like Var1 sends him RTCP from his socket
 				gen_udp:send(Var1#media.fd, Var2#media.ip, Var2#media.port, Msg)
 		end,
 		case lists:keymember(bye, 1, Rtcps) of
