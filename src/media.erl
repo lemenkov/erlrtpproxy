@@ -178,7 +178,13 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when State#state.started == null ->
 			{noreply, State#state{from=F, to=T}}
 	end;
 
-handle_info({udp, Fd, Ip, Port, Msg}, State) when (State#state.from)#media.rtpstate == nortp; (State#state.to)#media.rtpstate == nortp ->
+% We received UDP-data on From or To socket, so we must send in from To or From socket respectively
+% (if we not in HOLD state)
+% (symmetric NAT from the client's PoV)
+% We must ignore previous state ('rtp' or 'nortp') and set it to 'rtp'
+% We use Ip and Port as address for future messages to FdTo or FdFrom
+handle_info({udp, Fd, Ip, Port, Msg}, State) ->
+%handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.from)#media.fd; Fd == (State#state.to)#media.fd ->
 	% TODO check that message was arrived from valid {Ip, Port}
 	{From, To, F, I, P} = if
 		Fd == (State#state.from)#media.fd ->
@@ -194,6 +200,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when (State#state.from)#media.rtpst
 				(State#state.to)#media.ip,
 				(State#state.to)#media.port}
 	end,
+
 	case State#state.holdstate of
 		true ->
 			% do nothing
@@ -204,31 +211,6 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when (State#state.from)#media.rtpst
 	end,
 
 	{noreply, State#state{from=From, to=To}};
-
-handle_info({udp, Fd, Ip, Port, Msg}, State) when State#state.holdstate == true ->
-	{noreply, State};
-
-% We received UDP-data on From or To socket, so we must send in from To or From socket respectively
-% (if we not in HOLD state)
-% (symmetric NAT from the client's PoV)
-% We must ignore previous state ('rtp' or 'nortp') and set it to 'rtp'
-% We use Ip and Port as address for future messages to FdTo or FdFrom
-handle_info({udp, Fd, Ip, Port, Msg}, State) ->
-%handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.from)#media.fd; Fd == (State#state.to)#media.fd ->
-	% TODO check that message was arrived from valid {Ip, Port}
-	{F, I, P} = if
-		Fd == (State#state.from)#media.fd ->
-			{	(State#state.to)#media.fd,
-				(State#state.from)#media.ip,
-				(State#state.from)#media.port};
-		Fd == (State#state.to)#media.fd ->
-			{	(State#state.from)#media.fd,
-				(State#state.to)#media.ip,
-				(State#state.to)#media.port}
-	end,
-	% TODO check whether message is valid rtp stream
-	gen_udp:send(F, I, P, Msg),
-	{noreply, State};
 
 handle_info(ping, State) ->
 	case {(State#state.from)#media.rtpstate, (State#state.to)#media.rtpstate} of
