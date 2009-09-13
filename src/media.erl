@@ -119,7 +119,6 @@ terminate(Reason, State) ->
 	?ERR("terminated due to reason [~p]", [Reason]).
 
 handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#media.fd; Fd == (State#state.tortcp)#media.fd ->
-
 	% First, we'll try do decode our RCP packet(s)
 	Rtcps = try
 		rtcp:decode(Msg)
@@ -133,38 +132,34 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#m
 			[]
 	end,
 
-	SafeSendRtcp = fun(F,I,P,M) ->
+	% Var1 - source of rtcp
+	% Var2 - dest of rtcp
+	SafeSendAndUpdate = fun(Var1, Var2) ->
 		if
-			I == null; P == null ->
+			Var2#media.ip == null; Var2#media.port == null ->
 %				?WARN("Probably RTCP to ~p from Ip[~p] Port[~p] but we CANNOT send", [Fd, Ip, Port]),
 				ok;
 			true ->
-%				?INFO("Probably RTCP to ~p from Ip[~p] Port[~p]", [Fd, Ip, Port]),
-				gen_udp:send(F, I, P, Msg)
+				gen_udp:send(Var1#media.fd, Var2#media.ip, Var2#media.port, Msg)
+		end,
+		case lists:keymember(bye, 1, Rtcps) of
+			true ->
+				?ERR("We SHOULD terminate this stream due to RTCP BYE", []),
+				% Unfortunately, it's not possible due to issues in Asterisk configs
+				% which users unwilling to fix. So we just warn about it.
+				% Maybe, in the future, we'll reconsider this behaviour.
+%				{stop, rtcp_bye, State};
+				Var1#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()};
+			_ ->
+				Var1#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}
 		end
 	end,
 
 	if
 		Fd == (State#state.fromrtcp)#media.fd ->
-			SafeSendRtcp((State#state.to)#media.fd, (State#state.fromrtcp)#media.ip, (State#state.fromrtcp)#media.port, Msg),
-			case lists:keymember(bye, 1, Rtcps) of
-				true ->
-					?ERR("We SHOULD terminate this stream due to RTCP BYE", []),
-					{noreply, State#state{tortcp=(State#state.tortcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}};
-%					{stop, rtcp_bye, State};
-				_ -> {noreply, State#state{tortcp=(State#state.tortcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
-			end;
-%			{noreply, State#state{tortcp=(State#state.tortcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}};
+			{noreply, State#state{tortcp=SafeSendAndUpdate(State#state.tortcp, State#state.fromrtcp)}};
 		Fd == (State#state.tortcp)#media.fd ->
-			SafeSendRtcp((State#state.from)#media.fd, (State#state.tortcp)#media.ip, (State#state.tortcp)#media.port, Msg),
-			case lists:keymember(bye, 1, Rtcps) of
-				true ->
-					?ERR("We SHOULD terminate this stream due to RTCP BYE", []),
-					{noreply, State#state{tortcp=(State#state.tortcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}};
-%					{stop, rtcp_bye, State};
-				_ -> {noreply, State#state{fromrtcp=(State#state.fromrtcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
-			end
-%			{noreply, State#state{fromrtcp=(State#state.fromrtcp)#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}}}
+			{noreply, State#state{fromrtcp=SafeSendAndUpdate(State#state.fromrtcp, State#state.tortcp)}}
 	end;
 
 handle_info({udp, Fd, Ip, Port, Msg}, State) when State#state.started == null ->
