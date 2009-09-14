@@ -168,44 +168,41 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#m
 % (symmetric NAT from the client's PoV)
 % We must ignore previous state ('rtp' or 'nortp') and set it to 'rtp'
 % We use Ip and Port as address for future messages to FdTo or FdFrom
+
+% TODO check that message was arrived from valid {Ip, Port}
+% TODO check whether message is valid rtp stream
 handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 %handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.from)#media.fd; Fd == (State#state.to)#media.fd ->
-	% TODO check that message was arrived from valid {Ip, Port}
-	{From, To, F, I, P} = if
-		Fd == (State#state.from)#media.fd ->
-			{	State#state.from,
-				(State#state.to)#media{ip=Ip, port=Port, rtpstate=rtp},
-				(State#state.to)#media.fd,
-				(State#state.from)#media.ip,
-				(State#state.from)#media.port};
-		Fd == (State#state.to)#media.fd ->
-			{	(State#state.from)#media{ip=Ip, port=Port, rtpstate=rtp},
-				State#state.to,
-				(State#state.from)#media.fd,
-				(State#state.to)#media.ip,
-				(State#state.to)#media.port}
+	SafeSendAndUpdate = fun(Var1, Var2) ->
+		case State#state.holdstate of
+			true ->
+				% do nothing
+				ok;
+			false ->
+				if
+					Var2#media.ip == null; Var2#media.port == null ->
+						% Probably RTP, but we CANNOT send yet.
+						ok;
+					true ->
+						gen_udp:send(Var1#media.fd, Var2#media.ip, Var2#media.port, Msg)
+				end
+		end,
+		% No need to fill lastseen here, since we currently don't use it
+		Var1#media{ip=Ip,port=Port,rtpstate=rtp}
 	end,
 
-	case State#state.holdstate of
-		true ->
-			% do nothing
-			ok;
-		false ->
-			% TODO check whether message is valid rtp stream
-			if
-				I == null; P == null ->
-					% Probably RTP, but we CANNOT send yet.
-					ok;
-				true ->
-					gen_udp:send(F, I, P, Msg)
-			end
+	NewState = if
+		Fd == (State#state.from)#media.fd ->
+			State#state{to=SafeSendAndUpdate(State#state.to, State#state.from)};
+		Fd == (State#state.to)#media.fd ->
+			State#state{from=SafeSendAndUpdate(State#state.from, State#state.to)}
 	end,
 
 	case {State#state.started, (State#state.from)#media.rtpstate, (State#state.to)#media.rtpstate} of
 		{null, rtp, rtp} ->
-			{noreply, State#state{from=From, to=To, started=now()}};
+			{noreply, NewState#state{started=now()}};
 		_ ->
-			{noreply, State#state{from=From, to=To}}
+			{noreply, NewState}
 	end;
 
 handle_info(ping, State) ->
