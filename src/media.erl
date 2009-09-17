@@ -39,7 +39,7 @@
 % * ip - real client's ip
 % * port - real client's port
 -record(media, {fd=null, ip=null, port=null, rtpstate=nortp, lastseen}).
--record(state, {parent, tref, from, fromrtcp, to, tortcp, holdstate=false, started=null}).
+-record(state, {parent, tref, from, fromrtcp, to, tortcp, fun_send_rtp, fun_send_rtcp, fun_start_acc, holdstate=false, started=null}).
 
 start(Args) ->
 	gen_server:start(?MODULE, Args, []).
@@ -57,6 +57,19 @@ init ({Parent, From, FromRtcp, To, ToRtcp}) ->
 			_ -> null
 		end
 	end,
+
+	% Define function to send RTP/RTCP and update state
+	SafeSendAndRetState = fun(Var1, Var2, Ip, Port, Msg) ->
+		if
+			Var2#media.ip == null; Var2#media.port == null ->
+				% Probably RTP or RTCP, but we CANNOT send yet.
+				ok;
+			true ->
+				gen_udp:send(Var1#media.fd, Var2#media.ip, Var2#media.port, Msg)
+		end,
+		Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()}
+	end,
+
 	{ok,
 		#state{
 			parent=Parent,
@@ -64,7 +77,23 @@ init ({Parent, From, FromRtcp, To, ToRtcp}) ->
 			from	=SafeMakeMedia(From),
 			fromrtcp=SafeMakeMedia(FromRtcp),
 			to	=SafeMakeMedia(To),
-			tortcp	=SafeMakeMedia(ToRtcp)
+			tortcp	=SafeMakeMedia(ToRtcp),
+			fun_send_rtp =SafeSendAndRetState,
+			fun_send_rtcp=SafeSendAndRetState,
+			fun_start_acc= fun(S1) ->
+						case {S1#state.started, (S1#state.from)#media.rtpstate, (S1#state.to)#media.rtpstate} of
+							{null, rtp, rtp} ->
+								{noreply, S1#state{
+											started=now(),
+											fun_start_acc = fun(S2) ->
+														{noreply, S2}
+													end
+										}
+								};
+							_ ->
+								{noreply, S1}
+						end
+					end
 		}
 	}.
 
@@ -84,12 +113,23 @@ handle_cast(stop, State) ->
 handle_cast(hold, State) when State#state.holdstate == false ->
 	?INFO("HOLD on", []),
 	% We should suppress timer since we shouldn't care this mediastream
-	{noreply, State#state{holdstate=true}};
+	{noreply, State#state{fun_send_rtp = fun(Var1, _, Ip, Port, _) -> Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()} end, holdstate=true}};
 
 handle_cast(hold, State) when State#state.holdstate == true ->
 	?INFO("HOLD off", []),
 	% since we suppressed timer earlier, we need to restart it
-	{noreply, State#state{holdstate=false}};
+	% Define function to send RTP/RTCP and update state
+	SafeSendAndRetState = fun(Var1, Var2, Ip, Port, Msg) ->
+		if
+			Var2#media.ip == null; Var2#media.port == null ->
+				% Probably RTP or RTCP, but we CANNOT send yet.
+				ok;
+			true ->
+				gen_udp:send(Var1#media.fd, Var2#media.ip, Var2#media.port, Msg)
+		end,
+		Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()}
+	end,
+	{noreply, State#state{fun_send_rtp=SafeSendAndRetState, holdstate=false}};
 
 handle_cast({recording, RecState}, State) ->
 	case RecState of
@@ -132,35 +172,23 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#m
 			[]
 	end,
 
-	% Var1 - source of rtcp
-	% Var2 - dest of rtcp
-	SafeSendAndUpdate = fun(Var1, Var2) ->
-		if
-			Var2#media.ip == null; Var2#media.port == null ->
-				% Probably RTCP, but we CANNOT send yet.
-				ok;
-			true ->
-				% From the Var2 point of view, it looks like Var1 sends him RTCP from his socket
-				gen_udp:send(Var1#media.fd, Var2#media.ip, Var2#media.port, Msg)
-		end,
-		case lists:keymember(bye, 1, Rtcps) of
-			true ->
-				?ERR("We SHOULD terminate this stream due to RTCP BYE", []),
-				% Unfortunately, it's not possible due to issues in Asterisk configs
-				% which users unwilling to fix. So we just warn about it.
-				% Maybe, in the future, we'll reconsider this behaviour.
-%				{stop, rtcp_bye, State};
-				Var1#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()};
-			_ ->
-				Var1#media{ip=Ip,port=Port,rtpstate=rtp,lastseen=now()}
-		end
+	case lists:keymember(bye, 1, Rtcps) of
+		true ->
+			?ERR("We SHOULD terminate this stream due to RTCP BYE", []),
+			% Unfortunately, it's not possible due to issues in Asterisk configs
+			% which users unwilling to fix. So we just warn about it.
+			% Maybe, in the future, we'll reconsider this behaviour.
+%			{stop, rtcp_bye, State};
+			ok;
+		_ ->
+			ok
 	end,
 
 	if
 		Fd == (State#state.fromrtcp)#media.fd ->
-			{noreply, State#state{tortcp=SafeSendAndUpdate(State#state.tortcp, State#state.fromrtcp)}};
+			{noreply, State#state{tortcp=(State#state.fun_send_rtcp)(State#state.tortcp, State#state.fromrtcp, Ip, Port, Msg)}};
 		Fd == (State#state.tortcp)#media.fd ->
-			{noreply, State#state{fromrtcp=SafeSendAndUpdate(State#state.fromrtcp, State#state.tortcp)}}
+			{noreply, State#state{fromrtcp=(State#state.fun_send_rtcp)(State#state.fromrtcp, State#state.tortcp, Ip, Port, Msg)}}
 	end;
 
 % We received UDP-data on From or To socket, so we must send in from To or From socket respectively
@@ -173,37 +201,14 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.fromrtcp)#m
 % TODO check whether message is valid rtp stream
 handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 %handle_info({udp, Fd, Ip, Port, Msg}, State) when Fd == (State#state.from)#media.fd; Fd == (State#state.to)#media.fd ->
-	SafeSendAndUpdate = fun(Var1, Var2) ->
-		case State#state.holdstate of
-			true ->
-				% do nothing
-				ok;
-			false ->
-				if
-					Var2#media.ip == null; Var2#media.port == null ->
-						% Probably RTP, but we CANNOT send yet.
-						ok;
-					true ->
-						gen_udp:send(Var1#media.fd, Var2#media.ip, Var2#media.port, Msg)
-				end
-		end,
-		% No need to fill lastseen here, since we currently don't use it
-		Var1#media{ip=Ip,port=Port,rtpstate=rtp}
-	end,
-
 	NewState = if
 		Fd == (State#state.from)#media.fd ->
-			State#state{to=SafeSendAndUpdate(State#state.to, State#state.from)};
+			State#state{to=(State#state.fun_send_rtp)(State#state.to, State#state.from, Ip, Port, Msg)};
 		Fd == (State#state.to)#media.fd ->
-			State#state{from=SafeSendAndUpdate(State#state.from, State#state.to)}
+			State#state{from=(State#state.fun_send_rtp)(State#state.from, State#state.to, Ip, Port, Msg)}
 	end,
 
-	case {State#state.started, (State#state.from)#media.rtpstate, (State#state.to)#media.rtpstate} of
-		{null, rtp, rtp} ->
-			{noreply, NewState#state{started=now()}};
-		_ ->
-			{noreply, NewState}
-	end;
+	(State#state.fun_start_acc)(NewState);
 
 handle_info(ping, State) ->
 	case {(State#state.from)#media.rtpstate, (State#state.to)#media.rtpstate} of
