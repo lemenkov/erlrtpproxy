@@ -204,7 +204,7 @@ decode(Data) ->
 		end
 	end,
 
-	% There can me multiple RTCP packets stacked, and there is no way to determine reliably how many packets we just received
+	% There can be multiple RTCP packets stacked, and there is no way to determine reliably how many packets we received
 	% so we need recursively process them one by one
 	(y:y(DecodeRtcp))({Data, []}).
 
