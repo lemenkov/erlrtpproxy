@@ -3,7 +3,7 @@
 
 
 Name:		erlrtpproxy
-Version:	0.2.1
+Version:	0.2.2
 Release:	1%{?dist}
 Summary:	RTP proxying daemon
 Group:		Applications/Internet
@@ -154,6 +154,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/erlang/lib/%{erlname}-%{version}/ebin/ser_sup.beam
 
 %changelog
+* Fri Sep 18 2009 Peter Lemenkov <lemenkov@gmail.com> 0.2.2-1
+- Ver. 0.2.2
+
 * Tue Sep  8 2009 Peter Lemenkov <lemenkov@gmail.com> 0.2.1-1
 - Ver. 0.2.1
 
