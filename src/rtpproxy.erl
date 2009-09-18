@@ -406,7 +406,7 @@ handle_cast({node_del, {Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}}, St
 	{noreply, State#state{rtphosts=lists:keydelete(Node, 1 , State#state.rtphosts)}};
 
 handle_cast(status, State) ->
-	?INFO("Current state - ~p calls:", [length(State#state.calls)]),
+	?INFO("Current state - ~p call(s):", [length(State#state.calls)]),
 	lists:foreach(	fun(X) ->
 				% TODO fix this strange situation
 				{ok, Reply} = try gen_server:call(X#thread.pid, ?CMD_I) catch E:C -> {ok, [["died (shouldn't happend)"]]} end,
