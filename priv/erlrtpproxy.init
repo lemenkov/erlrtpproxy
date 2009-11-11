@@ -22,23 +22,12 @@
 
 prog="erlrtpproxy"
 
-[ -e /etc/sysconfig/$prog ] && . /etc/sysconfig/$prog
+CONFIG_FILE=/etc/$prog.config
+ERL_PARAMETERS="+K true +W w"
+ERL_NODE="127.0.0.1"
+ERL_COOKIE="testcookie"
 
-if [ ! "$CONFIG_FILE" ]; then
-	CONFIG_FILE=/etc/$prog.config
-fi
-
-if [ ! "$ERL_PARAMETERS" ]; then
-	ERL_PARAMETERS="+K true +W w"
-fi
-
-if [ ! "$ERL_NODE" ]; then
-	ERL_NODE="127.0.0.1"
-fi
-
-if [ ! "$ERL_COOKIE" ]; then
-	ERL_COOKIE="testcookie"
-fi
+[ -f /etc/sysconfig/$prog ] && . /etc/sysconfig/$prog
 
 lockfile=/var/lock/subsys/$prog
 
