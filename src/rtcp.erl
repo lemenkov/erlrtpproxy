@@ -200,7 +200,11 @@ decode(Data) ->
 					_ ->
 						{error, unknown_type}
 				end,
-				F1({Next, DecodedRtcps ++ [Rtcp]})
+				F1({Next, DecodedRtcps ++ [Rtcp]});
+
+			({Padding, DecodedRtcps}) ->
+				error_logger:warning_msg("RTCP unknown padding [~p]~n", [Padding]),
+				DecodedRtcps
 		end
 	end,
 
