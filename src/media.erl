@@ -51,49 +51,49 @@ init ({Parent, From, FromRtcp, To, ToRtcp}) ->
 	?INFO("started ~p ~p", [From, To]),
 	process_flag(trap_exit, true),
 	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE*5, ping),
-	SafeMakeMedia = fun(Desc) ->
-		case Desc of
-			{F,I,P} -> #media{fd=F,ip=I,port=P,lastseen=now()};
-			_ -> null
-		end
+
+	% Define simple function for safe Media object creation
+	SafeMakeMedia = fun
+		({F,I,P}) ->
+			#media{fd=F,ip=I,port=P,lastseen=now()};
+		_ ->
+			null
 	end,
 
-	% Define function to send RTP/RTCP and update state
-	SafeSendAndRetState = fun(Var1, Var2, Ip, Port, Msg) ->
-		if
-			Var2#media.ip == null; Var2#media.port == null ->
-				% Probably RTP or RTCP, but we CANNOT send yet.
-				ok;
-			true ->
-				gen_udp:send(Var1#media.fd, Var2#media.ip, Var2#media.port, Msg)
-		end,
-		Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()}
+	% Define function for sending RTCP and updating state
+	SafeSendAndRetState = fun
+		(Var1, #media{ip = null, port = null} = Var2, Ip, Port, Msg) ->
+			% Probably RTP or RTCP, but we CANNOT send yet.
+			Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()};
+		(Var1, Var2, Ip, Port, Msg) ->
+			gen_udp:send(Var1#media.fd, Var2#media.ip, Var2#media.port, Msg),
+			Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()}
+	end,
+
+	% Define function for safe 
+	FunStartAcc = fun
+		(#state{started = null} = S1) ->
+			case {(S1#state.from)#media.rtpstate, (S1#state.to)#media.rtpstate} of
+				{rtp, rtp} ->
+					{noreply, S1#state{started=now(), fun_start_acc = fun(S2) -> {noreply, S2} end}};
+				_ ->
+					{noreply, S1}
+			end;
+		(_) ->
+			{noreply, S1}
 	end,
 
 	{ok,
 		#state{
 			parent=Parent,
 			tref=TRef,
-			from	=SafeMakeMedia(From),
-			fromrtcp=SafeMakeMedia(FromRtcp),
-			to	=SafeMakeMedia(To),
-			tortcp	=SafeMakeMedia(ToRtcp),
-			fun_send_rtp =SafeSendAndRetState,
-			fun_send_rtcp=SafeSendAndRetState,
-			fun_start_acc= fun(S1) ->
-						case {S1#state.started, (S1#state.from)#media.rtpstate, (S1#state.to)#media.rtpstate} of
-							{null, rtp, rtp} ->
-								{noreply, S1#state{
-											started=now(),
-											fun_start_acc = fun(S2) ->
-														{noreply, S2}
-													end
-										}
-								};
-							_ ->
-								{noreply, S1}
-						end
-					end
+			from	= SafeMakeMedia(From),
+			fromrtcp= SafeMakeMedia(FromRtcp),
+			to	= SafeMakeMedia(To),
+			tortcp	= SafeMakeMedia(ToRtcp),
+			fun_send_rtp = SafeSendAndRetState,
+			fun_send_rtcp= SafeSendAndRetState,
+			fun_start_acc= FunStartAcc	
 		}
 	}.
 
@@ -151,6 +151,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 terminate(Reason, State) ->
 	timer:cancel(State#state.tref),
+	% TODO we should send RTCP BYE here
 	lists:map(fun (X) -> case X of null -> ok; _ -> gen_udp:close(X#media.fd) end end, [State#state.from, State#state.fromrtcp, State#state.to, State#state.tortcp]),
 	case Reason of
 		nortp -> gen_server:cast(State#state.parent, {stop, timeout, self()});
