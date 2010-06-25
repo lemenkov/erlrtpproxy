@@ -84,7 +84,7 @@ init ({CallID, MainIp, RadAcctServers}) ->
 
 % handle originate call leg (new media id possibly)
 % TODO handle Modifiers
-handle_call({?CMD_U, {StartPort, {GuessIp, GuessPort}, {FromTag, MediaId}, To, Modifiers}}, _, State) ->
+handle_call({?CMD_U, {StartPort, {GuessIp, GuessPort}, {FromTag, MediaId}, To, Modifiers}}, _, #state{ip = Ip, parties = Parties} = State) ->
 	case To of
 		null ->
 			?INFO("message [U] probably from ~w:~w  MediaId [~b]", [GuessIp, GuessPort, MediaId]);
@@ -92,7 +92,7 @@ handle_call({?CMD_U, {StartPort, {GuessIp, GuessPort}, {FromTag, MediaId}, To, M
 			?INFO("message [U] probably from ~w:~w  MediaId [~b] REINVITE!", [GuessIp, GuessPort, MediaId])
 	end,
 	% search for already  existed
-	case lists:keysearch(MediaId, #party.mediaid, State#state.parties) of
+	case lists:keysearch(MediaId, #party.mediaid, Parties) of
 		% call already exists
 		{value, Party} ->
 			case
@@ -117,7 +117,7 @@ handle_call({?CMD_U, {StartPort, {GuessIp, GuessPort}, {FromTag, MediaId}, To, M
 			end;
 		false ->
 			% open new FdFrom and attach it
-			case gen_udp:open(StartPort, [binary, {ip, State#state.ip}, {active, true}, {raw,1,11,<<1:32/native>>}]) of
+			case gen_udp:open(StartPort, [binary, {ip, Ip}, {active, true}, {raw,1,11,<<1:32/native>>}]) of
 				{ok, Fd} ->
 					SafeOpenFd = fun(Port, Params) when is_list (Params) ->
 						case gen_udp:open(Port, Params) of
@@ -128,17 +128,17 @@ handle_call({?CMD_U, {StartPort, {GuessIp, GuessPort}, {FromTag, MediaId}, To, M
 					NewParty = #party{	% TODO add Ip and Port only on demand
 %								from	=#source{fd=Fd, tag=FromTag},
 								from	=#source{fd=Fd, ip=GuessIp, port=GuessPort, tag=FromTag},
-								fromrtcp=#source{fd=SafeOpenFd (StartPort+1, [binary, {ip, State#state.ip}, {active, true}, {raw,1,11,<<1:32/native>>}])},
-								to	=#source{fd=SafeOpenFd (StartPort+2, [binary, {ip, State#state.ip}, {active, true}, {raw,1,11,<<1:32/native>>}])},
-								tortcp	=#source{fd=SafeOpenFd (StartPort+3, [binary, {ip, State#state.ip}, {active, true}, {raw,1,11,<<1:32/native>>}])},
+								fromrtcp=#source{fd=SafeOpenFd (StartPort+1, [binary, {ip, Ip}, {active, true}, {raw,1,11,<<1:32/native>>}])},
+								to	=#source{fd=SafeOpenFd (StartPort+2, [binary, {ip, Ip}, {active, true}, {raw,1,11,<<1:32/native>>}])},
+								tortcp	=#source{fd=SafeOpenFd (StartPort+3, [binary, {ip, Ip}, {active, true}, {raw,1,11,<<1:32/native>>}])},
 								startport=StartPort,
 								mediaid=MediaId},
 					{ok, {LocalIp, LocalPort}} = inet:sockname(Fd),
 					Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 					?INFO("answer [~s]", [Reply]),
-					{reply, {ok, new, Reply}, State#state{parties=lists:append(State#state.parties, [NewParty])}};
+					{reply, {ok, new, Reply}, State#state{parties=lists:append(Parties, [NewParty])}};
 				{error, Reason} ->
-					?ERR("Create new socket at ~p ~p FAILED [~p]", [State#state.ip, StartPort, Reason]),
+					?ERR("Create new socket at ~p ~p FAILED [~p]", [Ip, StartPort, Reason]),
 					{reply, {error, udp_error}, State}
 			end
 	end;
@@ -408,7 +408,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 %			?WARN("Probably RTCP to ~p from Ip[~p] Port[~p]", [Fd, Ip, Port]),
 			{noreply, State}
 	end;
-handle_info(timeout, State) when State#state.status == notstarted ->
+handle_info(timeout, #state{status = notstarted} = State) ->
 	{stop, timeout, State};
 
 handle_info(timeout, State) when (State#state.radius)#rad_accreq.login_time /= undefined ->

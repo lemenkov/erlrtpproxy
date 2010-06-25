@@ -90,36 +90,36 @@ init(_Unused) ->
 handle_call(_Message, _From , State) ->
 	{reply, ?RTPPROXY_ERR_SOFTWARE, State}.
 
-handle_cast({message, Cmd}, State) when Cmd#cmd.type == ?CMD_V ->
+handle_cast({message, #cmd{type = ?CMD_V, origin = #origin{pid = Pid}} = Cmd}, State) ->
 	% Request basic supported rtpproxy protocol version
 	% see available versions here:
 	% http://cvs.berlios.de/cgi-bin/viewcvs.cgi/ser/rtpproxy/rtpp_command.c?view=markup
-	% We, curently, providing only basic functional;ity
-	gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, "20040107"}),
+	% We, curently, providing only basic functionality
+	gen_server:cast(Pid, {reply, Cmd, "20040107"}),
 	{noreply, State};
 
-handle_cast({message, Cmd}, State) when Cmd#cmd.type == ?CMD_VF ->
+handle_cast({message, #cmd{type = ?CMD_VF, origin = #origin{pid = Pid}} = Cmd}, State) ->
 	% Request additional rtpproxy protocol extensions
 	% TODO we should check version capabilities here
-	gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, "1"}),
+	gen_server:cast(Pid, {reply, Cmd, "1"}),
 	{noreply, State};
 
-handle_cast({message, Cmd}, State) when Cmd#cmd.type == ?CMD_X ->
+handle_cast({message, #cmd{type = ?CMD_X, origin = #origin{pid = Pid}} = Cmd}, State) ->
 	% stop all active sessions
 	lists:foreach(fun(X) -> gen_server:cast(X#thread.pid, message_d) end, State#state.calls),
 	lists:foreach(fun(X) -> gen_server:cast(X#thread.pid, message_d) end, State#state.players),
-	gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_OK}),
+	gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK}),
 	{noreply, State};
 
-handle_cast({message, Cmd}, State) when Cmd#cmd.type == ?CMD_I ->
+handle_cast({message, #cmd{type = ?CMD_I, origin = #origin{pid = Pid}} = Cmd}, State) ->
 	% TODO show information about calls
 	Stats = lists:map(fun(X) -> gen_server:call(X#thread.pid, message_i) end, State#state.calls),
 	% "sessions created: %llu\nactive sessions: %d\n active streams: %d\n"
 	% foreach session "%s/%s: caller = %s:%d/%s, callee = %s:%d/%s, stats = %lu/%lu/%lu/%lu, ttl = %d/%d\n"
-	gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_OK}),
+	gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK}),
 	{noreply, State};
 
-handle_cast({message, Cmd}, State) when Cmd#cmd.type == ?CMD_D; Cmd#cmd.type == ?CMD_S ->
+handle_cast({message, #cmd{origin = #origin{pid = Pid}} = Cmd}, State)  when Cmd#cmd.type == ?CMD_D; Cmd#cmd.type == ?CMD_S ->
 	[CallPid, PlayerPid] = lists:map(fun(List) ->
 						case lists:keysearch(Cmd#cmd.callid, #thread.callid, List) of
 							{value, CI} -> CI#thread.pid;
@@ -135,12 +135,12 @@ handle_cast({message, Cmd}, State) when Cmd#cmd.type == ?CMD_D; Cmd#cmd.type == 
 			gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_OK});
 		true ->
 			?ERR("CANNOT find thread(s) to stop.", []),
-			gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_OK})
-%			gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_ERR_NOSESSION})
+			gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK})
+%			gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_ERR_NOSESSION})
 	end,
 	{noreply, State};
 
-handle_cast({message, Cmd}, State) when Cmd#cmd.type == ?CMD_P ->
+handle_cast({message, #cmd{type = ?CMD_P, origin = #origin{pid = Pid}} = Cmd}, State) ->
 	case
 		case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.players) of
 			{value, PlayerInfo} ->
@@ -199,71 +199,71 @@ handle_cast({message, Cmd}, State) when Cmd#cmd.type == ?CMD_P ->
 		end
 	of
 		{Reply, NewState} ->
-			gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, Reply}),
+			gen_server:cast(Pid, {reply, Cmd, Reply}),
 			{noreply, NewState};
 		Reply ->
-			gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, Reply}),
+			gen_server:cast(Pid, {reply, Cmd, Reply}),
 			{noreply, State}
 	end;
 
-handle_cast({message, Cmd}, State) when Cmd#cmd.type == ?CMD_Q ->
+handle_cast({message, #cmd{type = ?CMD_Q, origin = #origin{pid = Pid}} = Cmd}, State) ->
 	case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.calls) of
 		{value, CallInfo} ->
 			% TODO
 			% sprintf(buf, "%s %d %lu %lu %lu %lu\n", cookie, spa->ttl, spa->pcount[idx], spa->pcount[NOT(idx)], spa->pcount[2], spa->pcount[3]);
-			gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_OK});
+			gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK});
 		NotFound ->
 			?WARN("Session not exists. Do nothing.", []),
-			gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_ERR_NOSESSION})
+			gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_ERR_NOSESSION})
 	end,
 	{noreply, State};
 
-handle_cast({message, Cmd}, State) when Cmd#cmd.type == ?CMD_C ->
+handle_cast({message, #cmd{type = ?CMD_C, origin = #origin{pid = Pid}} = Cmd}, State) ->
 	case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.calls) of
 		{value, CallInfo} ->
 			% TODO
-			gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_OK});
+			gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK});
 		NotFound ->
 			?WARN("Session not exists. Do nothing.", []),
-			gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_ERR_NOSESSION})
+			gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_ERR_NOSESSION})
 	end,
 	{noreply, State};
 
-handle_cast({message, Cmd}, State) when Cmd#cmd.type == ?CMD_R ->
+handle_cast({message, #cmd{type = ?CMD_R, origin = #origin{pid = Pid}} = Cmd}, State) ->
 	case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.calls) of
 		{value, CallInfo} ->
 			gen_server:cast(CallInfo#thread.pid, {Cmd#cmd.type, Cmd#cmd.filename}),
-			gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_OK});
+			gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK});
 		NotFound ->
 			?WARN("Session not exists. Do nothing.", []),
-			gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_ERR_NOSESSION})
+			gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_ERR_NOSESSION})
 	end,
 	{noreply, State};
 
-handle_cast({message, Cmd}, State) when Cmd#cmd.type == ?CMD_L ->
+handle_cast({message, #cmd{type = ?CMD_L, origin = #origin{pid = Pid}} = Cmd}, State) ->
 	case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.calls) of
 		{value, CallInfo} ->
 			try gen_server:call(CallInfo#thread.pid, {Cmd#cmd.type, {Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.params}}) of
 				{ok, Reply} ->
-					gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, Reply});
+					gen_server:cast(Pid, {reply, Cmd, Reply});
 				{error, not_found} ->
 					?ERR("error not found while CMD_L!", []),
-					gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_ERR_NOSESSION});
+					gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_ERR_NOSESSION});
 				{error, udp_error} ->
 					?ERR("error in udp while CMD_L!", []),
-					gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_ERR_SOFTWARE})
+					gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_ERR_SOFTWARE})
 			catch
 				Error:ErrorClass ->
 					?ERR("Exception {~p,~p} while CMD_L!", [Error,ErrorClass]),
-					gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_ERR_SOFTWARE})
+					gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_ERR_SOFTWARE})
 			end;
 		NotFound ->
 			?WARN("Session not exists. Do nothing.", []),
-			gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_ERR_NOSESSION})
+			gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_ERR_NOSESSION})
 	end,
 	{noreply, State};
 
-handle_cast({message, Cmd}, State) when	Cmd#cmd.type == ?CMD_U ->
+handle_cast({message, #cmd{type = ?CMD_U, origin = #origin{pid = Pid}} = Cmd}, State) ->
 %	?INFO("Cmd[~p]", [Cmd]),
 	case
 		case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.calls) of
@@ -342,16 +342,16 @@ handle_cast({message, Cmd}, State) when	Cmd#cmd.type == ?CMD_U ->
 		end
 	of
 		{R, NewState} ->
-			gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, R}),
+			gen_server:cast(Pid, {reply, Cmd, R}),
 			{noreply, NewState};
 		R ->
-			gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, R}),
+			gen_server:cast(Pid, {reply, Cmd, R}),
 			{noreply, State}
 	end;
 
-handle_cast({message, Cmd}, State) ->
+handle_cast({message, #cmd{origin = #origin{pid = Pid}} = Cmd}, State) ->
 	% Unknown command
-	gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_ERR_SOFTWARE}),
+	gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_ERR_SOFTWARE}),
 	{noreply, State};
 
 handle_cast({call_terminated, {Pid, {ports, Ports}, Reason}}, State) when is_list(Ports) ->

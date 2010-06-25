@@ -1,14 +1,17 @@
-all:
-	erlc -o ebin src/call.erl
-	erlc -o ebin src/media.erl
-	erlc -o ebin src/player.erl
-	erlc -o ebin src/rtcp.erl
-	erlc -o ebin src/rtpproxy.erl
-	erlc -o ebin src/rtpproxy_app.erl
-	erlc -o ebin src/rtpproxy_sup.erl
-	erlc -o ebin src/ser.erl
-	erlc -o ebin src/ser_app.erl
-	erlc -o ebin src/ser_sup.erl
+ERLC := /usr/bin/erlc
+EMULATOR := beam
+
+EBIN_DIR := ./ebin
+ERL_SOURCES  := $(wildcard src/*.erl)
+ERL_OBJECTS  := $(ERL_SOURCES:src/%.erl=$(EBIN_DIR)/%.beam)
+
+all: $(EBIN_DIR) $(ERL_OBJECTS)
+
+$(EBIN_DIR)/%.$(EMULATOR): ./src/%.erl
+	$(ERLC) $(ERLC_FLAGS) -o $(EBIN_DIR) $<
+
+$(EBIN_DIR):
+	mkdir -p $(EBIN_DIR)
 
 clean:
-	rm -f ebin/*.beam priv/*~ src/*~ *~
+	rm -f $(ERL_OBJECTS) priv/*~ src/*~ *~
