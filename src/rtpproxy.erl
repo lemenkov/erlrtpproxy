@@ -31,9 +31,6 @@
 -export([code_change/3]).
 -export([terminate/2]).
 
--export([upgrade/0]).
--export([stop/0]).
--export([status/0]).
 -export([test/0]).
 
 -include("../include/common.hrl").
@@ -500,65 +497,6 @@ find_host([{Node,Ip,Ports}|OtherNodes], Acc) ->
 	after 100 ->
 			find_host(OtherNodes, Acc ++ [{Node,Ip,Ports}])
 	end.
-
-upgrade() ->
-	Status = case init:get_plain_arguments() of
-		[NodeStr] ->
-			Node = list_to_atom(NodeStr),
-			try rpc:call(Node, gen_server, cast, [{global, rtpproxy}, upgrade], 5000) of
-				{badrpc, Reason} ->
-					2;
-				_ ->
-					0
-			catch _:_ ->
-				2
-			end;
-		_ ->
-			1
-	end,
-	halt(Status).
-
-stop() ->
-	Status = case init:get_plain_arguments() of
-		[NodeStr] ->
-			Node = list_to_atom(NodeStr),
-			try rpc:call(Node, application, stop, [rtpproxy], 5000) of
-				{badrpc, Reason} ->
-					2;
-				_ ->
-					case rpc:call(Node, init, stop, [], 5000) of
-						{badrpc, Reason} ->
-							2;
-						_ ->
-							0
-					end
-			catch _:_ ->
-				2
-			end;
-		_ ->
-			1
-	end,
-	halt(Status).
-
-status() ->
-	Status = case init:get_plain_arguments() of
-		[NodeStr] ->
-			Node = list_to_atom(NodeStr),
-			try rpc:call(Node, application, get_application, [rtpproxy], 5000) of
-				{badrpc, Reason} ->
-					4;
-				{ok, rtpproxy} ->
-					rpc:call(Node, gen_server, cast, [{global,rtpproxy}, status], 5000),
-					0;
-				undefined ->
-					3
-			catch _:_ ->
-				4
-			end;
-		_ ->
-			4
-	end,
-	halt(Status).
 
 test() ->
 	io:format("Done!~n").
