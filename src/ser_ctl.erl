@@ -20,8 +20,12 @@
 -module(ser_ctl).
 -author('lemenkov@gmail.com').
 
+-export([start/0]).
 -export([stop/0]).
 -export([status/0]).
+
+start() ->
+	ser_app:start(normal, []).
 
 stop() ->
 	Status = case init:get_plain_arguments() of
