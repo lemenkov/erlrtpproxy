@@ -1,12 +1,9 @@
 -module(ser_app).
 -behaviour(application).
--export([start/0, start/2, stop/1]).
+-export([start/2, stop/1]).
 
-start() ->
+start(normal, _StartArgs) ->
 	application:start(erlsyslog),
-	application:start(ser).
-
-start(_Type, _StartArgs) ->
 	ser_sup:start_link().
 
 stop(_State) ->
