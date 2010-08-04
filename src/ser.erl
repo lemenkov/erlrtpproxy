@@ -30,8 +30,6 @@
 -export([code_change/3]).
 -export([terminate/2]).
 
--export([test/0]).
-
 -include("../include/common.hrl").
 
 start(Args) ->
@@ -263,6 +261,3 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 handle_info(Info, Fd) ->
 	?WARN("Info [~w]", [Info]),
 	{noreply, Fd}.
-
-test() ->
-	io:format("Done!~n").
