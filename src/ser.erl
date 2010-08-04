@@ -83,7 +83,6 @@ terminate(Reason, Fd) ->
 % Fd from which message arrived must be equal to Fd from our state
 % Brief introduction of protocol is here: http://rtpproxy.org/wiki/RTPproxyProtocol
 handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
-	% TODO fix issue with missing Cookie
 	% TODO pass modifiers as atoms (not as string)
 	[Cookie|Rest] = string:tokens(Msg, " ;"),
 	?INFO("SER cmd: ~p", [Rest]),
