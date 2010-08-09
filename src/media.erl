@@ -176,7 +176,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{tortcp = #media{fd = Fd}} = State) 
 handle_info({udp, Fd, Ip, Port, Msg}, #state{fromrtcp = #media{fd = Fd}} = State) ->
 	% First, we'll try do decode our RCP packet(s)
 	try
-		Rtcps = rtcp:decode(Msg),
+		{ok, Rtcps} = rtcp:decode(Msg),
 		case lists:keymember(bye, 1, Rtcps) of
 			true ->
 				?ERR("We SHOULD terminate this stream due to RTCP BYE", []);
