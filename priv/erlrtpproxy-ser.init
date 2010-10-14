@@ -31,43 +31,60 @@ ERL_COOKIE="testcookie"
 
 lockfile=/var/lock/subsys/$prog
 
+retval=0
+
 start() {
-    echo -n $"Starting $prog: "
-    daemon --user rtpproxy "erl $ERL_PARAMETERS -name $prog@$ERL_NODE -setcookie $ERL_COOKIE -config $CONFIG_FILE -detached -s ser_ctl"
-    retval=$?
-    echo
-    [ $retval -eq 0 ] && touch $lockfile
-    return $retval
+	echo -n $"Starting $prog: "
+
+	# check whether $prog was already started
+	if rh_status_q ; then
+		echo -n "already running" && warning && echo
+		return 0
+	fi
+
+	daemon --user rtpproxy "erl $ERL_PARAMETERS -name $prog@$ERL_NODE -setcookie $ERL_COOKIE -config $CONFIG_FILE -detached -s ser_ctl"
+	retval=$?
+	echo
+	[ $retval -eq 0 ] && touch $lockfile
+	return $retval
 }
 
 stop() {
-    echo -n $"Stopping $prog: "
-    daemon --user rtpproxy "erl -noinput $ERL_PARAMETERS -name close@$ERL_NODE  -setcookie $ERL_COOKIE  -s ser_ctl stop -extra $prog@$ERL_NODE"
-    retval=$?
-    echo
-    [ $retval -eq 0 ] && rm -f $lockfile
-    return $retval
+	echo -n $"Stopping $prog: "
+
+	# check whether $prog was already started
+	if ! rh_status_q ; then
+		echo -n "already stopped" && warning && echo
+		return 0
+	fi
+
+	daemon --user rtpproxy "erl -noinput $ERL_PARAMETERS -name close@$ERL_NODE  -setcookie $ERL_COOKIE  -s ser_ctl stop -extra $prog@$ERL_NODE"
+	retval=$?
+	echo
+	[ $retval -eq 0 ] && rm -f $lockfile
+	return $retval
 }
 
 restart() {
-    stop
-    sleep 5
-    start
+	stop
+	sleep 10
+	start
 }
 
 reload() {
-    restart
+	restart
 }
 
 force_reload() {
-    restart
+	restart
 }
 
 rh_status() {
-	echo -n $"Getting $prog status (see in syslog): "
-	daemon --user rtpproxy "erl -noinput $ERL_PARAMETERS -name status@$ERL_NODE  -setcookie $ERL_COOKIE  -s ser_ctl status -extra $prog@$ERL_NODE"
+	echo -n $"Getting $prog status: "
+	/sbin/runuser -s /bin/bash rtpproxy -c "erl -noinput $ERL_PARAMETERS -name status@$ERL_NODE  -setcookie $ERL_COOKIE  -s ser_ctl status -extra $prog@$ERL_NODE" 2>&1
+	retval=$?
 	echo
-	return $?
+	return $retval
 }
 
 rh_status_q() {
@@ -101,6 +118,6 @@ case "$1" in
         ;;
     *)
         echo $"Usage: $0 {start|stop|status|restart|condrestart|try-restart|reload|force-reload}"
-        exit 2
+        retval=2
 esac
-exit $?
+exit $retval
