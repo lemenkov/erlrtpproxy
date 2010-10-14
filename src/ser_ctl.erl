@@ -25,7 +25,8 @@
 -export([status/0]).
 
 start() ->
-	ser_app:start(normal, []).
+	application:start(erlsyslog),
+	application:start(ser).
 
 stop() ->
 	Status = case init:get_plain_arguments() of
@@ -54,16 +55,24 @@ status() ->
 		[NodeStr] ->
 			Node = list_to_atom(NodeStr),
 			try rpc:call(Node, application, get_application, [ser]) of
+				{badrpc, nodedown} ->
+					io:format("stopped (nodedown)"),
+					3;
 				{badrpc, Reason} ->
+					io:format("bad rpc: ~p~n", [Reason]),
 					4;
 				{ok, ser} ->
+					io:format("running..."),
 					0;
 				undefined ->
+					io:format("stopped (undefined)"),
 					3
-			catch _:_ ->
+			catch E:R ->
+				io:format("E:R: ~p:~p~n", [E,R]),
 				4
 			end;
-		_ ->
+		Other ->
+			io:format("Other: ~p~n", [Other]),
 			4
 	end,
 	halt(Status).
