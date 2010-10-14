@@ -34,5 +34,3 @@
 -define(CMD_X, message_x).
 -define(CMD_I, message_i).
 
--include_lib("erlsyslog/include/erlsyslog.hrl").
-
