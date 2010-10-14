@@ -30,7 +30,7 @@
 -export([code_change/3]).
 -export([terminate/2]).
 
--include("../include/common.hrl").
+-include("common.hrl").
 
 start(Args) ->
 	gen_server:start(?MODULE, Args, []).
