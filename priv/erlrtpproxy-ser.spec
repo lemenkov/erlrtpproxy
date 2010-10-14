@@ -64,10 +64,9 @@ if [ $1 = 0 ]; then
         /sbin/chkconfig --del %{name}
 fi
 
-
 %postun
 if [ "$1" -ge "1" ]; then
-        /sbin/service %{name} condrestart >/dev/null 2>&1
+        /sbin/service %{name} reload >/dev/null 2>&1
 fi
 
 

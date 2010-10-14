@@ -23,6 +23,7 @@
 -export([start/0]).
 -export([stop/0]).
 -export([status/0]).
+-export([reload/0]).
 
 start() ->
 	application:start(erlsyslog),
@@ -74,6 +75,53 @@ status() ->
 		Other ->
 			io:format("Other: ~p~n", [Other]),
 			4
+	end,
+	halt(Status).
+
+reload() ->
+	Status = case code:lib_dir(ser) of
+		non_existing ->
+			1;
+		NewDir ->
+			case init:get_plain_arguments() of
+				[NodeStr] ->
+					Node = list_to_atom(NodeStr),
+					try rpc:call(Node, code, lib_dir, [ser]) of
+						{badrpc, nodedown} ->
+							io:format("stopped (nodedown)"),
+							3;
+						{badrpc, Reason} ->
+							io:format("bad rpc: ~p~n", [Reason]),
+							4;
+						{error, bad_name} ->
+							io:format("{error, bad_name}"),
+							3;
+						OldDir ->
+							try rpc:call(Node, code, replace_path, [OldDir, NewDir]) of
+								{badrpc, nodedown} ->
+									io:format("stopped (nodedown)"),
+									3;
+								{badrpc, Reason} ->
+									io:format("bad rpc: ~p~n", [Reason]),
+									4;
+								true ->
+									io:format("path replaced..."),
+									0;
+								{error, What} ->
+									io:format("{error, ~p}", [What]),
+									3
+							catch E:R ->
+								io:format("E:R: ~p:~p~n", [E,R]),
+								4
+							end
+					catch E:R ->
+						io:format("E:R: ~p:~p~n", [E,R]),
+						4
+					end;
+				Other ->
+					io:format("Other: ~p~n", [Other]),
+					4
+			end
 	end,
 	halt(Status).
 

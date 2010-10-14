@@ -72,11 +72,22 @@ restart() {
 }
 
 reload() {
-	restart
+	echo -n $"Reloading $prog beam-files: "
+
+	# check whether $prog was started
+	if ! rh_status_q ; then
+		echo -n " stopped" && error && echo
+		return 7
+	fi
+
+	/sbin/runuser -s /bin/bash rtpproxy -c "erl -noinput $ERL_PARAMETERS -name status@$ERL_NODE  -setcookie $ERL_COOKIE  -s ser_ctl reload -extra $prog@$ERL_NODE" 2>&1
+	retval=$?
+	echo
+	return $retval
 }
 
 force_reload() {
-	restart
+	reload
 }
 
 rh_status() {
@@ -103,8 +114,7 @@ case "$1" in
         restart
         ;;
     reload)
-        rh_status_q || exit 7
-        $1
+        reload
         ;;
     force-reload)
         force_reload
