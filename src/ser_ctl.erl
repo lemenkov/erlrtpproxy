@@ -96,8 +96,8 @@ reload() ->
 						{error, bad_name} ->
 							io:format("{error, bad_name}"),
 							3;
-						OldDir ->
-							try rpc:call(Node, code, replace_path, [OldDir, NewDir]) of
+						_OldDir ->
+							try rpc:call(Node, code, replace_path, [ser, NewDir]) of
 								{badrpc, nodedown} ->
 									io:format("stopped (nodedown)"),
 									3;
