@@ -86,6 +86,8 @@ reload() ->
 			case init:get_plain_arguments() of
 				[NodeStr] ->
 					Node = list_to_atom(NodeStr),
+					application:load(ser),
+					{ok, Modules} = application:get_key(ser, modules),
 					try rpc:call(Node, code, lib_dir, [ser]) of
 						{badrpc, nodedown} ->
 							io:format("stopped (nodedown)"),
@@ -105,6 +107,9 @@ reload() ->
 									io:format("bad rpc: ~p~n", [Reason]),
 									4;
 								true ->
+									lists:foreach(fun(Mod) ->
+												{Mod, Bin, File} = code:get_object_code(Mod),
+												rpc:call(Node, code, load_binary, [Mod, File, Bin]) end, Modules),
 									io:format("path replaced..."),
 									0;
 								{error, What} ->
