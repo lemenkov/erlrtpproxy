@@ -1,4 +1,5 @@
 VSN := 0.2
+BUILD_DATE := `LANG=C date +"%a %b %d %Y"`
 NAME := ser
 
 ERLC := /usr/bin/erlc
@@ -11,14 +12,18 @@ EBIN_DIR := ebin
 ERL_SOURCES  := $(wildcard src/*.erl)
 ERL_OBJECTS  := $(ERL_SOURCES:src/%.erl=$(EBIN_DIR)/%.beam)
 APP_FILE := $(EBIN_DIR)/$(NAME).app
+SPEC_FILE := priv/erlrtpproxy-ser.spec
 
-all: $(EBIN_DIR) $(ERL_OBJECTS) $(APP_FILE)
+all: $(EBIN_DIR) $(ERL_OBJECTS) $(APP_FILE) $(SPEC_FILE)
 
 $(EBIN_DIR)/%.$(EMULATOR): ./src/%.erl
 	$(ERLC) $(ERLC_FLAGS) -I include -o $(EBIN_DIR) $<
 
 $(EBIN_DIR)/%.app: ./src/%.app.src
 	sed -e "s,%VSN%,$(VSN),g" $< > $@
+
+priv/%.spec: priv/%.spec.in
+	sed -e "s,%VSN%,$(VSN),g;s,%DATE%,$(BUILD_DATE),g"  $< > $@
 
 $(EBIN_DIR):
 	mkdir -p $(EBIN_DIR)
@@ -31,4 +36,4 @@ install: all
 	install -D -p -m 0644 priv/erlrtpproxy-ser.sysconfig $(DESTDIR)/etc/sysconfig/$(NAME)
 
 clean:
-	rm -f $(ERL_OBJECTS) $(APP_FILE) priv/*~ src/*~ *~
+	rm -f $(ERL_OBJECTS) $(APP_FILE) $(SPEC_FILE) priv/*~ src/*~ *~

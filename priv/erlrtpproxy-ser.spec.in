@@ -3,7 +3,7 @@
 
 
 Name:		erlrtpproxy-ser
-Version:	0.1
+Version:	%VSN%
 Release:	1%{?dist}
 Summary:	RTP proxying daemon interface
 Group:		Applications/Internet
@@ -79,6 +79,6 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/erlang/lib/%{erlname}-%{version}/ebin/ser_sup.beam
 
 %changelog
-* Tue Jul 13 2010 Peter Lemenkov <lemenkov@gmail.com> 0.1-1
-- Initial package
+* %DATE% Peter Lemenkov <lemenkov@gmail.com> - %VSN%-1
+- Ver. %VSN%
 
