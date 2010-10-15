@@ -38,15 +38,8 @@ make %{?_smp_mflags}
 
 %install
 rm -rf $RPM_BUILD_ROOT
-mkdir -p $RPM_BUILD_ROOT%{_libdir}/erlang/lib/%{erlname}-%{version}/ebin
-install -m 644 ebin/%{erlname}.app $RPM_BUILD_ROOT%{_libdir}/erlang/lib/%{erlname}-%{version}/ebin
-install -m 644 ebin/%{erlname}.beam $RPM_BUILD_ROOT%{_libdir}/erlang/lib/%{erlname}-%{version}/ebin
-install -m 644 ebin/%{erlname}_app.beam $RPM_BUILD_ROOT%{_libdir}/erlang/lib/%{erlname}-%{version}/ebin
-install -m 644 ebin/%{erlname}_sup.beam $RPM_BUILD_ROOT%{_libdir}/erlang/lib/%{erlname}-%{version}/ebin
+make install
 
-install -D -m 755 priv/%{name}.init $RPM_BUILD_ROOT%{_initrddir}/%{name}
-install -D -m 644 priv/%{name}.config $RPM_BUILD_ROOT%{_sysconfdir}/%{name}.config
-install -D -m 644 priv/%{name}.sysconfig $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig/%{name}
 
 %pre
 getent group %{erlname} >/dev/null || groupadd -r %{erlname}
