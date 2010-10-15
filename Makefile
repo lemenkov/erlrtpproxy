@@ -2,22 +2,20 @@ VSN := 0.1
 NAME := ser
 
 ERLC := /usr/bin/erlc
+ERLC_FLAGS := +debug_info
 EMULATOR := beam
+ERLANG_ROOT := $(shell erl -eval 'io:format("~s", [code:root_dir()])' -s init stop -noshell)
+ERLDIR=$(ERLANG_ROOT)/lib/$(NAME)-$(VSN)
 
 EBIN_DIR := ebin
 ERL_SOURCES  := $(wildcard src/*.erl)
 ERL_OBJECTS  := $(ERL_SOURCES:src/%.erl=$(EBIN_DIR)/%.beam)
 APP_FILE := $(EBIN_DIR)/$(NAME).app
-ERLC_FLAGS := +debug_info
-
-ERLANG_ROOT := $(shell erl -eval 'io:format("~s", [code:root_dir()])' -s init stop -noshell)
-ERLDIR=$(ERLANG_ROOT)/lib/$(NAME)-$(VSN)
 
 all: $(EBIN_DIR) $(ERL_OBJECTS) $(APP_FILE)
 
 $(EBIN_DIR)/%.$(EMULATOR): ./src/%.erl
 	$(ERLC) $(ERLC_FLAGS) -I include -o $(EBIN_DIR) $<
-
 
 $(EBIN_DIR)/%.app: ./src/%.app.src
 	sed -e "s,%VSN%,$(VSN),g" $< > $@
