@@ -1,4 +1,4 @@
-VSN := 0.3.2
+VSN := 0.3.3
 BUILD_DATE := `LANG=C date +"%a %b %d %Y"`
 NAME := ser
 
