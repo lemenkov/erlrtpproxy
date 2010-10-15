@@ -20,7 +20,8 @@
 # Source function library.
 . /etc/rc.d/init.d/functions
 
-prog="erlrtpproxy-ser"
+prog="ser"
+user="ser"
 
 CONFIG_FILE=/etc/$prog.config
 ERL_PARAMETERS="+K true +W w"
@@ -42,7 +43,7 @@ start() {
 		return 0
 	fi
 
-	daemon --user rtpproxy "erl $ERL_PARAMETERS -name $prog@$ERL_NODE -setcookie $ERL_COOKIE -config $CONFIG_FILE -detached -s ser_ctl"
+	daemon --user $user "erl $ERL_PARAMETERS -name $prog@$ERL_NODE -setcookie $ERL_COOKIE -config $CONFIG_FILE -detached -s ser_ctl"
 	retval=$?
 	echo
 	[ $retval -eq 0 ] && touch $lockfile
@@ -58,7 +59,7 @@ stop() {
 		return 0
 	fi
 
-	daemon --user rtpproxy "erl -noinput $ERL_PARAMETERS -name close@$ERL_NODE  -setcookie $ERL_COOKIE  -s ser_ctl stop -extra $prog@$ERL_NODE"
+	daemon --user $user "erl -noinput $ERL_PARAMETERS -name close@$ERL_NODE  -setcookie $ERL_COOKIE  -s ser_ctl stop -extra $prog@$ERL_NODE"
 	retval=$?
 	echo
 	[ $retval -eq 0 ] && rm -f $lockfile
@@ -80,7 +81,7 @@ reload() {
 		return 7
 	fi
 
-	/sbin/runuser -s /bin/bash rtpproxy -c "erl -noinput $ERL_PARAMETERS -name status@$ERL_NODE  -setcookie $ERL_COOKIE  -s ser_ctl reload -extra $prog@$ERL_NODE" 2>&1
+	/sbin/runuser -s /bin/bash $user -c "erl -noinput $ERL_PARAMETERS -name status@$ERL_NODE  -setcookie $ERL_COOKIE  -s ser_ctl reload -extra $prog@$ERL_NODE" 2>&1
 	retval=$?
 	echo
 	return $retval
@@ -92,7 +93,7 @@ force_reload() {
 
 rh_status() {
 	echo -n $"Getting $prog status: "
-	/sbin/runuser -s /bin/bash rtpproxy -c "erl -noinput $ERL_PARAMETERS -name status@$ERL_NODE  -setcookie $ERL_COOKIE  -s ser_ctl status -extra $prog@$ERL_NODE" 2>&1
+	/sbin/runuser -s /bin/bash $user -c "erl -noinput $ERL_PARAMETERS -name status@$ERL_NODE  -setcookie $ERL_COOKIE  -s ser_ctl status -extra $prog@$ERL_NODE" 2>&1
 	retval=$?
 	echo
 	return $retval
