@@ -34,11 +34,11 @@ stop() ->
 		[NodeStr] ->
 			Node = list_to_atom(NodeStr),
 			try rpc:call(Node, application, stop, [ser]) of
-				{badrpc, Reason} ->
+				{badrpc, _Reason} ->
 					2;
 				_ ->
 					case rpc:call(Node, init, stop, []) of
-						{badrpc, Reason} ->
+						{badrpc, _Reason} ->
 							2;
 						_ ->
 							0
