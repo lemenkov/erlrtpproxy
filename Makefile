@@ -15,4 +15,4 @@ $(EBIN_DIR):
 	mkdir -p $(EBIN_DIR)
 
 clean:
-	rm -f $(ERL_OBJECTS) src/*~ *~
+	rm -f $(ERL_OBJECTS) priv/*~ src/*~ *~
