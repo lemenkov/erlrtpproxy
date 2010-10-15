@@ -32,7 +32,7 @@ install: all
 	install -D -p -m 0644 $(APP_FILE) $(DESTDIR)$(ERLDIR)/$(APP_FILE)
 	install -p -m 0644 $(ERL_OBJECTS) $(DESTDIR)$(ERLDIR)/$(EBIN_DIR)
 	install -D -p -m 0644 priv/erlrtpproxy-ser.config $(DESTDIR)/etc/$(NAME).config
-	install -D -p -m 0755 priv/erlrtpproxy-ser.init $(DESTDIR)/etc/init.d/$(NAME)
+	install -D -p -m 0755 priv/erlrtpproxy-ser.init $(DESTDIR)/etc/rc.d/init.d/$(NAME)
 	install -D -p -m 0644 priv/erlrtpproxy-ser.sysconfig $(DESTDIR)/etc/sysconfig/$(NAME)
 
 clean:
