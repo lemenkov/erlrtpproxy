@@ -1,4 +1,4 @@
-VSN := 0.1
+VSN := 0.2
 NAME := ser
 
 ERLC := /usr/bin/erlc
