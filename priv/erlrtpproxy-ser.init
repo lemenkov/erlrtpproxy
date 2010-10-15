@@ -77,7 +77,7 @@ reload() {
 
 	# check whether $prog was started
 	if ! rh_status_q ; then
-		echo -n " stopped" && error && echo
+		echo -n " stopped" && failure && echo
 		return 7
 	fi
 
