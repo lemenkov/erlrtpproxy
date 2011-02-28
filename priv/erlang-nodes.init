@@ -22,19 +22,14 @@
 
 prog="erlang-nodes"
 
+ULIMIT_MAX_FILES=1024
+USER=rtpproxy
+ERL_PARAMETERS="+K true +W w"
+ERL_NODE="127.0.0.1"
+ERL_COOKIE="testcookie"
+NODES="1 2"
+
 [ -e /etc/sysconfig/$prog ] && . /etc/sysconfig/$prog
-
-if [ ! "$ERL_PARAMETERS" ]; then
-	ERL_PARAMETERS="+K true +W w"
-fi
-
-if [ ! "$ERL_NODE" ]; then
-	ERL_NODE="127.0.0.1"
-fi
-
-if [ ! "$ERL_COOKIE" ]; then
-	ERL_COOKIE="testcookie"
-fi
 
 lockfile=/var/lock/subsys/$prog
 
