@@ -1,17 +1,8 @@
-ERLC := /usr/bin/erlc
-EMULATOR := beam
-
-EBIN_DIR := ./ebin
-ERL_SOURCES  := $(wildcard src/*.erl)
-ERL_OBJECTS  := $(ERL_SOURCES:src/%.erl=$(EBIN_DIR)/%.beam)
-
-all: $(EBIN_DIR) $(ERL_OBJECTS)
-
-$(EBIN_DIR)/%.$(EMULATOR): ./src/%.erl
-	$(ERLC) $(ERLC_FLAGS) -o $(EBIN_DIR) $<
-
-$(EBIN_DIR):
-	mkdir -p $(EBIN_DIR)
+all:
+	@[ -d ./ebin ] || mkdir -p ./ebin
+	@cp src/rtpproxy.app.src ebin/rtpproxy.app
+	@cp src/ser.app.src ebin/ser.app
+	@erl -make
 
 clean:
-	rm -f $(ERL_OBJECTS) priv/*~ src/*~ *~
+	@rm -f ./ebin/*.beam ./ebin/*.app priv/*~ src/*~ *~
