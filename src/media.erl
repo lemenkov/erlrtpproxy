@@ -39,7 +39,7 @@
 % * ip - real client's ip
 % * port - real client's port
 -record(media, {fd=null, ip=null, port=null, rtpstate=nortp, lastseen, ssrc=null}).
--record(state, {parent, tref, from, fromrtcp, to, tortcp, fun_send_rtp, fun_send_rtcp, fun_start_acc, holdstate=false, started=null}).
+-record(state, {parent, tref, from, fromrtcp, to, tortcp, fun_send_rtp, fun_start_acc, holdstate=false, started=null}).
 
 start(Args) ->
 	gen_server:start(?MODULE, Args, []).
@@ -87,7 +87,6 @@ init ({Parent, From, FromRtcp, To, ToRtcp}) ->
 			to	= SafeMakeMedia(To),
 			tortcp	= SafeMakeMedia(ToRtcp),
 			fun_send_rtp = SafeSendAndRetState,
-			fun_send_rtcp= SafeSendAndRetState,
 			fun_start_acc= FunStartAcc
 		}
 	}.
@@ -164,7 +163,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{tortcp = #media{fd = Fd}} = State) 
 				ok
 		end,
 
-		{noreply, State#state{fromrtcp=(State#state.fun_send_rtcp)(State#state.fromrtcp, State#state.tortcp, Ip, Port, Msg)}}
+		{noreply, State#state{fromrtcp=safe_send(State#state.fromrtcp, State#state.tortcp, Ip, Port, Msg)}}
 	catch
 		E:C ->
 			rtp_utils:dump_packet(node(), self(), Msg),
@@ -188,7 +187,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fromrtcp = #media{fd = Fd}} = State
 				ok
 		end,
 
-		{noreply, State#state{tortcp=(State#state.fun_send_rtcp)(State#state.tortcp, State#state.fromrtcp, Ip, Port, Msg)}}
+		{noreply, State#state{tortcp=safe_send(State#state.tortcp, State#state.fromrtcp, Ip, Port, Msg)}}
 	catch
 		E:C ->
 			rtp_utils:dump_packet(node(), self(), Msg),
@@ -228,3 +227,15 @@ handle_info(Other, State) ->
 	?WARN("Other Info [~p], State [~p]", [Other, State]),
 	{noreply, State}.
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%% Internal functions %%
+%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Define function for sending RTP/RTCP and updating state
+safe_send (Var1, #media{ip = null, port = null} = Var2, Ip, Port, _Msg) ->
+	% Probably RTP or RTCP, but we CANNOT send yet.
+	Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()};
+safe_send (Var1, Var2, Ip, Port, Msg) ->
+	gen_udp:send(Var1#media.fd, Var2#media.ip, Var2#media.port, Msg),
+	Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()}.
