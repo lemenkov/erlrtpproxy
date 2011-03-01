@@ -52,14 +52,6 @@ init ({Parent, From, FromRtcp, To, ToRtcp}) ->
 	process_flag(trap_exit, true),
 	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE*5, ping),
 
-	% Define simple function for safe Media object creation
-	SafeMakeMedia = fun
-		({F,I,P}) ->
-			#media{fd=F,ip=I,port=P,lastseen=now()};
-		(_) ->
-			null
-	end,
-
 	% Define function for sending RTCP and updating state
 	SafeSendAndRetState = fun
 		(Var1, #media{ip = null, port = null}, Ip, Port, _Msg) ->
@@ -82,10 +74,10 @@ init ({Parent, From, FromRtcp, To, ToRtcp}) ->
 		#state{
 			parent=Parent,
 			tref=TRef,
-			from	= SafeMakeMedia(From),
-			fromrtcp= SafeMakeMedia(FromRtcp),
-			to	= SafeMakeMedia(To),
-			tortcp	= SafeMakeMedia(ToRtcp),
+			from	= safe_make_media(From),
+			fromrtcp= safe_make_media(FromRtcp),
+			to	= safe_make_media(To),
+			tortcp	= safe_make_media(ToRtcp),
 			fun_send_rtp = SafeSendAndRetState,
 			fun_start_acc= FunStartAcc
 		}
@@ -231,6 +223,12 @@ handle_info(Other, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%
 %% Internal functions %%
 %%%%%%%%%%%%%%%%%%%%%%%%
+
+% Define simple function for safe Media object creation
+safe_make_media ({F,I,P}) ->
+	#media{fd=F,ip=I,port=P,lastseen=now()};
+safe_make_media (_) ->
+		null.
 
 % Define function for sending RTP/RTCP and updating state
 safe_send (Var1, #media{ip = null, port = null} = Var2, Ip, Port, _Msg) ->
