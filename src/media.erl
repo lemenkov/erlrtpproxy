@@ -108,18 +108,8 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{tortcp = #media{fd = Fd}} = State) 
 	% First, we'll try do decode our RCP packet(s)
 	try
 		{ok, Rtcps} = rtcp:decode(Msg),
-		case lists:keymember(bye, 1, Rtcps) of
-			true ->
-				?ERR("We SHOULD terminate this stream due to RTCP BYE", []);
-				% Unfortunately, it's not possible due to issues in Asterisk configs
-				% which users are unwilling to fix. So we just warn about it.
-				% Maybe, in the future, we'll reconsider this behaviour.
-%				{stop, rtcp_bye, State};
-			_ ->
-				ok
-		end,
-
-		{noreply, State#state{fromrtcp=safe_send(State#state.fromrtcp, State#state.tortcp, Ip, Port, Msg)}}
+		Msg2 = rtcp_process (Rtcps, State#state.parent),
+		{noreply, State#state{fromrtcp=safe_send(State#state.fromrtcp, State#state.tortcp, Ip, Port, Msg2)}}
 	catch
 		E:C ->
 			rtp_utils:dump_packet(node(), self(), Msg),
@@ -132,18 +122,8 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fromrtcp = #media{fd = Fd}} = State
 	% First, we'll try do decode our RCP packet(s)
 	try
 		{ok, Rtcps} = rtcp:decode(Msg),
-		case lists:keymember(bye, 1, Rtcps) of
-			true ->
-				?ERR("We SHOULD terminate this stream due to RTCP BYE", []);
-				% Unfortunately, it's not possible due to issues in Asterisk configs
-				% which users are unwilling to fix. So we just warn about it.
-				% Maybe, in the future, we'll reconsider this behaviour.
-%				{stop, rtcp_bye, State};
-			_ ->
-				ok
-		end,
-
-		{noreply, State#state{tortcp=safe_send(State#state.tortcp, State#state.fromrtcp, Ip, Port, Msg)}}
+		Msg2 = rtcp_process (Rtcps, State#state.parent),
+		{noreply, State#state{tortcp=safe_send(State#state.tortcp, State#state.fromrtcp, Ip, Port, Msg2)}}
 	catch
 		E:C ->
 			rtp_utils:dump_packet(node(), self(), Msg),
@@ -208,3 +188,24 @@ start_acc (#state{started = null, from = #media{rtpstate = rtp}, to = #media{rtp
 	now();
 start_acc (S) ->
 	S#state.started.
+
+rtcp_process (Rtcps, Parent) ->
+	rtcp_process (Rtcps, [], Parent).
+rtcp_process ([], Rtcps, Parent) ->
+	lists:map(fun rtcp:decode/1, Rtcps);
+rtcp_process ([Rtcp | Rest], Processed, Parent) ->
+	NewRtcp = case rtp_utils:get_type(Rtcp) of
+		sr -> Rtcp;
+		rr -> Rtcp;
+		sdes -> Rtcp;
+		bye ->
+			?ERR("We SHOULD terminate this stream due to RTCP BYE", []),
+			% Unfortunately, it's not possible due to issues in Asterisk configs
+			% which users are unwilling to fix. So we just warn about it.
+			% Maybe, in the future, we'll reconsider this behaviour.
+			Rtcp;
+		app -> Rtcp;
+		xr -> Rtcp;
+		_ -> Rtcp
+	end,
+	rtcp_process (Rest, Processed ++ [NewRtcp],  Parent).
