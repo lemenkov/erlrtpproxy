@@ -24,7 +24,6 @@
 -export([start/1]).
 -export([start_link/1]).
 -export([init/1]).
--export([handle_call/3]).
 -export([handle_cast/2]).
 -export([handle_info/2]).
 -export([code_change/3]).
@@ -64,15 +63,9 @@ init (_Unused) ->
 			{stop, Reason}
 	end.
 
-handle_call(_Other, _From, Fd) ->
-	{noreply, Fd}.
-
 handle_cast({reply, Cmd, Answer}, Fd) ->
 	Origin = Cmd#cmd.origin,
 	gen_udp:send(Fd, Origin#origin.ip, Origin#origin.port, Cmd#cmd.cookie ++ " " ++  Answer ++ "\n"),
-	{noreply, Fd};
-
-handle_cast(_Request, Fd) ->
 	{noreply, Fd}.
 
 code_change(_OldVsn, Fd, _Extra) ->

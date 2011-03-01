@@ -88,10 +88,7 @@ handle_call(?CMD_I, _From, #state{started = Started} = State) ->
 %-record(media, {fd=null, ip=null, port=null, rtpstate=rtp, lastseen}).
 %-record(state, {parent, tref, from, fromrtcp, to, tortcp, holdstate=false, started}).
 	Reply = io_lib:format("CallDuration: ~w", [case Started of null -> "<not started yet>"; _ -> trunc(0.5 + timer:now_diff(erlang:now(), Started) / 1000000) end]),
-	{reply, {ok, Reply}, State};
-
-handle_call(_Other, _From, State) ->
-	{noreply, State}.
+	{reply, {ok, Reply}, State}.
 
 handle_cast(stop, State) ->
 	{stop, stop, State};
@@ -121,10 +118,6 @@ handle_cast({recording, {start, _Filename}}, State) ->
 
 handle_cast({recording, stop}, State) ->
 	% TODO stop recording of RTP
-	{noreply, State};
-
-% all other casts
-handle_cast(_Request, State) ->
 	{noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->

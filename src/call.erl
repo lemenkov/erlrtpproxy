@@ -232,11 +232,7 @@ handle_call({?CMD_P, {Tag, MediaId}}, _From, State) ->
 		false ->
 			{error, not_found}
 	end,
-	{reply, Result, State};
-
-
-handle_call(_Other, _From, State) ->
-	{noreply, State}.
+	{reply, Result, State}.
 
 handle_cast(?CMD_D, State) ->
 	% No need to cleanup  list of media-streams here
@@ -284,11 +280,7 @@ handle_cast({stop, Reason, Pid}, State) ->
 		false ->
 			?ERR("Cannot find such Pid", []),
 			{noreply, State}
-	end;
-
-% all other messages
-handle_cast(_Request, State) ->
-	{noreply, State}.
+	end.
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
