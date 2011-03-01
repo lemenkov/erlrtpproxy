@@ -52,14 +52,6 @@ init ({Parent, From, FromRtcp, To, ToRtcp}) ->
 	process_flag(trap_exit, true),
 	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE*5, ping),
 
-	% Define function for safe
-	FunStartAcc = fun
-		(#state{started = null, from = #media{rtpstate = rtp}, to = #media{rtpstate = rtp}} = S) ->
-			{noreply, S#state{started=now(), fun_start_acc = fun(S2) -> {noreply, S2} end}};
-		(S) ->
-			{noreply, S}
-	end,
-
 	{ok,
 		#state{
 			parent=Parent,
@@ -67,8 +59,7 @@ init ({Parent, From, FromRtcp, To, ToRtcp}) ->
 			from	= safe_make_media(From),
 			fromrtcp= safe_make_media(FromRtcp),
 			to	= safe_make_media(To),
-			tortcp	= safe_make_media(ToRtcp),
-			fun_start_acc= FunStartAcc
+			tortcp	= safe_make_media(ToRtcp)
 		}
 	}.
 
@@ -168,10 +159,11 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fromrtcp = #media{fd = Fd}} = State
 
 % TODO check that message was arrived from valid {Ip, Port}
 % TODO check whether message is valid rtp stream
-handle_info({udp, Fd, Ip, Port, Msg}, #state{fun_start_acc = FSA, from = #media{fd = Fd}} = State) ->
-	FSA(State#state{to = safe_send(State#state.to, State#state.from, Ip, Port, Msg)});
-handle_info({udp, Fd, Ip, Port, Msg}, #state{fun_start_acc = FSA, to = #media{fd = Fd}} = State) ->
-	FSA(State#state{from = safe_send(State#state.from, State#state.to, Ip, Port, Msg)});
+handle_info({udp, Fd, Ip, Port, Msg}, #state{from = #media{fd = Fd}} = State) ->
+	{noreply, State#state{to = safe_send(State#state.to, State#state.from, Ip, Port, Msg), started=start_acc(State)}};
+
+handle_info({udp, Fd, Ip, Port, Msg}, #state{to = #media{fd = Fd}} = State) ->
+	{noreply, State#state{from = safe_send(State#state.from, State#state.to, Ip, Port, Msg), started=start_acc(State)}};
 
 handle_info(ping, #state{from = #media{rtpstate = rtp}, to = #media{rtpstate = rtp}} =  State) ->
 	% Both sides are active, so we just set state to 'nortp' and continue
@@ -204,9 +196,15 @@ safe_make_media (_) ->
 		null.
 
 % Define function for sending RTP/RTCP and updating state
-safe_send (Var1, #media{ip = null, port = null} = Var2, Ip, Port, _Msg) ->
+safe_send (Var1, #media{ip = null, port = null}, Ip, Port, _Msg) ->
 	% Probably RTP or RTCP, but we CANNOT send yet.
 	Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()};
 safe_send (Var1, Var2, Ip, Port, Msg) ->
 	gen_udp:send(Var1#media.fd, Var2#media.ip, Var2#media.port, Msg),
 	Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()}.
+
+% Define function for safe determinin of starting media
+start_acc (#state{started = null, from = #media{rtpstate = rtp}, to = #media{rtpstate = rtp}}) ->
+	now();
+start_acc (S) ->
+	S#state.started.
