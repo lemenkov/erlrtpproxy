@@ -39,7 +39,7 @@
 % * ip - real client's ip
 % * port - real client's port
 -record(media, {fd=null, ip=null, port=null, rtpstate=nortp, lastseen, ssrc=null}).
--record(state, {parent, tref, from, fromrtcp, to, tortcp, fun_send_rtp, fun_start_acc, holdstate=false, started=null}).
+-record(state, {parent, tref, from, fromrtcp, to, tortcp, fun_start_acc, holdstate=false, started=null}).
 
 start(Args) ->
 	gen_server:start(?MODULE, Args, []).
@@ -51,16 +51,6 @@ init ({Parent, From, FromRtcp, To, ToRtcp}) ->
 	?INFO("started ~p ~p", [From, To]),
 	process_flag(trap_exit, true),
 	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE*5, ping),
-
-	% Define function for sending RTCP and updating state
-	SafeSendAndRetState = fun
-		(Var1, #media{ip = null, port = null}, Ip, Port, _Msg) ->
-			% Probably RTP or RTCP, but we CANNOT send yet.
-			Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()};
-		(Var1, Var2, Ip, Port, Msg) ->
-			gen_udp:send(Var1#media.fd, Var2#media.ip, Var2#media.port, Msg),
-			Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()}
-	end,
 
 	% Define function for safe
 	FunStartAcc = fun
@@ -78,7 +68,6 @@ init ({Parent, From, FromRtcp, To, ToRtcp}) ->
 			fromrtcp= safe_make_media(FromRtcp),
 			to	= safe_make_media(To),
 			tortcp	= safe_make_media(ToRtcp),
-			fun_send_rtp = SafeSendAndRetState,
 			fun_start_acc= FunStartAcc
 		}
 	}.
@@ -96,21 +85,12 @@ handle_cast(stop, State) ->
 handle_cast(hold, #state{holdstate = false} = State) ->
 	?INFO("HOLD on", []),
 	% We should suppress timer since we shouldn't care this mediastream
-	{noreply, State#state{fun_send_rtp = fun(Var1, _, Ip, Port, _) -> Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()} end, holdstate=true}};
+	{noreply, State#state{holdstate=true}};
 
 handle_cast(hold, #state{holdstate = true} = State) ->
 	?INFO("HOLD off", []),
 	% since we suppressed timer earlier, we need to restart it
-	% Define function to send RTP/RTCP and update state
-	SafeSendAndRetState = fun
-		(Var1, #media{ip = null, port = null}, Ip, Port, Msg) ->
-			% Probably RTP or RTCP, but we CANNOT send yet.
-			Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()};
-		(Var1, Var2, Ip, Port, Msg) ->
-			gen_udp:send(Var1#media.fd, Var2#media.ip, Var2#media.port, Msg),
-			Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()}
-	end,
-	{noreply, State#state{fun_send_rtp=SafeSendAndRetState, holdstate=false}};
+	{noreply, State#state{holdstate=false}};
 
 handle_cast({recording, {start, _Filename}}, State) ->
 	% TODO set flag to record this stream RTP
@@ -188,10 +168,10 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fromrtcp = #media{fd = Fd}} = State
 
 % TODO check that message was arrived from valid {Ip, Port}
 % TODO check whether message is valid rtp stream
-handle_info({udp, Fd, Ip, Port, Msg}, #state{fun_start_acc = FSA, fun_send_rtp = FSR, from = #media{fd = Fd}} = State) ->
-	FSA(State#state{to = FSR(State#state.to, State#state.from, Ip, Port, Msg)});
-handle_info({udp, Fd, Ip, Port, Msg}, #state{fun_start_acc = FSA, fun_send_rtp = FSR, to = #media{fd = Fd}} = State) ->
-	FSA(State#state{from = FSR(State#state.from, State#state.to, Ip, Port, Msg)});
+handle_info({udp, Fd, Ip, Port, Msg}, #state{fun_start_acc = FSA, from = #media{fd = Fd}} = State) ->
+	FSA(State#state{to = safe_send(State#state.to, State#state.from, Ip, Port, Msg)});
+handle_info({udp, Fd, Ip, Port, Msg}, #state{fun_start_acc = FSA, to = #media{fd = Fd}} = State) ->
+	FSA(State#state{from = safe_send(State#state.from, State#state.to, Ip, Port, Msg)});
 
 handle_info(ping, #state{from = #media{rtpstate = rtp}, to = #media{rtpstate = rtp}} =  State) ->
 	% Both sides are active, so we just set state to 'nortp' and continue
