@@ -8,6 +8,12 @@ start_link() ->
 	supervisor:start_link({global, ?MODULE}, ?MODULE, []).
 
 init([]) ->
+	RestartStrategy = one_for_one,
+	MaxRestarts = 10,
+	MaxTimeBetweenRestarts = 1,
+	SupFlags = {RestartStrategy, MaxRestarts, MaxTimeBetweenRestarts},
+
 	Child = {rtpproxy,{rtpproxy,start_link,[ignored]},permanent,2000,worker,[rtpproxy]},
-	{ok,{{one_for_one,10,1}, [Child]}}.
+
+	{ok,{SupFlags, [Child]}}.
 
