@@ -123,8 +123,8 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fromrtcp = #media{fd = Fd}} = State
 	% First, we'll try do decode our RCP packet(s)
 	try
 		{ok, Rtcps} = rtcp:decode(Msg),
+		?INFO("RTCP from ~s: ~p", [State#state.callid, Rtcps]),
 		Msg2 = rtcp_process (Rtcps, State#state.parent),
-		?INFO("RTCP from ~s: ~p", [State#state.callid, Msg2]),
 		{noreply, State#state{tortcp=safe_send(State#state.tortcp, State#state.fromrtcp, Ip, Port, Msg2)}}
 	catch
 		E:C ->
