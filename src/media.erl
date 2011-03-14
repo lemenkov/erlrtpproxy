@@ -39,7 +39,7 @@
 % * ip - real client's ip
 % * port - real client's port
 -record(media, {fd=null, ip=null, port=null, rtpstate=nortp, lastseen, ssrc=null}).
--record(state, {parent, tref, from, fromrtcp, to, tortcp, fun_start_acc, holdstate=false, started=null}).
+-record(state, {parent, callid, tref, from, fromrtcp, to, tortcp, holdstate=false, started=null}).
 
 start(Args) ->
 	gen_server:start(?MODULE, Args, []).
@@ -47,7 +47,7 @@ start(Args) ->
 start_link(Args) ->
 	gen_server:start_link(?MODULE, Args, []).
 
-init ({Parent, From, FromRtcp, To, ToRtcp}) ->
+init ({Parent, CallID, From, FromRtcp, To, ToRtcp}) ->
 	?INFO("started ~p ~p", [From, To]),
 	process_flag(trap_exit, true),
 	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE*5, ping),
@@ -55,6 +55,7 @@ init ({Parent, From, FromRtcp, To, ToRtcp}) ->
 	{ok,
 		#state{
 			parent=Parent,
+			callid = CallID,
 			tref=TRef,
 			from	= safe_make_media(From),
 			fromrtcp= safe_make_media(FromRtcp),
@@ -123,6 +124,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fromrtcp = #media{fd = Fd}} = State
 	try
 		{ok, Rtcps} = rtcp:decode(Msg),
 		Msg2 = rtcp_process (Rtcps, State#state.parent),
+		?INFO("RTCP from ~s: ~p", [State#state.callid, Msg2]),
 		{noreply, State#state{tortcp=safe_send(State#state.tortcp, State#state.fromrtcp, Ip, Port, Msg2)}}
 	catch
 		E:C ->

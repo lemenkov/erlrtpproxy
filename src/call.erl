@@ -354,7 +354,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 				_ -> {X#source.fd, X#source.ip, X#source.port}
 			end
 		end,
-		{ok, P} = media:start({self(), {F#source.fd, F#source.ip, F#source.port}, SafeGetAddr(FRtcp), {T#source.fd, T#source.ip, T#source.port}, SafeGetAddr(TRtcp)}),
+		{ok, P} = media:start({self(), State#state.callid, {F#source.fd, F#source.ip, F#source.port}, SafeGetAddr(FRtcp), {T#source.fd, T#source.ip, T#source.port}, SafeGetAddr(TRtcp)}),
 		[gen_udp:controlling_process(X#source.fd, P) || X <- [F, FRtcp, T, TRtcp], X /= null],
 		P
 	end,
