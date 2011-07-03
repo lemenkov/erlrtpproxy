@@ -18,6 +18,14 @@ all: compile
 compile:
 	VSN=$(VSN) BUILD_DATE=$(BUILD_DATE) $(REBAR) compile $(REBAR_FLAGS)
 
+rel: compile
+	rm -rf rel/ser
+	$(REBAR) generate $(REBAR_FLAGS)
+
+run: rel
+	chmod 755 ./rel/ser/bin/ser
+	./rel/ser/bin/ser start
+
 install: all
 	install -D -p -m 0644 $(APP_FILE) $(DESTDIR)$(ERLDIR)/$(APP_FILE)
 	install -p -m 0644 $(ERL_OBJECTS) $(DESTDIR)$(ERLDIR)/$(EBIN_DIR)
