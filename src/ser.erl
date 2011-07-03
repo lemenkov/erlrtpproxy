@@ -48,7 +48,6 @@ init (_Unused) ->
 	{ok, {SyslogHost, SyslogPort}} = application:get_env(?MODULE, syslog_address),
 
 	error_logger:add_report_handler(erlsyslog, {0, SyslogHost, SyslogPort}),
-	error_logger:tty(false),
 
 	net_adm:ping(RtpproxyNode),
 
