@@ -1,10 +1,10 @@
-VSN := 0.3.3
+REBAR ?= $(shell which rebar 2>/dev/null || which ./rebar)
+REBAR_FLAGS ?=
+
+VSN := "0.3.3"
 BUILD_DATE := `LANG=C date +"%a %b %d %Y"`
 NAME := ser
 
-ERLC := /usr/bin/erlc
-ERLC_FLAGS := +debug_info
-EMULATOR := beam
 ERLANG_ROOT := $(shell erl -eval 'io:format("~s", [code:root_dir()])' -s init stop -noshell)
 ERLDIR=$(ERLANG_ROOT)/lib/$(NAME)-$(VSN)
 
@@ -12,21 +12,11 @@ EBIN_DIR := ebin
 ERL_SOURCES  := $(wildcard src/*.erl)
 ERL_OBJECTS  := $(ERL_SOURCES:src/%.erl=$(EBIN_DIR)/%.beam)
 APP_FILE := $(EBIN_DIR)/$(NAME).app
-SPEC_FILE := priv/erlrtpproxy-ser.spec
 
-all: $(EBIN_DIR) $(ERL_OBJECTS) $(APP_FILE) $(SPEC_FILE)
+all: compile
 
-$(EBIN_DIR)/%.$(EMULATOR): ./src/%.erl
-	$(ERLC) $(ERLC_FLAGS) -I include -o $(EBIN_DIR) $<
-
-$(EBIN_DIR)/%.app: ./src/%.app.src
-	sed -e "s,%VSN%,$(VSN),g" $< > $@
-
-priv/%.spec: priv/%.spec.in
-	sed -e "s,%VSN%,$(VSN),g;s,%DATE%,$(BUILD_DATE),g"  $< > $@
-
-$(EBIN_DIR):
-	mkdir -p $(EBIN_DIR)
+compile:
+	VSN=$(VSN) BUILD_DATE=$(BUILD_DATE) $(REBAR) compile $(REBAR_FLAGS)
 
 install: all
 	install -D -p -m 0644 $(APP_FILE) $(DESTDIR)$(ERLDIR)/$(APP_FILE)
@@ -36,4 +26,4 @@ install: all
 	install -D -p -m 0644 priv/erlrtpproxy-ser.sysconfig $(DESTDIR)/etc/sysconfig/$(NAME)
 
 clean:
-	rm -f $(ERL_OBJECTS) $(APP_FILE) $(SPEC_FILE) priv/*~ src/*~ *~
+	$(REBAR) clean $(REBAR_FLAGS)

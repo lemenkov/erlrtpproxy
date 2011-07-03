@@ -3,7 +3,7 @@
 	    [
 		{description, "Application for tearing down calls"},
 		{vsn, "%VSN%"},
-		{modules, [ser, ser_app, ser_sup]},
+		{modules, []},
 		{registered, [ser, ser_sup]},
 		{applications, [kernel, stdlib, erlsyslog]},
 		{env,
