@@ -40,8 +40,6 @@ start_link(Args) ->
 	gen_server:start_link(?MODULE, Args, []).
 
 init (_Unused) ->
-	process_flag(trap_exit, true),
-
 	% Load parameters
 	{ok, {Ip, Port}} = application:get_env(?MODULE, listen_address),
 	{ok, RtpproxyNode} = application:get_env(?MODULE, rtpproxy_node),
