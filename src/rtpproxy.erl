@@ -166,32 +166,13 @@ handle_cast({message, #cmd{type = ?CMD_P, origin = #origin{pid = Pid}} = Cmd}, S
 					{error, notfound} ->
 						?RTPPROXY_ERR_NOSESSION;
 					Addr ->
-						case find_host(State#state.rtphosts) of
-							{RtpHost={Node, NodeIp, AvailablePorts}, RtpHosts} ->
-								try rpc:call(Node, player, start, [Cmd#cmd.filename, Cmd#cmd.codecs, Addr]) of
-									{ok, PlayerPid} ->
-										NewPlayerThread = #thread{pid=PlayerPid, callid=Cmd#cmd.callid, node=Node},
-										{?RTPPROXY_OK, State#state{
-												players=lists:append (State#state.players, [NewPlayerThread]),
-												rtphosts=RtpHosts ++ [RtpHost]
-											}
-										};
-									{badrpc, nodedown} ->
-										?ERR("rtp host [~w] seems stopped!", [{Node,NodeIp}]),
-										% FIXME consider to remove bad host from list
-										{?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts++[RtpHost]}};
-									Other ->
-										?ERR("error creating call! [~w]", [Other]),
-										{?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts++[RtpHost]}}
-								catch
-									ExceptionClass:ExceptionPattern ->
-										?ERR("Exception [~w] reached with result [~w]", [ExceptionClass, ExceptionPattern]),
-										{?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts++[RtpHost]}}
-								end;
-							error_no_nodes ->
-								?ERR("error no suitable nodes to create new player!", []),
-								?RTPPROXY_ERR_SOFTWARE
-						end
+						PlayerPid = pool:pspawn(player, start, [Cmd#cmd.filename, Cmd#cmd.codecs, Addr]),
+						NewPlayerThread = #thread{pid=PlayerPid, callid=Cmd#cmd.callid, node=Node},
+						{?RTPPROXY_OK, State#state{
+							players=lists:append (State#state.players, [NewPlayerThread]),
+							rtphosts=RtpHosts ++ [RtpHost]
+							}
+						}
 				end
 		end
 	of
@@ -293,48 +274,25 @@ handle_cast({message, #cmd{type = ?CMD_U, origin = #origin{pid = Pid}} = Cmd}, S
 						?RTPPROXY_ERR_SOFTWARE
 				end;
 			NoSessionFound ->
-				% New session
-				case find_host(State#state.rtphosts) of
-					{{Node, NodeIp, []}, RtpHosts} ->
-						?ERR("error no free ports at node ~p (ip ~p)!", [Node, NodeIp]),
-						{?RTPPROXY_ERR_SOFTWARE, State#state{rtphosts=RtpHosts++[{Node, NodeIp, []}]}};
-					{RtpHost={Node, NodeIp, [NewPort|AvailablePorts]}, RtpHosts} ->
-						?INFO("Session not exists. Creating new at ~w.", [Node]),
-						try rpc:call(Node, call, start, [{Cmd#cmd.callid, NodeIp, State#state.radacct_servers}]) of
-							{ok, CallPid} ->
-								NewCallThread = #thread{pid=CallPid, callid=Cmd#cmd.callid, node=Node},
-								case gen_server:call(CallPid, {Cmd#cmd.type, {NewPort, Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.params}}) of
-									{ok, new, Reply} ->
-										{Reply, State#state{
-												calls=lists:append (State#state.calls, [NewCallThread]),
-												rtphosts=RtpHosts++[{Node, NodeIp, AvailablePorts}]
-											}
-										};
-									{ok, old, Reply} ->
-										{Reply, State#state{
-												calls=lists:append (State#state.calls, [NewCallThread]),
-												rtphosts=RtpHosts++[RtpHost]
-											}
-										};
-									{error, udp_error} ->
-										?ERR("error in udp while CMD_U!", []),
-										{?RTPPROXY_ERR_SOFTWARE, State#state{rtphosts=RtpHosts++[{Node, NodeIp, AvailablePorts}]}}
-								end;
-							{badrpc, nodedown} ->
-								?ERR("rtp host [~w] seems stopped!", [{Node,NodeIp}]),
-								% FIXME consider to remove bad host from list
-								{?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts++[RtpHost]}};
-							Other ->
-								?ERR("error creating call! [~w]", [Other]),
-								{?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts++[RtpHost]}}
-						catch
-							ExceptionClass:ExceptionPattern ->
-								?ERR("Exception [~w] reached with result [~w]", [ExceptionClass, ExceptionPattern]),
-								{?RTPPROXY_ERR_SOFTWARE,  State#state{rtphosts=RtpHosts++[RtpHost]}}
-						end;
-					error_no_nodes ->
-						?ERR("error no suitable nodes (from ~p) to create new session!", [State#state.rtphosts]),
-						?RTPPROXY_ERR_SOFTWARE
+				?INFO("Session not exists. Creating new at ~w.", [Node]),
+				CallPid = pool:pspawn(call, start, [{Cmd#cmd.callid, NodeIp, State#state.radacct_servers}]),
+				NewCallThread = #thread{pid=CallPid, callid=Cmd#cmd.callid, node=Node},
+				case gen_server:call(CallPid, {Cmd#cmd.type, {NewPort, Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.params}}) of
+					{ok, new, Reply} ->
+						{Reply, State#state{
+								calls=lists:append (State#state.calls, [NewCallThread]),
+								rtphosts=RtpHosts++[{Node, NodeIp, AvailablePorts}]
+							}
+						};
+					{ok, old, Reply} ->
+						{Reply, State#state{
+								calls=lists:append (State#state.calls, [NewCallThread]),
+								rtphosts=RtpHosts++[RtpHost]
+							}
+						};
+					{error, udp_error} ->
+						?ERR("error in udp while CMD_U!", []),
+						{?RTPPROXY_ERR_SOFTWARE, State#state{rtphosts=RtpHosts++[{Node, NodeIp, AvailablePorts}]}}
 				end
 		end
 	of
@@ -470,29 +428,6 @@ terminate(Reason, State) ->
 	?ERR("RTPPROXY terminated due to reason [~w]", [Reason]),
 	error_logger:delete_report_handler(erlsyslog),
 	error_logger:tty(true).
-
-find_host(Nodes) ->
-	find_host(Nodes, []).
-
-find_host([], _Acc) ->
-	error_no_nodes;
-
-find_host([{Node,Ip,Ports}|OtherNodes], Acc) ->
-	Parent = self(),
-	spawn (fun() ->
-			Ret = net_adm:ping(Node),
-			Parent ! Ret
-		end),
-	receive
-		pong ->
-			{{Node,Ip,Ports},OtherNodes ++ Acc};
-		pang ->
-			find_host(OtherNodes, Acc ++ [{Node,Ip,Ports}])
-	% TODO
-%	after State#state.ping_timeout ->
-	after 100 ->
-			find_host(OtherNodes, Acc ++ [{Node,Ip,Ports}])
-	end.
 
 test() ->
 	io:format("Done!~n").
