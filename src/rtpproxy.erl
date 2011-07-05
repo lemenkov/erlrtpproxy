@@ -60,9 +60,7 @@ init(_Unused) ->
 
 	error_logger:add_report_handler(erlsyslog, {0, SyslogHost, SyslogPort}),
 	error_logger:tty(false),
-%	erlang:system_monitor(self(), [{long_gc, 1000}, {large_heap, 1000000}, busy_port, busy_dist_port]),
 
-%	mnesia:create_table({thread, [{disc_only_copies, [node()]}, {attributes, record_info(fields, thread)}]}),
 
 	lists:map(fun(N) ->
 			?INFO("Adding node ~p", [N]),
