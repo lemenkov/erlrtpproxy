@@ -37,7 +37,7 @@
 
 % description of call thread
 -record(thread, {pid=null, callid=null}).
--record(state, {calls=[], players=[], radacct_servers}).
+-record(state, {calls=[], players=[]}).
 
 start() ->
 	gen_server:start({global, ?MODULE}, ?MODULE, [], []).
@@ -53,7 +53,6 @@ init(_Unused) ->
 
 	% Load parameters
 	{ok, {SyslogHost, SyslogPort}} = application:get_env(?MODULE, syslog_address),
-	{ok, RadAcctServers} = application:get_env(?MODULE, radacct_servers),
 
 	error_logger:add_report_handler(erlsyslog, {0, SyslogHost, SyslogPort}),
 	error_logger:tty(false),
@@ -67,7 +66,7 @@ init(_Unused) ->
 		pool:get_nodes()
 	),
 
-	{ok, #state{radacct_servers=RadAcctServers}}.
+	{ok, #state{}}.
 
 handle_call(_Message, _From , State) ->
 	{reply, ?RTPPROXY_ERR_SOFTWARE, State}.
@@ -250,7 +249,7 @@ handle_cast({message, #cmd{type = ?CMD_U, origin = #origin{pid = Pid}} = Cmd}, S
 				end;
 			NoSessionFound ->
 				?INFO("Session not exists. Creating new.", []),
-				CallPid = pool:pspawn(call, start, [{Cmd#cmd.callid, State#state.radacct_servers}]),
+				CallPid = pool:pspawn(call, start, [Cmd#cmd.callid]),
 				NewCallThread = #thread{pid=CallPid, callid=Cmd#cmd.callid},
 				case gen_server:call(CallPid, {Cmd#cmd.type, { Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.params}}) of
 					{ok, new, Reply} ->
