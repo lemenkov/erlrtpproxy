@@ -37,7 +37,7 @@
 
 % description of call thread
 -record(thread, {pid=null, callid=null}).
--record(state, {calls=[], players=[], ports_per_media, radacct_servers}).
+-record(state, {calls=[], players=[], radacct_servers}).
 
 start() ->
 	gen_server:start({global, ?MODULE}, ?MODULE, [], []).
@@ -53,7 +53,6 @@ init(_Unused) ->
 
 	% Load parameters
 	{ok, {SyslogHost, SyslogPort}} = application:get_env(?MODULE, syslog_address),
-	{ok, PortsPerMedia} = application:get_env(?MODULE, ports_per_media),
 	{ok, RadAcctServers} = application:get_env(?MODULE, radacct_servers),
 
 	error_logger:add_report_handler(erlsyslog, {0, SyslogHost, SyslogPort}),
@@ -68,7 +67,7 @@ init(_Unused) ->
 		pool:get_nodes()
 	),
 
-	{ok, #state{ports_per_media=PortsPerMedia, radacct_servers=RadAcctServers}}.
+	{ok, #state{radacct_servers=RadAcctServers}}.
 
 handle_call(_Message, _From , State) ->
 	{reply, ?RTPPROXY_ERR_SOFTWARE, State}.
