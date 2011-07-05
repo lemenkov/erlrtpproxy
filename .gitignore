@@ -1,0 +1,7 @@
+*.diff
+*.orig
+*.patch
+*.rej
+*~
+ebin/
+priv/erlrtpproxy.spec
