@@ -8,7 +8,6 @@
 		{applications, [kernel, stdlib, erlsyslog]},
 		{env,
 			[
-				{ping_timeout, 100},
 				{ports_per_media, 4},
 				{radacct_servers, [[{127,0,0,1},1813,"testradacctpass"]]},
 				{syslog_address, {"localhost", 514}},

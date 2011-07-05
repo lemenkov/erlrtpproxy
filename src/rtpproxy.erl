@@ -37,7 +37,7 @@
 
 % description of call thread
 -record(thread, {pid=null, callid=null}).
--record(state, {calls=[], players=[], ports_per_media, ping_timeout, radacct_servers}).
+-record(state, {calls=[], players=[], ports_per_media, radacct_servers}).
 
 start() ->
 	gen_server:start({global, ?MODULE}, ?MODULE, [], []).
@@ -54,7 +54,6 @@ init(_Unused) ->
 	% Load parameters
 	{ok, {SyslogHost, SyslogPort}} = application:get_env(?MODULE, syslog_address),
 	{ok, PortsPerMedia} = application:get_env(?MODULE, ports_per_media),
-	{ok, PingTimeout} = application:get_env(?MODULE, ping_timeout),
 	{ok, RadAcctServers} = application:get_env(?MODULE, radacct_servers),
 
 	error_logger:add_report_handler(erlsyslog, {0, SyslogHost, SyslogPort}),
@@ -69,7 +68,7 @@ init(_Unused) ->
 		pool:get_nodes()
 	),
 
-	{ok, #state{ports_per_media=PortsPerMedia, ping_timeout=PingTimeout, radacct_servers=RadAcctServers}}.
+	{ok, #state{ports_per_media=PortsPerMedia, radacct_servers=RadAcctServers}}.
 
 handle_call(_Message, _From , State) ->
 	{reply, ?RTPPROXY_ERR_SOFTWARE, State}.
@@ -301,25 +300,11 @@ handle_cast({call_terminated, {Pid, {ports, Ports}, Reason}}, State) when is_lis
 			end
 	end;
 
-handle_cast({node_add, {Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}}, State) when is_atom(Node), is_atom(Ip) ->
-	?INFO("add node [~w]", [{Node, Ip}]),
-	Parent = self(),
-	spawn (fun() ->
-			Ret = net_adm:ping(Node),
-			Parent ! Ret
-		end),
-	receive
-		pong ->
-			?INFO("Adding node ~p", [Node]),
-			rtpproxy_ctl:upgrade(Node),
-			{noreply, State};
-		pang ->
-			?ERR("Failed to add node ~p due to pang answer", [Node]),
-			{noreply, State}
-	after State#state.ping_timeout ->
-			?ERR("Failed to add node ~p due to TIMEOUT", [Node]),
-			{noreply, State}
-	end;
+handle_cast({node_add, Node}, State) when is_atom(Node) ->
+	?INFO("add node [~w]", [Node]),
+	pspawn:attach(Node),
+	rtpproxy_ctl:upgrade(Node),
+	{noreply, State};
 
 handle_cast(status, State) ->
 	?INFO("Current state - ~p call(s):", [length(State#state.calls)]),
