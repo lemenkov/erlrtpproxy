@@ -31,8 +31,6 @@
 -export([code_change/3]).
 -export([terminate/2]).
 
--export([test/0]).
-
 -include("../include/common.hrl").
 
 % description of call thread
@@ -372,6 +370,3 @@ terminate(Reason, State) ->
 	?ERR("RTPPROXY terminated due to reason [~w]", [Reason]),
 	error_logger:delete_report_handler(erlsyslog),
 	error_logger:tty(true).
-
-test() ->
-	io:format("Done!~n").
