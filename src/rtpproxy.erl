@@ -36,8 +36,8 @@
 -include("../include/common.hrl").
 
 % description of call thread
--record(thread, {pid=null, callid=null, node=null}).
--record(state, {calls=[], rtphosts=null, players=[], ports_per_media, ping_timeout, radacct_servers}).
+-record(thread, {pid=null, callid=null}).
+-record(state, {calls=[], players=[], ports_per_media, ping_timeout, radacct_servers}).
 
 start() ->
 	gen_server:start({global, ?MODULE}, ?MODULE, [], []).
@@ -53,7 +53,6 @@ init(_Unused) ->
 
 	% Load parameters
 	{ok, {SyslogHost, SyslogPort}} = application:get_env(?MODULE, syslog_address),
-	{ok, RtpHosts} = application:get_env(?MODULE, rtphosts),
 	{ok, PortsPerMedia} = application:get_env(?MODULE, ports_per_media),
 	{ok, PingTimeout} = application:get_env(?MODULE, ping_timeout),
 	{ok, RadAcctServers} = application:get_env(?MODULE, radacct_servers),
@@ -61,14 +60,16 @@ init(_Unused) ->
 	error_logger:add_report_handler(erlsyslog, {0, SyslogHost, SyslogPort}),
 	error_logger:tty(false),
 
+	pool:start(rtpproxy),
 
 	lists:map(fun(N) ->
 			?INFO("Adding node ~p", [N]),
 			rtpproxy_ctl:upgrade(N)
 		end,
-		RtpHosts),
+		pool:get_nodes()
+	),
 
-	{ok, #state{rtphosts=RH, ports_per_media=PortsPerMedia, ping_timeout=PingTimeout, radacct_servers=RadAcctServers}}.
+	{ok, #state{ports_per_media=PortsPerMedia, ping_timeout=PingTimeout, radacct_servers=RadAcctServers}}.
 
 handle_call(_Message, _From , State) ->
 	{reply, ?RTPPROXY_ERR_SOFTWARE, State}.
@@ -153,10 +154,9 @@ handle_cast({message, #cmd{type = ?CMD_P, origin = #origin{pid = Pid}} = Cmd}, S
 						?RTPPROXY_ERR_NOSESSION;
 					Addr ->
 						PlayerPid = pool:pspawn(player, start, [Cmd#cmd.filename, Cmd#cmd.codecs, Addr]),
-						NewPlayerThread = #thread{pid=PlayerPid, callid=Cmd#cmd.callid, node=Node},
+						NewPlayerThread = #thread{pid=PlayerPid, callid=Cmd#cmd.callid},
 						{?RTPPROXY_OK, State#state{
-							players=lists:append (State#state.players, [NewPlayerThread]),
-							rtphosts=RtpHosts ++ [RtpHost]
+							players=lists:append (State#state.players, [NewPlayerThread])
 							}
 						}
 				end
@@ -234,51 +234,40 @@ handle_cast({message, #cmd{type = ?CMD_U, origin = #origin{pid = Pid}} = Cmd}, S
 			% Already created session
 			{value, CallInfo} ->
 %				?INFO("Session exists. Update/create existing session.", []),
-				% TODO get rid of hardcoded number "1"
-				case lists:keytake(CallInfo#thread.node, 1, State#state.rtphosts) of
-					{value, {Node, NodeIp, []}, OtherRtpHosts} ->
-						?ERR("cannot start session on node [~p] - no available ports", [Node]),
-						?RTPPROXY_ERR_SOFTWARE;
-					{value, {Node, NodeIp, [NewPort|AvailablePorts]}, OtherRtpHosts} ->
-						try gen_server:call(CallInfo#thread.pid, {Cmd#cmd.type, {NewPort, Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.params}}) of
-							{ok, new, Reply} ->
-								{Reply, State#state{rtphosts=OtherRtpHosts ++ [{Node, NodeIp, AvailablePorts}]}};
-							{ok, old, Reply} ->
-								Reply;
-							{error, not_found} ->
-								?ERR("Session does not exists.", []),
-								?RTPPROXY_ERR_NOSESSION;
-							{error, udp_error} ->
-								?ERR("error in udp while CMD_U!", []),
-								?RTPPROXY_ERR_SOFTWARE
-						catch
-							Error:ErrorClass ->
-								?ERR("Exception {~p,~p} while CMD_U!", [Error,ErrorClass]),
-								?RTPPROXY_ERR_SOFTWARE
-						end;
-					false ->
+				try gen_server:call(CallInfo#thread.pid, {Cmd#cmd.type, {Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.params}}) of
+					{ok, new, Reply} ->
+						{Reply, State};
+					{ok, old, Reply} ->
+						Reply;
+					{error, not_found} ->
+						?ERR("Session does not exists.", []),
+						?RTPPROXY_ERR_NOSESSION;
+					{error, udp_error} ->
+						?ERR("error in udp while CMD_U!", []),
+						?RTPPROXY_ERR_SOFTWARE
+				catch
+					Error:ErrorClass ->
+						?ERR("Exception {~p,~p} while CMD_U!", [Error,ErrorClass]),
 						?RTPPROXY_ERR_SOFTWARE
 				end;
 			NoSessionFound ->
-				?INFO("Session not exists. Creating new at ~w.", [Node]),
-				CallPid = pool:pspawn(call, start, [{Cmd#cmd.callid, NodeIp, State#state.radacct_servers}]),
-				NewCallThread = #thread{pid=CallPid, callid=Cmd#cmd.callid, node=Node},
-				case gen_server:call(CallPid, {Cmd#cmd.type, {NewPort, Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.params}}) of
+				?INFO("Session not exists. Creating new.", []),
+				CallPid = pool:pspawn(call, start, [{Cmd#cmd.callid, State#state.radacct_servers}]),
+				NewCallThread = #thread{pid=CallPid, callid=Cmd#cmd.callid},
+				case gen_server:call(CallPid, {Cmd#cmd.type, { Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.params}}) of
 					{ok, new, Reply} ->
 						{Reply, State#state{
-								calls=lists:append (State#state.calls, [NewCallThread]),
-								rtphosts=RtpHosts++[{Node, NodeIp, AvailablePorts}]
+								calls=lists:append (State#state.calls, [NewCallThread])
 							}
 						};
 					{ok, old, Reply} ->
 						{Reply, State#state{
-								calls=lists:append (State#state.calls, [NewCallThread]),
-								rtphosts=RtpHosts++[RtpHost]
+								calls=lists:append (State#state.calls, [NewCallThread])
 							}
 						};
 					{error, udp_error} ->
 						?ERR("error in udp while CMD_U!", []),
-						{?RTPPROXY_ERR_SOFTWARE, State#state{rtphosts=RtpHosts++[{Node, NodeIp, AvailablePorts}]}}
+						{?RTPPROXY_ERR_SOFTWARE, State}
 				end
 		end
 	of
@@ -300,14 +289,7 @@ handle_cast({call_terminated, {Pid, {ports, Ports}, Reason}}, State) when is_lis
 	case lists:keytake(Pid, #thread.pid, State#state.calls) of
 		{value, CallThread, OtherCalls} ->
 			?INFO("call [~w] closed", [Pid]),
-			% TODO get rid of hardcoded number "1"
-			case lists:keytake(CallThread#thread.node, 1, State#state.rtphosts) of
-				{value, {Node, NodeIp, AvailablePorts}, OtherRtpHosts} ->
-					{noreply, State#state{calls=OtherCalls, rtphosts=OtherRtpHosts ++ [{Node, NodeIp, AvailablePorts ++ Ports}]}};
-				false ->
-					?WARN("Cannot find node and (therefore) return ports to it", []),
-					{noreply, State#state{calls=OtherCalls}}
-			end;
+			{noreply, State#state{calls=OtherCalls}};
 		false ->
 			case lists:keytake(Pid, #thread.pid, State#state.players) of
 				{value, PlayerThread, OtherPlayers} ->
@@ -328,14 +310,14 @@ handle_cast({node_add, {Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}}, St
 		end),
 	receive
 		pong ->
-			?INFO("Adding node ~p at ip ~p with port range [~p - ~p]", [Node, Ip, MinPort, MaxPort]),
+			?INFO("Adding node ~p", [Node]),
 			rtpproxy_ctl:upgrade(Node),
-			{noreply, State#state{rtphosts=lists:append(State#state.rtphosts, [{Node, Ip, lists:seq(MinPort, MaxPort, State#state.ports_per_media)}])}};
+			{noreply, State};
 		pang ->
-			?ERR("Failed to add node ~p at ip ~p with port range [~p - ~p] due to pang answer", [Node, Ip, MinPort, MaxPort]),
+			?ERR("Failed to add node ~p due to pang answer", [Node]),
 			{noreply, State}
 	after State#state.ping_timeout ->
-			?ERR("Failed to add node ~p at ip ~p with port range [~p - ~p] due to TIMEOUT", [Node, Ip, MinPort, MaxPort]),
+			?ERR("Failed to add node ~p due to TIMEOUT", [Node]),
 			{noreply, State}
 	end;
 
@@ -344,7 +326,7 @@ handle_cast(status, State) ->
 	lists:foreach(	fun(X) ->
 				% TODO fix this strange situation
 				{ok, Reply} = try gen_server:call(X#thread.pid, ?CMD_I) catch E:C -> {ok, [["died (shouldn't happend)"]]} end,
-				?INFO("* Node: ~p, Pid: ~p, CallID: ~p, State:", [X#thread.node, X#thread.pid, X#thread.callid]),
+				?INFO("* Pid: ~p, CallID: ~p, State:", [X#thread.pid, X#thread.callid]),
 				lists:foreach(	fun(Y) ->
 							lists:foreach(	fun(Z) ->
 										?INFO("---> ~s", [Z])
@@ -368,7 +350,7 @@ handle_cast(upgrade, State) ->
 	lists:foreach(fun(N) ->
 			?WARN("UPGRADING on node ~p", [N]),
 			rtpproxy_ctl:upgrade(N)
-			end, State#state.rtphosts ++ [{node(), unused, unused}])
+			end, pool:get_nodes()),
 	{noreply, State};
 
 handle_cast(_Other, State) ->
