@@ -398,10 +398,6 @@ handle_cast({node_add, {Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}}, St
 			{noreply, State}
 	end;
 
-handle_cast({node_del, {Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}}, State) when is_atom(Node), is_atom(Ip) ->
-	?INFO("del node [~w]", [{Node, Ip}]),
-	{noreply, State#state{rtphosts=lists:keydelete(Node, 1 , State#state.rtphosts)}};
-
 handle_cast(status, State) ->
 	?INFO("Current state - ~p call(s):", [length(State#state.calls)]),
 	lists:foreach(	fun(X) ->
