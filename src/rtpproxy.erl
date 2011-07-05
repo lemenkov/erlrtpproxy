@@ -37,7 +37,7 @@
 
 % description of call thread
 -record(thread, {pid=null, callid=null, node=null}).
--record(state, {calls=[], rtphosts=null, players=[], sources, ports_per_media, ping_timeout, radacct_servers}).
+-record(state, {calls=[], rtphosts=null, players=[], ports_per_media, ping_timeout, radacct_servers}).
 
 start() ->
 	gen_server:start({global, ?MODULE}, ?MODULE, [], []).
@@ -56,7 +56,6 @@ init(_Unused) ->
 	{ok, RtpHosts} = application:get_env(?MODULE, rtphosts),
 	{ok, PortsPerMedia} = application:get_env(?MODULE, ports_per_media),
 	{ok, PingTimeout} = application:get_env(?MODULE, ping_timeout),
-	{ok, Sources} = application:get_env(?MODULE, sources),
 	{ok, RadAcctServers} = application:get_env(?MODULE, radacct_servers),
 
 	error_logger:add_report_handler(erlsyslog, {0, SyslogHost, SyslogPort}),
@@ -65,24 +64,13 @@ init(_Unused) ->
 
 %	mnesia:create_table({thread, [{disc_only_copies, [node()]}, {attributes, record_info(fields, thread)}]}),
 
-	RH = lists:map(
-		fun({Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}) ->
-			case net_adm:ping(Node) of
-				pong ->
-					?INFO("Adding node ~p at ip ~p with port range [~p - ~p]", [Node, Ip, MinPort, MaxPort]),
-					lists:foreach(fun(Mod) ->
-								{Mod, Bin, File} = code:get_object_code(Mod),
-								rpc:call(Node, code, load_binary, [Mod, File, Bin])
-							end, Sources),
-					{Node, Ip, lists:seq(MinPort, MaxPort, PortsPerMedia)};
-				pang ->
-					?ERR("Failed to add node ~p at ip ~p with port range [~p - ~p]", [Node, Ip, MinPort, MaxPort]),
-					[]
-			end
+	lists:map(fun(N) ->
+			?INFO("Adding node ~p", [N]),
+			rtpproxy_ctl:upgrade(N)
 		end,
 		RtpHosts),
 
-	{ok, #state{rtphosts=RH, sources=Sources, ports_per_media=PortsPerMedia, ping_timeout=PingTimeout, radacct_servers=RadAcctServers}}.
+	{ok, #state{rtphosts=RH, ports_per_media=PortsPerMedia, ping_timeout=PingTimeout, radacct_servers=RadAcctServers}}.
 
 handle_call(_Message, _From , State) ->
 	{reply, ?RTPPROXY_ERR_SOFTWARE, State}.
@@ -343,10 +331,7 @@ handle_cast({node_add, {Node, Ip, {min_port, MinPort}, {max_port, MaxPort}}}, St
 	receive
 		pong ->
 			?INFO("Adding node ~p at ip ~p with port range [~p - ~p]", [Node, Ip, MinPort, MaxPort]),
-			lists:foreach(fun(Mod) ->
-						{Mod, Bin, File} = code:get_object_code(Mod),
-						rpc:call(Node, code, load_binary, [Mod, File, Bin])
-					end, State#state.sources),
+			rtpproxy_ctl:upgrade(Node),
 			{noreply, State#state{rtphosts=lists:append(State#state.rtphosts, [{Node, Ip, lists:seq(MinPort, MaxPort, State#state.ports_per_media)}])}};
 		pang ->
 			?ERR("Failed to add node ~p at ip ~p with port range [~p - ~p] due to pang answer", [Node, Ip, MinPort, MaxPort]),
@@ -382,14 +367,10 @@ handle_cast(close_all, State) ->
 
 handle_cast(upgrade, State) ->
 	?WARN("UPGRADING beam-files on every node", []),
-	lists:foreach(fun(SourceFile) ->
-				compile:file(SourceFile, [verbose, report_errors, report_warnings]),
-				{Mod, Bin, File} = code:get_object_code(SourceFile),
-				lists:foreach(fun({Node, _, _}) ->
-						?WARN("UPGRADING on node ~w beam-file '~w'", [Node, Mod]),
-						rpc:call(Node, code, load_binary, [Mod, File, Bin], 5000)
-						end, State#state.rtphosts ++ [{node(), unused, unused}])
-			end, State#state.sources),
+	lists:foreach(fun(N) ->
+			?WARN("UPGRADING on node ~p", [N]),
+			rtpproxy_ctl:upgrade(N)
+			end, State#state.rtphosts ++ [{node(), unused, unused}])
 	{noreply, State};
 
 handle_cast(_Other, State) ->

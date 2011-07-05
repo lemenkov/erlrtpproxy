@@ -21,6 +21,7 @@
 -author('lemenkov@gmail.com').
 
 -export([upgrade/0]).
+-export([upgrade/1]).
 -export([stop/0]).
 -export([status/0]).
 
@@ -40,6 +41,17 @@ upgrade() ->
 			1
 	end,
 	halt(Status).
+
+upgrade(Nodes) when is_list(Nodes) ->
+	lists:foreach(fun upgrade/1, Nodes);
+
+upgrade(Node) when is_atom(Node) ->
+	{ok, Sources} = application:get_env(rtpproxy, sources),
+	lists:foreach(fun(Mod) ->
+			{Mod, Bin, File} = code:get_object_code(Mod),
+			rpc:call(Node, code, load_binary, [Mod, File, Bin])
+		end,
+	Sources).
 
 stop() ->
 	Status = case init:get_plain_arguments() of
