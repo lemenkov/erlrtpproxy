@@ -59,9 +59,11 @@ start(Args) ->
 start_link(Args) ->
 	gen_server:start_link(?MODULE, Args, []).
 
-init ({CallID, MainIp}) ->
+init (CallID) ->
 	process_flag(trap_exit, true),
 	{ok, RadAcctServers} = application:get_env(rtpproxy, radacct_servers),
+	% TODO just choose first one for now
+	[MainIp | Rest ]  = get_ipaddrs(),
 	eradius_dict:start(),
 	eradius_dict:load_tables(["dictionary", "dictionary_cisco"]),
 	case eradius_dict:lookup(?Acct_Session_Id) of
@@ -415,9 +417,38 @@ handle_info(Info, State) ->
 	?WARN("Info [~w]", [Info]),
 	{noreply, State}.
 
+%%
+%% Private functions
+%%
+
 date_time_fmt() ->
 	{{YYYY,MM,DD},{Hour,Min,Sec}} = erlang:localtime(),
 %	DayNumber = calendar:day_of_the_week({YYYY,MM,DD}),
 %	lists:flatten(io_lib:format("~s ~3s ~2.2.0w ~2.2.0w:~2.2.0w:~2.2.0w ~4.4.0w",[httpd_util:day(DayNumber),httpd_util:month(MM),DD,Hour,Min,Sec,YYYY])).
 	lists:flatten(io_lib:format("~4.4.0w-~2.2.0w-~2.2.0w ~2.2.0w:~2.2.0w:~2.2.0w", [YYYY, MM, DD, Hour,Min,Sec])).
+
+get_ipaddrs() ->
+	% TODO IPv4 only
+	{ok, IPv4List} = inet:getif(),
+	FilterIP = fun (F) ->
+			fun
+				({[], X}) ->
+					X;
+				% Loopback
+				({[{{127, _, _, _}, _Bcast,_Mask} | Rest], X}) ->
+					F({Rest, X});
+				% RFC 1918, 10.0.0.0 - 10.255.255.255
+				({[{{10,_,_,_}, _Bcast,_Mask} | Rest], X}) ->
+					F({Rest, X});
+				% RFC 1918, 172.16.0.0 - 172.31.255.255
+				({[{{172, A ,_,_}, _Bcast,_Mask} | Rest], X}) when A > 15 , A < 32 ->
+					F({Rest, X});
+				% RFC 1918, 192.168.0.0 - 192.168.255.255
+				({[{{192, 168,_,_}, _Bcast,_Mask} | Rest], X}) ->
+					F({Rest, X});
+				({[ {IPv4, _Bcast,_Mask} | Rest], X}) ->
+					F({Rest, X ++ [IPv4]})
+			end
+	end,
+	(y:y(FilterIP))({IPv4List, []}).
 
