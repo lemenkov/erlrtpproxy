@@ -59,9 +59,9 @@ start(Args) ->
 start_link(Args) ->
 	gen_server:start_link(?MODULE, Args, []).
 
-init ({CallID, MainIp, RadAcctServers}) ->
+init ({CallID, MainIp}) ->
 	process_flag(trap_exit, true),
-	% TODO we should add app-file for eradius
+	{ok, RadAcctServers} = application:get_env(rtpproxy, radacct_servers),
 	eradius_dict:start(),
 	eradius_dict:load_tables(["dictionary", "dictionary_cisco"]),
 	case eradius_dict:lookup(?Acct_Session_Id) of
