@@ -8,7 +8,6 @@
 		{applications, [kernel, stdlib, erlsyslog]},
 		{env,
 			[
-				{ports_per_media, 4},
 				{radacct_servers, [[{127,0,0,1},1813,"testradacctpass"]]},
 				{syslog_address, {"localhost", 514}},
 				{sources, [call, media, player, rtcp, rtpproxy, ser, y]}
