@@ -224,55 +224,33 @@ handle_cast({message, #cmd{type = ?CMD_L, origin = #origin{pid = Pid}} = Cmd}, S
 
 handle_cast({message, #cmd{type = ?CMD_U, origin = #origin{pid = Pid}} = Cmd}, State) ->
 %	?INFO("Cmd[~p]", [Cmd]),
-	case
-		case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.calls) of
-			% Already created session
-			{value, CallInfo} ->
-%				?INFO("Session exists. Update/create existing session.", []),
-				try gen_server:call(CallInfo#thread.pid, {Cmd#cmd.type, {Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.params}}) of
-					{ok, new, Reply} ->
-						{Reply, State};
-					{ok, old, Reply} ->
-						Reply;
-					{error, not_found} ->
-						?ERR("Session does not exists.", []),
-						?RTPPROXY_ERR_NOSESSION;
-					{error, udp_error} ->
-						?ERR("error in udp while CMD_U!", []),
-						?RTPPROXY_ERR_SOFTWARE
-				catch
-					Error:ErrorClass ->
-						?ERR("Exception {~p,~p} while CMD_U!", [Error,ErrorClass]),
-						?RTPPROXY_ERR_SOFTWARE
-				end;
-			NoSessionFound ->
-				?INFO("Session not exists. Creating new.", []),
-				CallPid = pool:pspawn(call, start, [Cmd#cmd.callid]),
-				NewCallThread = #thread{pid=CallPid, callid=Cmd#cmd.callid},
-				case gen_server:call(CallPid, {Cmd#cmd.type, { Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.params}}) of
-					{ok, new, Reply} ->
-						{Reply, State#state{
-								calls=lists:append (State#state.calls, [NewCallThread])
-							}
-						};
-					{ok, old, Reply} ->
-						{Reply, State#state{
-								calls=lists:append (State#state.calls, [NewCallThread])
-							}
-						};
-					{error, udp_error} ->
-						?ERR("error in udp while CMD_U!", []),
-						{?RTPPROXY_ERR_SOFTWARE, State}
-				end
-		end
-	of
-		{R, NewState} ->
-			gen_server:cast(Pid, {reply, Cmd, R}),
-			{noreply, NewState};
-		R ->
-			gen_server:cast(Pid, {reply, Cmd, R}),
-			{noreply, State}
-	end;
+	{CallPid, NewState} = case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.calls) of
+		% Already created session
+		{value, CallInfo} ->
+			{CallInfo#thread.pid, State};
+		NoSessionFound ->
+			?INFO("Session not exists. Creating new.", []),
+			CPid = pool:pspawn(call, start, [Cmd#cmd.callid]),
+			{CPid, State#state{ calls=lists:append (state#state.calls, [#thread{pid=CPid, callid=Cmd#cmd.callid}])}}
+	end,
+
+	R = try gen_server:call(CallPid, {Cmd#cmd.type, {Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.params}}) of
+		{ok, new, Reply} -> Reply;
+		{ok, old, Reply} -> Reply;
+		{error, not_found} ->
+			?ERR("Session does not exists.", []),
+			?RTPPROXY_ERR_NOSESSION;
+		{error, udp_error} ->
+			?ERR("error in udp while CMD_U!", []),
+			?RTPPROXY_ERR_SOFTWARE
+	catch
+		Error:ErrorClass ->
+			?ERR("Exception {~p,~p} while CMD_U!", [Error,ErrorClass]),
+			?RTPPROXY_ERR_SOFTWARE
+	end,
+
+	gen_server:cast(Pid, {reply, Cmd, R}),
+	{noreply, NewState};
 
 handle_cast({message, #cmd{origin = #origin{pid = Pid}} = Cmd}, State) ->
 	% Unknown command
