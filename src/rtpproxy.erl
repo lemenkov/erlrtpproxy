@@ -257,8 +257,8 @@ handle_cast({message, #cmd{origin = #origin{pid = Pid}} = Cmd}, State) ->
 	gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_ERR_SOFTWARE}),
 	{noreply, State};
 
-handle_cast({call_terminated, {Pid, {ports, Ports}, Reason}}, State) when is_list(Ports) ->
-	?INFO("received call [~w] closing due to [~w] returned ports: ~w", [Pid, Reason, Ports]),
+handle_cast({call_terminated, Pid, Reason}, State) ->
+	?INFO("received call [~w] closing due to [~w]", [Pid, Reason]),
 	case lists:keytake(Pid, #thread.pid, State#state.calls) of
 		{value, CallThread, OtherCalls} ->
 			?INFO("call [~w] closed", [Pid]),

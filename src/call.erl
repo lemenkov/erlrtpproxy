@@ -43,7 +43,6 @@
 		fromrtcp=null,
 		to=null,
 		tortcp=null,
-		startport=0,
 		mediaid=null,
 		pid=null,
 		mod_e=false,
@@ -63,7 +62,7 @@ init (CallID) ->
 	process_flag(trap_exit, true),
 	{ok, RadAcctServers} = application:get_env(rtpproxy, radacct_servers),
 	% TODO just choose first one for now
-	[MainIp | Rest ]  = get_ipaddrs(),
+	[MainIp | _Rest ]  = get_ipaddrs(),
 	eradius_dict:start(),
 	eradius_dict:load_tables(["dictionary", "dictionary_cisco"]),
 	case eradius_dict:lookup(?Acct_Session_Id) of
@@ -84,65 +83,66 @@ init (CallID) ->
 					tref2=TRef2}}
 	end.
 
-% handle originate call leg (new media id possibly)
+% handle originate call leg (new media id)
 % TODO handle Modifiers
-handle_call({?CMD_U, {StartPort, {GuessIp, GuessPort}, {FromTag, MediaId}, To, Modifiers}}, _, #state{ip = Ip, parties = Parties} = State) ->
-	case To of
-		null ->
-			?INFO("message [U] probably from ~w:~w  MediaId [~b]", [GuessIp, GuessPort, MediaId]);
-		_ ->
-			?INFO("message [U] probably from ~w:~w  MediaId [~b] REINVITE!", [GuessIp, GuessPort, MediaId])
-	end,
+handle_call({?CMD_U, {{GuessIp, GuessPort}, {FromTag, MediaId}, null, _Modifiers}}, _, #state{ip = Ip, parties = Parties} = State) ->
+	?INFO("message [U] probably from ~w:~w  MediaId [~b]", [GuessIp, GuessPort, MediaId]),
 	% search for already  existed
 	case lists:keysearch(MediaId, #party.mediaid, Parties) of
 		% call already exists
 		{value, Party} ->
-			case
-				try
-					if
-						FromTag == (Party#party.from)#source.tag -> inet:sockname((Party#party.from)#source.fd);
-						FromTag == (Party#party.to)#source.tag   -> inet:sockname((Party#party.to)#source.fd);
-						true -> {error, not_found}
-					end
-				catch
-					_:_ ->
-						% TODO probably re-invite?
-						{error, not_found}
-				end
-			of
-				{ok, {LocalIp, LocalPort}} ->
+			case FromTag == (Party#party.from)#source.tag of
+				true ->
+					{ok, {LocalIp, LocalPort}} = inet:sockname((Party#party.from)#source.fd),
 					Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 					?INFO("answer [~s] (already exists!)", [Reply]),
 					{reply, {ok, old, Reply}, State};
-				{error, not_found} ->
+				_ ->
 					{reply, {error, not_found}, State}
 			end;
 		false ->
 			% open new FdFrom and attach it
-			case gen_udp:open(StartPort, [binary, {ip, Ip}, {active, true}, {raw,1,11,<<1:32/native>>}]) of
-				{ok, Fd} ->
-					SafeOpenFd = fun(Port, Params) when is_list (Params) ->
-						case gen_udp:open(Port, Params) of
-							{ok, F} -> F;
-							_ -> null
-						end
-					end,
-					NewParty = #party{	% TODO add Ip and Port only on demand
-%								from	=#source{fd=Fd, tag=FromTag},
-								from	=#source{fd=Fd, ip=GuessIp, port=GuessPort, tag=FromTag},
-								fromrtcp=#source{fd=SafeOpenFd (StartPort+1, [binary, {ip, Ip}, {active, true}, {raw,1,11,<<1:32/native>>}])},
-								to	=#source{fd=SafeOpenFd (StartPort+2, [binary, {ip, Ip}, {active, true}, {raw,1,11,<<1:32/native>>}])},
-								tortcp	=#source{fd=SafeOpenFd (StartPort+3, [binary, {ip, Ip}, {active, true}, {raw,1,11,<<1:32/native>>}])},
-								startport=StartPort,
+			case get_fd_quadruple(Ip) of
+				{Fd0, Fd1, Fd2, Fd3} ->
+					NewParty = #party{	from	=#source{fd=Fd0, ip=GuessIp, port=GuessPort, tag=FromTag},
+								fromrtcp=#source{fd=Fd1},
+								to	=#source{fd=Fd2},
+								tortcp	=#source{fd=Fd3},
 								mediaid=MediaId},
-					{ok, {LocalIp, LocalPort}} = inet:sockname(Fd),
+					{ok, {LocalIp, LocalPort}} = inet:sockname(Fd0),
 					Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
 					?INFO("answer [~s]", [Reply]),
 					{reply, {ok, new, Reply}, State#state{parties=lists:append(Parties, [NewParty])}};
-				{error, Reason} ->
-					?ERR("Create new socket at ~p ~p FAILED [~p]", [Ip, StartPort, Reason]),
+				error ->
+					?ERR("Create new socket at ~p FAILED", [Ip]),
 					{reply, {error, udp_error}, State}
 			end
+	end;
+
+% REINVITE
+% TODO handle Modifiers
+handle_call({?CMD_U, {{GuessIp, GuessPort}, {FromTag, MediaId}, To, _Modifiers}}, _, #state{parties = Parties} = State) ->
+	?INFO("message [U] probably from ~w:~w  MediaId [~b] REINVITE!", [GuessIp, GuessPort, MediaId]),
+	case lists:keysearch(MediaId, #party.mediaid, Parties) of
+		% call already exists
+		{value, Party} ->
+			Ret = if
+				FromTag == (Party#party.from)#source.tag ->
+					inet:sockname((Party#party.from)#source.fd);
+				FromTag == (Party#party.to)#source.tag ->
+					inet:sockname((Party#party.to)#source.fd);
+				true -> {error, not_found}
+			end,
+			case Ret of
+				{ok, {LocalIp, LocalPort}} ->
+					Reply = integer_to_list(LocalPort) ++ " " ++ inet_parse:ntoa(LocalIp),
+					?INFO("answer [~s] (already exists!)", [Reply]),
+					{reply, {ok, old, Reply}, State};
+				_ ->
+					{reply, {error, not_found}, State}
+			end;
+		false ->
+			{reply, {error, not_found}, State}
 	end;
 
 % handle answered call leg
@@ -153,18 +153,13 @@ handle_call({?CMD_L, {{GuessIp, GuessPort}, {FromTag, MediaId}, {ToTag, MediaId}
 	case lists:keysearch(MediaId, #party.mediaid, State#state.parties) of
 		{value, Party} ->
 			case
-				case (Party#party.to)#source.fd of
-					null ->
-						gen_udp:open(Party#party.startport+2, [binary, {ip, State#state.ip}, {active, true}]);
-					_ ->
-						try
-							if
-								FromTag == (Party#party.to)#source.tag -> {ok, (Party#party.from)#source.fd};
-								FromTag == (Party#party.from)#source.tag -> {ok, (Party#party.to)#source.fd}
-							end
-						catch
-							Exception:ExceptionClass -> {Exception, ExceptionClass}
-						end
+				if
+					FromTag == (Party#party.to)#source.tag ->
+						{ok, (Party#party.from)#source.fd};
+					FromTag == (Party#party.from)#source.tag ->
+						{ok, (Party#party.to)#source.fd};
+					true ->
+						{error, not_found}
 				end
 			of
 				{ok, Fd} ->
@@ -191,9 +186,9 @@ handle_call({?CMD_L, {{GuessIp, GuessPort}, {FromTag, MediaId}, {ToTag, MediaId}
 						_ ->
 							{reply, {ok, Reply}, State#state{parties=lists:keyreplace(MediaId, #party.mediaid, State#state.parties, NewParty)}}
 					end;
-				{error, Reason} ->
-					?ERR("FAILED [~p]", [Reason]),
-					{reply, {error, udp_error}, State}
+				{error, not_found} ->
+					?ERR("FAILED", []),
+					{reply, {error, not_found}, State}
 			end;
 		false ->
 			% Call not found.
@@ -291,7 +286,7 @@ terminate(Reason, State) ->
 
 	% if some media pids are still aive, then we just send message to them (media thread will close ports by himself)
 	% if media pids == null, then we'll try to close ports by ourselves (it's possible that media thread wasn't even started)
-	Ports = lists:map(
+	lists:foreach(
 		fun(X)  ->
 			if
 				X#party.pid /= null ->
@@ -305,8 +300,7 @@ terminate(Reason, State) ->
 									ok
 							end
 						end, [X#party.from, X#party.fromrtcp, X#party.to, X#party.tortcp])
-			end,
-			X#party.startport
+			end
 		end,
 		State#state.parties),
 
@@ -324,7 +318,7 @@ terminate(Reason, State) ->
 	timer:cancel(State#state.tref2),
 
 	% We'll notify rtpproxy about our termination
-	gen_server:cast({global, rtpproxy}, {call_terminated, {self(), {ports, Ports}, Reason}}),
+	gen_server:cast({global, rtpproxy}, {call_terminated, self(), Reason}),
 
 	?ERR("terminated due to reason [~p]", [Reason]).
 
@@ -452,3 +446,43 @@ get_ipaddrs() ->
 	end,
 	(y:y(FilterIP))({IPv4List, []}).
 
+get_fd_pair(Ip) ->
+	get_fd_pair(Ip, 10).
+get_fd_pair(Ip, 0) ->
+	?ERR("Create new socket at ~p FAILED", [Ip]),
+	error;
+get_fd_pair(Ip, NTry) ->
+	case gen_udp:open(0, [binary, {ip, Ip}, {active, true}, {raw,1,11,<<1:32/native>>}]) of
+		{ok, Fd} ->
+			{ok, {Ip,Port}} = inet:sockname(Fd),
+			Port2 = case Port rem 2 of
+				0 -> Port + 1;
+				1 -> Port - 1
+			end,
+			case gen_udp:open(Port2, [binary, {ip, Ip}, {active, true}, {raw,1,11,<<1:32/native>>}]) of
+				{ok, Fd2} ->
+					if
+						Port > Port2 -> {Fd2, Fd};
+						Port < Port2 -> {Fd, Fd2}
+					end;
+				{error, _} ->
+					gen_udp:close(Fd),
+					get_fd_pair(Ip, NTry - 1)
+			end;
+		{error, _} ->
+			get_fd_pair(Ip, NTry - 1)
+	end.
+
+get_fd_quadruple(Ip) ->
+	case get_fd_pair(Ip) of
+		{Fd0, Fd1} ->
+			case get_fd_pair(Ip) of
+				{Fd2, Fd3} ->
+					{Fd0, Fd1, Fd2, Fd3};
+				error ->
+					gen_udp:close(Fd0),
+					gen_udp:close(Fd1),
+					error
+			end;
+		error -> error
+	end.
