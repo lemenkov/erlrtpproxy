@@ -78,7 +78,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_proto.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_sup.beam
 
-%dir %attr(0755,%{name},%{name}) %{_localstatedir}/lib/%{name}
+%dir %attr(0755,%{name},%{name}) %{_localstatedir}/lib/%{realname}
 
 
 %changelog
