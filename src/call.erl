@@ -35,6 +35,7 @@
 -include_lib("eradius/include/eradius_lib.hrl").
 -include_lib("eradius/include/dictionary.hrl").
 -include_lib("eradius/include/dictionary_cisco.hrl").
+-include_lib("eradius/include/dictionary_rfc2866.hrl").
 
 -record(source, {fd=null, ip=null, port=null, tag=null}).
 -record(state, {ip, callid, parties=[], radius, tref, tref2, status=notstarted}).
