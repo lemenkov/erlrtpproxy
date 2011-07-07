@@ -44,12 +44,34 @@ parse_splitted(["V"]) ->
 		type=?CMD_V
 	};
 
-parse_splitted(["VF" | Params]) ->
-	% Request additional rtpproxy protocol extensions
-	#cmd{
-		type=?CMD_VF,
-		params=Params
-	};
+% Request additional rtpproxy protocol extensions
+parse_splitted(["VF", "20040107"]) ->
+	% Basic RTP proxy functionality
+	#cmd{type=?CMD_VF, params="20040107"};
+parse_splitted(["VF", "20050322"]) ->
+	% Support for multiple RTP streams and MOH
+	#cmd{type=?CMD_VF, params="20050322"};
+parse_splitted(["VF", "20060704"]) ->
+	% Support for extra parameter in the V command
+	#cmd{type=?CMD_VF, params="20060704"};
+parse_splitted(["VF", "20071116"]) ->
+	% Support for RTP re-packetization
+	#cmd{type=?CMD_VF, params="20071116"};
+parse_splitted(["VF", "20071218"]) ->
+	% Support for forking (copying) RTP stream
+	#cmd{type=?CMD_VF, params="20071218"};
+parse_splitted(["VF", "20080403"]) ->
+	% Support for RTP statistics querying
+	#cmd{type=?CMD_VF, params="20080403"};
+parse_splitted(["VF", "20081102"]) ->
+	% Support for setting codecs in the update/lookup command
+	#cmd{type=?CMD_VF, params="20081102"};
+parse_splitted(["VF", "20081224"]) ->
+	% Support for session timeout notifications
+	#cmd{type=?CMD_VF, params="20081224"};
+parse_splitted(["VF", "20090810"]) ->
+	% Support for automatic bridging
+	#cmd{type=?CMD_VF, params="20090810"};
 
 parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, FromMediaId]) ->
 	% update/create session
