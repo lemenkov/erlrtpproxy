@@ -38,7 +38,6 @@ start() {
 		-name $prog@$ERL_NODE \
 		-setcookie $ERL_COOKIE \
 		-config $CONFIG_FILE \
-		-mnesia dir \\\"/var/lib/rtpproxy/spool\\\" \
 		-detached \
 		-s rtpproxy_app"
 	retval=$?
