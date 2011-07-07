@@ -42,7 +42,7 @@ make install DESTDIR=$RPM_BUILD_ROOT
 
 %pre
 getent group %{realname} >/dev/null || groupadd -r %{realname}
-getent passwd %{realname} >/dev/null || useradd -r -g %{realname} -d / -s /sbin/nologin -c "RTP proxying daemon" %{realname}
+getent passwd %{realname} >/dev/null || useradd -r -g %{realname} -d %{_localstatedir}/lib/%{realname} -s /bin/sh -c "RTP proxying daemon" %{realname}
 exit 0
 
 
@@ -76,6 +76,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_app.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_ctl.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_sup.beam
+
+%dir %attr(0755,%{name},%{name}) %{_localstatedir}/lib/%{name}
+
 
 %changelog
 * %DATE% Peter Lemenkov <lemenkov@gmail.com> - %VSN%-1
