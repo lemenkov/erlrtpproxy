@@ -24,6 +24,7 @@ install: all
 	install -D -p -m 0644 priv/erlrtpproxy.config $(DESTDIR)/etc/$(NAME).config
 	install -D -p -m 0755 priv/erlrtpproxy.init $(DESTDIR)/etc/rc.d/init.d/$(NAME)
 	install -D -p -m 0644 priv/erlrtpproxy.sysconfig $(DESTDIR)/etc/sysconfig/$(NAME)
+	install -d $(DESTDIR)/var/lib/$(NAME)
 
 test:
 	$(REBAR) eunit $(REBAR_FLAGS)

@@ -25,8 +25,7 @@ prog="erlrtpproxy"
 CONFIG_FILE=/etc/$prog.config
 ERL_PARAMETERS="+K true +W w"
 ERL_NODE="127.0.0.1"
-ERL_COOKIE="testcookie"
-USER="rtpproxy"
+USER="erlrtpproxy"
 
 [ -f /etc/sysconfig/$prog ] && . /etc/sysconfig/$prog
 
