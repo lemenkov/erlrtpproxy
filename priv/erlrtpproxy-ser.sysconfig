@@ -1,4 +1,3 @@
 CONFIG_FILE=/etc/ser.config
 ERL_PARAMETERS="+K true +W w"
 ERL_NODE="127.0.0.1"
-ERL_COOKIE="testcookie"
