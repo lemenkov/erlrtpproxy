@@ -186,7 +186,7 @@ parse_splitted(["I"]) ->
 		type=?CMD_I
 	};
 
-parse_splitted(Other) ->
+parse_splitted(_) ->
 	throw({error_syntax, "Unknown command"}).
 
 %%
