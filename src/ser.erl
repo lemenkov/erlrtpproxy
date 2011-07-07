@@ -81,7 +81,7 @@ terminate(Reason, Fd) ->
 handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 	try ser_proto:parse(Msg, Ip, Port) of
 		Cmd ->
-			?INFO("SER cmd: ~p", [Rest]),
+			?INFO("SER cmd: ~p", [Cmd]),
 			gen_server:cast({global, rtpproxy}, {message, Cmd})
 	catch
 		throw:{error_syntax, Error} ->
