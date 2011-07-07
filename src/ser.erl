@@ -81,12 +81,15 @@ terminate(Reason, Fd) ->
 handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 	try ser_proto:parse(Msg, Ip, Port) of
 		Cmd ->
+			?INFO("SER cmd: ~p", [Rest]),
 			gen_server:cast({global, rtpproxy}, {message, Cmd})
 	catch
-		throw:{error_syntax, _Error} ->
+		throw:{error_syntax, Error} ->
+			?ERR("Bad syntax. [~s -> ~s]~n", [Msg, Error]),
 			[Cookie|_Rest] = string:tokens(Msg, " ;"),
 			gen_udp:send(Fd, Ip, Port, Cookie ++ " " ++  ?RTPPROXY_ERR_SYNTAX ++ "\n");
-		_E:_C ->
+		E:C ->
+			?ERR("Exceptiond. [~s -> ~p:~p]~n", [Msg, E, C]),
 			[Cookie|_Rest] = string:tokens(Msg, " ;"),
 			gen_udp:send(Fd, Ip, Port, Cookie ++ " " ++  ?RTPPROXY_ERR_SYNTAX ++ "\n")
 	end,

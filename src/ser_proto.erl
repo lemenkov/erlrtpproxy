@@ -23,12 +23,10 @@
 -export([parse/3]).
 
 -include("common.hrl").
--include_lib("erlsyslog/include/erlsyslog.hrl").
 
 parse(Msg,Ip, Port) ->
 	% TODO pass modifiers as atoms (not as string)
 	[Cookie|Rest] = string:tokens(Msg, " ;"),
-	?INFO("SER cmd: ~p", [Rest]),
 	Cmd = parse_splitted(Rest),
 	Cmd#cmd{
 		cookie=Cookie,
@@ -189,7 +187,6 @@ parse_splitted(["I"]) ->
 	};
 
 parse_splitted(Other) ->
-	?ERR("Other command (bad syntax?) [~p]", [Other]),
 	throw({error_syntax, "Unknown command"}).
 
 %%
