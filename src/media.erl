@@ -39,7 +39,7 @@
 % * ip - real client's ip
 % * port - real client's port
 -record(media, {fd=null, ip=null, port=null, rtpstate=nortp, lastseen, ssrc=null}).
--record(state, {parent, callid, tref, from, fromrtcp, to, tortcp, holdstate=false, started=null}).
+-record(state, {callid, tref, from, fromrtcp, to, tortcp, holdstate=false, started=null}).
 
 start(Args) ->
 	gen_server:start(?MODULE, Args, []).
@@ -47,20 +47,20 @@ start(Args) ->
 start_link(Args) ->
 	gen_server:start_link(?MODULE, Args, []).
 
-init ({Parent, CallID, From, FromRtcp, To, ToRtcp}) ->
-	?INFO("started ~p ~p", [From, To]),
-	process_flag(trap_exit, true),
+init ({CallID, {F,I,P}, FromRtcp, To, ToRtcp}) ->
+
 	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE*5, ping),
+
+	[gen_udp:controlling_process(X, self()) || X <- [F, FromRtcp, To, ToRtcp]],
 
 	{ok,
 		#state{
-			parent=Parent,
-			callid = CallID,
-			tref=TRef,
-			from	= safe_make_media(From),
-			fromrtcp= safe_make_media(FromRtcp),
-			to	= safe_make_media(To),
-			tortcp	= safe_make_media(ToRtcp)
+			callid	= CallID,
+			tref	= TRef,
+			from	= #media{fd=F,ip=I,port=P},
+			fromrtcp= #media{fd=FromRtcp},
+			to	= #media{fd=To},
+			tortcp	= #media{fd=ToRtcp}
 		}
 	}.
 
@@ -95,14 +95,10 @@ handle_cast({recording, stop}, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, #state{parent = Pid, tref = TimerRef, from = From, fromrtcp = FromRtcp, to = To, tortcp = ToRtcp}) ->
+terminate(Reason, #state{tref = TimerRef, from = From, fromrtcp = FromRtcp, to = To, tortcp = ToRtcp}) ->
 	timer:cancel(TimerRef),
 	% TODO we should send RTCP BYE here
-	lists:map(fun (X) -> case X of null -> ok; _ -> gen_udp:close(X#media.fd) end end, [From, FromRtcp, To, ToRtcp]),
-	case Reason of
-		nortp -> gen_server:cast(Pid, {stop, timeout, self()});
-		_ -> gen_server:cast(Pid, {stop, stop, self()})
-	end,
+	lists:map(fun (X) -> gen_udp:close(X#media.fd) end, [From, FromRtcp, To, ToRtcp]),
 	?ERR("terminated due to reason [~p]", [Reason]).
 
 handle_info({udp, Fd, Ip, Port, Msg}, #state{tortcp = #media{fd = Fd}} = State) ->
@@ -110,7 +106,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{tortcp = #media{fd = Fd}} = State) 
 	try
 		{ok, Rtcps} = rtcp:decode(Msg),
 		?INFO("RTCP from ~s: ~p", [State#state.callid, lists:map (fun rtp_utils:pp/1, Rtcps)]),
-		Msg2 = rtcp_process (Rtcps, State#state.parent),
+		Msg2 = rtcp_process (Rtcps),
 		{noreply, State#state{fromrtcp=safe_send(State#state.fromrtcp, State#state.tortcp, Ip, Port, Msg2)}}
 	catch
 		E:C ->
@@ -125,7 +121,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fromrtcp = #media{fd = Fd}} = State
 	try
 		{ok, Rtcps} = rtcp:decode(Msg),
 		?INFO("RTCP from ~s: ~p", [State#state.callid, lists:map (fun rtp_utils:pp/1, Rtcps)]),
-		Msg2 = rtcp_process (Rtcps, State#state.parent),
+		Msg2 = rtcp_process (Rtcps),
 		{noreply, State#state{tortcp=safe_send(State#state.tortcp, State#state.fromrtcp, Ip, Port, Msg2)}}
 	catch
 		E:C ->
@@ -172,12 +168,6 @@ handle_info(Other, State) ->
 %% Internal functions %%
 %%%%%%%%%%%%%%%%%%%%%%%%
 
-% Define simple function for safe Media object creation
-safe_make_media ({F,I,P}) ->
-	#media{fd=F,ip=I,port=P,lastseen=now()};
-safe_make_media (_) ->
-		null.
-
 % Define function for sending RTP/RTCP and updating state
 safe_send (Var1, #media{ip = null, port = null}, Ip, Port, _Msg) ->
 	% Probably RTP or RTCP, but we CANNOT send yet.
@@ -192,11 +182,11 @@ start_acc (#state{started = null, from = #media{rtpstate = rtp}, to = #media{rtp
 start_acc (S) ->
 	S#state.started.
 
-rtcp_process (Rtcps, Parent) ->
-	rtcp_process (Rtcps, [], Parent).
-rtcp_process ([], Rtcps, Parent) ->
+rtcp_process (Rtcps) ->
+	rtcp_process (Rtcps, []).
+rtcp_process ([], Rtcps) ->
 	lists:map(fun rtcp:encode/1, Rtcps);
-rtcp_process ([Rtcp | Rest], Processed, Parent) ->
+rtcp_process ([Rtcp | Rest], Processed) ->
 	NewRtcp = case rtp_utils:get_type(Rtcp) of
 		sr -> Rtcp;
 		rr -> Rtcp;
@@ -211,4 +201,4 @@ rtcp_process ([Rtcp | Rest], Processed, Parent) ->
 		xr -> Rtcp;
 		_ -> Rtcp
 	end,
-	rtcp_process (Rest, Processed ++ [NewRtcp],  Parent).
+	rtcp_process (Rest, Processed ++ [NewRtcp]).
