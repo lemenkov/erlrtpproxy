@@ -72,8 +72,8 @@ handle_call(_Message, _From , State) ->
 handle_cast({message, #cmd{type = ?CMD_V, origin = #origin{pid = Pid}} = Cmd}, State) ->
 	% Request basic supported rtpproxy protocol version
 	% see available versions here:
-	% http://cvs.berlios.de/cgi-bin/viewcvs.cgi/ser/rtpproxy/rtpp_command.c?view=markup
-	% We, curently, providing only basic functionality
+	% http://sippy.git.sourceforge.net/git/gitweb.cgi?p=sippy/rtpproxy;a=blob;f=rtpp_command.c#l58
+	% We, curently, provide only basic functionality
 	gen_server:cast(Pid, {reply, Cmd, "20040107"}),
 	{noreply, State};
 
@@ -85,14 +85,14 @@ handle_cast({message, #cmd{type = ?CMD_VF, origin = #origin{pid = Pid}} = Cmd}, 
 
 handle_cast({message, #cmd{type = ?CMD_X, origin = #origin{pid = Pid}} = Cmd}, State) ->
 	% stop all active sessions
-	lists:foreach(fun(X) -> gen_server:cast(X#thread.pid, message_d) end, State#state.calls),
+	lists:foreach(fun(X) -> gen_server:cast(X#thread.pid, stop) end, State#state.calls),
 	lists:foreach(fun(X) -> gen_server:cast(X#thread.pid, message_d) end, State#state.players),
 	gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK}),
 	{noreply, State};
 
 handle_cast({message, #cmd{type = ?CMD_I, origin = #origin{pid = Pid}} = Cmd}, State) ->
 	% TODO show information about calls
-	Stats = lists:map(fun(X) -> gen_server:call(X#thread.pid, message_i) end, State#state.calls),
+	Stats = lists:map(fun(X) -> gen_server:call(X#thread.pid, ?CMD_Q) end, State#state.calls),
 	% "sessions created: %llu\nactive sessions: %d\n active streams: %d\n"
 	% foreach session "%s/%s: caller = %s:%d/%s, callee = %s:%d/%s, stats = %lu/%lu/%lu/%lu, ttl = %d/%d\n"
 	gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK}),
@@ -169,7 +169,7 @@ handle_cast({message, #cmd{type = ?CMD_Q, origin = #origin{pid = Pid}} = Cmd}, S
 	case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.calls) of
 		{value, CallInfo} ->
 			% TODO
-			% sprintf(buf, "%s %d %lu %lu %lu %lu\n", cookie, spa->ttl, spa->pcount[idx], spa->pcount[NOT(idx)], spa->pcount[2], spa->pcount[3]);
+			{ok, _Reply} = gen_server:call(CallInfo#thread.pid, ?CMD_Q),
 			gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK});
 		NotFound ->
 			?WARN("Session not exists. Do nothing.", []),
@@ -222,7 +222,7 @@ handle_cast({message, #cmd{type = ?CMD_L, origin = #origin{pid = Pid}} = Cmd}, S
 	end,
 	{noreply, State};
 
-handle_cast({message, #cmd{type = ?CMD_U, origin = #origin{pid = Pid}} = Cmd}, State) ->
+handle_cast({message, #cmd{type = ?CMD_U, origin = #origin{pid = Pid}, from = {Tag, MediaId}} = Cmd}, State) ->
 %	?INFO("Cmd[~p]", [Cmd]),
 	{CallPid, NewState} = case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.calls) of
 		% Already created session
@@ -230,7 +230,7 @@ handle_cast({message, #cmd{type = ?CMD_U, origin = #origin{pid = Pid}} = Cmd}, S
 			{CallInfo#thread.pid, State};
 		NoSessionFound ->
 			?INFO("Session not exists. Creating new.", []),
-			CPid = pool:pspawn(call, start, [Cmd#cmd.callid]),
+			CPid = pool:pspawn(media, start, [Cmd#cmd.callid, Tag, MediaId]),
 			{CPid, State#state{ calls=lists:append (state#state.calls, [#thread{pid=CPid, callid=Cmd#cmd.callid}])}}
 	end,
 
@@ -304,14 +304,6 @@ handle_cast(close_all, State) ->
 	lists:foreach(fun(X) -> gen_server:cast(X#thread.pid, message_d) end, State#state.players),
 	{noreply, State};
 
-handle_cast(upgrade, State) ->
-	?WARN("UPGRADING beam-files on every node", []),
-	lists:foreach(fun(N) ->
-			?WARN("UPGRADING on node ~p", [N]),
-			rtpproxy_ctl:upgrade(N)
-			end, pool:get_nodes()),
-	{noreply, State};
-
 handle_cast(_Other, State) ->
 	{noreply, State}.
 
@@ -324,17 +316,7 @@ handle_info({'EXIT', Pid, Reason}, State) ->
 			{noreply, State#state{calls=lists:delete(CallThread, State#state.calls)}};
 		false ->
 			{noreply, State}
-	end;
-
-handle_info(Info, State) ->
-	case Info of
-		{udp, Fd, Ip, Port, Data} ->
-			{ok, {LocalIp, LocalPort}} = inet:sockname(Fd),
-			?WARN("got udp INFO (shouldn't happend) from [~w ~w] to [~w, ~w, ~w] <<some data>> of size ~w", [Ip, Port, Fd, LocalIp, LocalPort, size(Data)]);
-		_ ->
-			?WARN("got INFO [~w]", [Info])
-	end,
-	{noreply, State}.
+	end.
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.

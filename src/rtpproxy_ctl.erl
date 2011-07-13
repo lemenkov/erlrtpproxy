@@ -42,6 +42,9 @@ upgrade() ->
 	end,
 	halt(Status).
 
+upgrade(all) ->
+	upgrade(pool:get_nodes());
+
 upgrade(Nodes) when is_list(Nodes) ->
 	lists:foreach(fun upgrade/1, Nodes);
 

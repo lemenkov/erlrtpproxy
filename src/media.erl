@@ -21,8 +21,7 @@
 -author('lemenkov@gmail.com').
 
 -behaviour(gen_server).
--export([start/1]).
--export([start_link/1]).
+-export([start/3]).
 -export([init/1]).
 -export([handle_call/3]).
 -export([handle_cast/2]).
@@ -39,35 +38,82 @@
 % * ip - real client's ip
 % * port - real client's port
 -record(media, {fd=null, ip=null, port=null, rtpstate=nortp, lastseen, ssrc=null}).
--record(state, {callid, tref, from, fromrtcp, to, tortcp, holdstate=false, started=null}).
+-record(state, {
+		callid,
+		mediaid,
+		tag_f,
+		tag_t,
+		tref,
+		from,
+		fromrtcp,
+		to,
+		tortcp,
+		holdstate=false,
+		started=false,
+		mod_e=false,
+		mod_i=false,
+		mod_ipv6=false,
+		mod_symmetric=true,
+		mod_weak=false,
+		mod_z=false
+	}
+).
 
-start(Args) ->
-	gen_server:start(?MODULE, Args, []).
+start(CallID, MediaID, TagFrom) ->
+	% TODO run under supervisor maybe?
+	gen_server:start(?MODULE, [[CallID, MediaID, TagFrom]], []).
 
-start_link(Args) ->
-	gen_server:start_link(?MODULE, Args, []).
-
-init ({CallID, {F,I,P}, FromRtcp, To, ToRtcp}) ->
+init ([CallID, MediaID, TagFrom]) ->
+	% TODO just choose the first IP address for now
+	[MainIp | _Rest ]  = get_ipaddrs(),
+	?INFO("started at ~s", [inet_parse:ntoa(MainIp)]),
 
 	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE*5, ping),
+%	{ok, TRef} = timer:send_interval(?CALL_TIME_TO_LIVE*5, timeout),
+%	{ok, TRef2} = timer:send_interval(?CALL_TIME_TO_LIVE, interim_update),
 
-	[gen_udp:controlling_process(X, self()) || X <- [F, FromRtcp, To, ToRtcp]],
+	case MediaID of
+		1 -> gen_server:cast({global,radius}, {start, CallID});
+		_ -> ok
+	end,
+
+	{Fd0, Fd1, Fd2, Fd3} = get_fd_quadruple(MainIp),
 
 	{ok,
 		#state{
 			callid	= CallID,
+			mediaid = MediaID,
+			tag_f	= TagFrom,
+			tag_t	= null,
 			tref	= TRef,
-			from	= #media{fd=F,ip=I,port=P},
-			fromrtcp= #media{fd=FromRtcp},
-			to	= #media{fd=To},
-			tortcp	= #media{fd=ToRtcp}
+			from	= #media{fd=Fd0},
+			fromrtcp= #media{fd=Fd1},
+			to	= #media{fd=Fd2},
+			tortcp	= #media{fd=Fd3}
 		}
 	}.
 
-handle_call(?CMD_I, _From, #state{started = Started} = State) ->
+handle_call({?CMD_U, GuessIp, GuessPort, CallID, MediaID, FromTag}, _From, #state{from = #media{fd=F} = From} = State) ->
+	{ok, {I, P}} = inet:sockname(F),
+	{reply, {ok, {I, P}}, State#state{from = From#media{ip=GuessIp, port=GuessPort}}};
+
+handle_call({?CMD_U, GuessIp, GuessPort, CallID, MediaID, ToTag}, _From, #state{to = #media{fd=F} = To} = State) ->
+	{ok, {I, P}} = inet:sockname(F),
+	{reply, {ok, {I, P}}, State#state{to = To#media{ip=GuessIp, port=GuessPort}}};
+
+handle_call({?CMD_L, GuessIp, GuessPort, CallID, MediaID, FromTag}, _From, #state{from = #media{fd=F} = From} = State) ->
+	{ok, {I, P}} = inet:sockname(F),
+	{reply, {ok, {I, P}}, State#state{from = From#media{ip=GuessIp, port=GuessPort}}};
+
+handle_call({?CMD_L, GuessIp, GuessPort, CallID, MediaID, ToTag}, _From, #state{to = #media{fd=F} = To} = State) ->
+	{ok, {I, P}} = inet:sockname(F),
+	{reply, {ok, {I, P}}, State#state{to = To#media{ip=GuessIp, port=GuessPort}}};
+
+handle_call(?CMD_Q, _From, #state{started = Started} = State) ->
 	% TODO (acquire information about call state)
 %-record(media, {fd=null, ip=null, port=null, rtpstate=rtp, lastseen}).
 %-record(state, {parent, tref, from, fromrtcp, to, tortcp, holdstate=false, started}).
+	% sprintf(buf, "%s %d %lu %lu %lu %lu\n", cookie, spa->ttl, spa->pcount[idx], spa->pcount[NOT(idx)], spa->pcount[2], spa->pcount[3]);
 	Reply = io_lib:format("CallDuration: ~w", [case Started of null -> "<not started yet>"; _ -> trunc(0.5 + timer:now_diff(erlang:now(), Started) / 1000000) end]),
 	{reply, {ok, Reply}, State}.
 
@@ -114,7 +160,6 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{tortcp = #media{fd = Fd}} = State) 
 			?ERR("rtcp:decode(...) error ~p:~p", [E,C]),
 			{noreply, State}
 	end;
-
 
 handle_info({udp, Fd, Ip, Port, Msg}, #state{fromrtcp = #media{fd = Fd}} = State) ->
 	% First, we'll try do decode our RCP packet(s)
@@ -163,7 +208,6 @@ handle_info(Other, State) ->
 	?WARN("Other Info [~p], State [~p]", [Other, State]),
 	{noreply, State}.
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%
 %% Internal functions %%
 %%%%%%%%%%%%%%%%%%%%%%%%
@@ -202,3 +246,72 @@ rtcp_process ([Rtcp | Rest], Processed) ->
 		_ -> Rtcp
 	end,
 	rtcp_process (Rest, Processed ++ [NewRtcp]).
+
+%% Determine the list of suitable IP addresses
+get_ipaddrs() ->
+	% TODO IPv4 only
+	{ok, IPv4List} = inet:getif(),
+	FilterIP = fun (F) ->
+			fun
+				({[], X}) ->
+					X;
+				% Loopback
+				({[{{127, _, _, _}, _Bcast,_Mask} | Rest], X}) ->
+					F({Rest, X});
+				% RFC 1918, 10.0.0.0 - 10.255.255.255
+				({[{{10,_,_,_}, _Bcast,_Mask} | Rest], X}) ->
+					F({Rest, X});
+				% RFC 1918, 172.16.0.0 - 172.31.255.255
+				({[{{172, A ,_,_}, _Bcast,_Mask} | Rest], X}) when A > 15 , A < 32 ->
+					F({Rest, X});
+				% RFC 1918, 192.168.0.0 - 192.168.255.255
+				({[{{192, 168,_,_}, _Bcast,_Mask} | Rest], X}) ->
+					F({Rest, X});
+				({[ {IPv4, _Bcast,_Mask} | Rest], X}) ->
+					F({Rest, X ++ [IPv4]})
+			end
+	end,
+	(y:y(FilterIP))({IPv4List, []}).
+
+%% Open a pair of UDP ports - N and N+1 (for RTP and RTCP consequently)
+get_fd_pair(Ip) ->
+	get_fd_pair(Ip, 10).
+get_fd_pair(Ip, 0) ->
+	?ERR("Create new socket at ~p FAILED", [Ip]),
+	error;
+get_fd_pair(Ip, NTry) ->
+	case gen_udp:open(0, [binary, {ip, Ip}, {active, true}, {raw,1,11,<<1:32/native>>}]) of
+		{ok, Fd} ->
+			{ok, {Ip,Port}} = inet:sockname(Fd),
+			Port2 = case Port rem 2 of
+				0 -> Port + 1;
+				1 -> Port - 1
+			end,
+			case gen_udp:open(Port2, [binary, {ip, Ip}, {active, true}, {raw,1,11,<<1:32/native>>}]) of
+				{ok, Fd2} ->
+					if
+						Port > Port2 -> {Fd2, Fd};
+						Port < Port2 -> {Fd, Fd2}
+					end;
+				{error, _} ->
+					gen_udp:close(Fd),
+					get_fd_pair(Ip, NTry - 1)
+			end;
+		{error, _} ->
+			get_fd_pair(Ip, NTry - 1)
+	end.
+
+%% Get a two pairs of UDP ports
+get_fd_quadruple(Ip) ->
+	case get_fd_pair(Ip) of
+		{Fd0, Fd1} ->
+			case get_fd_pair(Ip) of
+				{Fd2, Fd3} ->
+					{Fd0, Fd1, Fd2, Fd3};
+				error ->
+					gen_udp:close(Fd0),
+					gen_udp:close(Fd1),
+					error
+			end;
+		error -> error
+	end.
