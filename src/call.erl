@@ -32,10 +32,6 @@
 
 -include("../include/common.hrl").
 -include("config.hrl").
--include_lib("eradius/include/eradius_lib.hrl").
--include_lib("eradius/include/dictionary.hrl").
--include_lib("eradius/include/dictionary_cisco.hrl").
--include_lib("eradius/include/dictionary_rfc2866.hrl").
 
 -record(source, {fd=null, ip=null, port=null, tag=null}).
 -record(state, {ip, callid, parties=[], radius, tref, tref2, status=notstarted}).
@@ -61,28 +57,18 @@ start_link(Args) ->
 
 init (CallID) ->
 	process_flag(trap_exit, true),
-	{ok, RadAcctServers} = application:get_env(rtpproxy, radacct_servers),
 	% TODO just choose first one for now
 	[MainIp | _Rest ]  = get_ipaddrs(),
-	eradius_dict:start(),
-	eradius_dict:load_tables(["dictionary", "dictionary_cisco"]),
-	case eradius_dict:lookup(?Acct_Session_Id) of
-		[] ->
-			?ERR("Can't load dictionary", []),
-			{stop, "Can't load dictionary"};
-		_ ->
-			eradius_acc:start(),
-			{ok, TRef} = timer:send_interval(?CALL_TIME_TO_LIVE*5, timeout),
-			{ok, TRef2} = timer:send_interval(?CALL_TIME_TO_LIVE, interim_update),
-			?INFO("started at ~s", [inet_parse:ntoa(MainIp)]),
-			{ok, #state{	ip=MainIp,
-					callid=CallID,
-					radius=#rad_accreq{	servers=RadAcctServers,
-								login_time = undefined,
-								std_attrs=[{?Acct_Session_Id, CallID}]},
-					tref=TRef,
-					tref2=TRef2}}
-	end.
+	gen_server:cast({global,radius}, {start, CallID}),
+	{ok, TRef} = timer:send_interval(?CALL_TIME_TO_LIVE*5, timeout),
+	{ok, TRef2} = timer:send_interval(?CALL_TIME_TO_LIVE, interim_update),
+	?INFO("started at ~s", [inet_parse:ntoa(MainIp)]),
+	{ok, #state{	ip=MainIp,
+			callid=CallID,
+			tref=TRef,
+			tref2=TRef2
+		}
+	}.
 
 % handle originate call leg (new media id)
 % TODO handle Modifiers
@@ -148,7 +134,7 @@ handle_call({?CMD_U, {{GuessIp, GuessPort}, {FromTag, MediaId}, To, _Modifiers}}
 
 % handle answered call leg
 % Both MediaId's are equal (just guessing)
-handle_call({?CMD_L, {{GuessIp, GuessPort}, {FromTag, MediaId}, {ToTag, MediaId}, Modifiers}}, _, State) ->
+handle_call({?CMD_L, {{GuessIp, GuessPort}, {FromTag, MediaId}, {ToTag, MediaId}, Modifiers}}, _, #state{callid=CallID} = State) ->
 	?INFO("message [L] probably from ~w:~w  MediaId [~b] with modifiers: ~p", [GuessIp, GuessPort, MediaId, Modifiers]),
 	% search for already  existed
 	case lists:keysearch(MediaId, #party.mediaid, State#state.parties) of
@@ -173,20 +159,10 @@ handle_call({?CMD_L, {{GuessIp, GuessPort}, {FromTag, MediaId}, {ToTag, MediaId}
 					?INFO("answer [~s]", [Reply]),
 					% TODO use some other flag
 					case lists:member(mod_i, Modifiers) of
-						true ->
-							case (State#state.radius)#rad_accreq.login_time of
-								undefined ->
-									Req = (State#state.radius)#rad_accreq{
-											login_time = erlang:now(),
-											vend_attrs = [{?Cisco, [{?h323_connect_time, date_time_fmt()}]}]},
-									eradius_acc:acc_start(Req),
-									{reply, {ok, Reply}, State#state{parties=lists:keyreplace(MediaId, #party.mediaid, State#state.parties, NewParty), radius=Req}};
-								_ ->
-									{reply, {ok, Reply}, State#state{parties=lists:keyreplace(MediaId, #party.mediaid, State#state.parties, NewParty)}}
-							end;
-						_ ->
-							{reply, {ok, Reply}, State#state{parties=lists:keyreplace(MediaId, #party.mediaid, State#state.parties, NewParty)}}
-					end;
+						true -> gen_server:cast({global,radius}, {connect, CallID});
+						_ -> ok
+					end,
+					{reply, {ok, Reply}, State#state{parties=lists:keyreplace(MediaId, #party.mediaid, State#state.parties, NewParty)}};
 				{error, not_found} ->
 					?ERR("FAILED", []),
 					{reply, {error, not_found}, State}
@@ -283,7 +259,7 @@ handle_cast({stop, Reason, Pid}, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, State) ->
+terminate(Reason, #state{callid=CallID} = State) ->
 
 	% if some media pids are still aive, then we just send message to them (media thread will close ports by himself)
 	% if media pids == null, then we'll try to close ports by ourselves (it's possible that media thread wasn't even started)
@@ -305,15 +281,7 @@ terminate(Reason, State) ->
 		end,
 		State#state.parties),
 
-	% we'll send  (if login_time was defined before) 'STOP' radius accounting message
-	case (State#state.radius)#rad_accreq.login_time of
-		undefined ->
-			ok;
-		_ ->
-			Req0 = eradius_acc:set_logout_time(State#state.radius),
-			Req1 = Req0#rad_accreq{vend_attrs = [{?Cisco, [{?h323_disconnect_time, date_time_fmt()}]}]},
-			eradius_acc:acc_stop(Req1)
-	end,
+	gen_server:cast({global,radius}, {stop, CallID}),
 
 	timer:cancel(State#state.tref),
 	timer:cancel(State#state.tref2),
@@ -400,12 +368,8 @@ handle_info({udp, Fd, Ip, Port, Msg}, State) ->
 handle_info(timeout, #state{status = notstarted} = State) ->
 	{stop, timeout, State};
 
-handle_info(timeout, State) when (State#state.radius)#rad_accreq.login_time /= undefined ->
-	eradius_acc:acc_update(State#state.radius),
-	{noreply, State};
-
-handle_info(interim_update, State) when (State#state.radius)#rad_accreq.login_time /= undefined ->
-	eradius_acc:acc_update(State#state.radius),
+handle_info(timeout, #state{callid=CallID} = State) ->
+	gen_server:cast({global,radius}, {update, CallID}),
 	{noreply, State};
 
 handle_info(Info, State) ->
@@ -415,12 +379,6 @@ handle_info(Info, State) ->
 %%
 %% Private functions
 %%
-
-date_time_fmt() ->
-	{{YYYY,MM,DD},{Hour,Min,Sec}} = erlang:localtime(),
-%	DayNumber = calendar:day_of_the_week({YYYY,MM,DD}),
-%	lists:flatten(io_lib:format("~s ~3s ~2.2.0w ~2.2.0w:~2.2.0w:~2.2.0w ~4.4.0w",[httpd_util:day(DayNumber),httpd_util:month(MM),DD,Hour,Min,Sec,YYYY])).
-	lists:flatten(io_lib:format("~4.4.0w-~2.2.0w-~2.2.0w ~2.2.0w:~2.2.0w:~2.2.0w", [YYYY, MM, DD, Hour,Min,Sec])).
 
 get_ipaddrs() ->
 	% TODO IPv4 only
