@@ -34,7 +34,7 @@
 -include("config.hrl").
 
 -record(source, {fd=null, ip=null, port=null, tag=null}).
--record(state, {ip, callid, parties=[], radius, tref, tref2, status=notstarted}).
+-record(state, {ip, callid, parties=[], tref, tref2, status=notstarted}).
 
 -record(party, {from=null,
 		fromrtcp=null,
