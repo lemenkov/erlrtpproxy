@@ -12,7 +12,7 @@ Group:		Applications/Internet
 License:	GPLv3+
 URL:		http://code.google.com/p/erlrtpproxy/
 # wget --no-check-certificate http://github.com/lemenkov/erlrtpproxy/tarball/erlrtpproxy-%VSN%
-Source0:	lemenkov-%{realname}-%{version}-%{patchnumber}-g%{git_tag}.tar.gz
+Source0:	lemenkov-%{name}-%{version}-%{patchnumber}-g%{git_tag}.tar.gz
 BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 BuildRequires:	erlang
@@ -30,7 +30,7 @@ RTP proxying daemon for OpenSER and compatible SIP-servers.
 
 
 %prep
-%setup -q -n lemenkov-%{realname}-%{git_tag}
+%setup -q -n lemenkov-%{name}-%{git_tag}
 
 
 %build
