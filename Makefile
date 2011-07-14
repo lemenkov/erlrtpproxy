@@ -21,9 +21,9 @@ compile:
 install: all
 	install -D -p -m 0644 $(APP_FILE) $(DESTDIR)$(ERLDIR)/$(APP_FILE)
 	install -p -m 0644 $(ERL_OBJECTS) $(DESTDIR)$(ERLDIR)/$(EBIN_DIR)
-	install -D -p -m 0644 priv/erlrtpproxy.config $(DESTDIR)/etc/$(NAME).config
-	install -D -p -m 0755 priv/erlrtpproxy.init $(DESTDIR)/etc/rc.d/init.d/$(NAME)
-	install -D -p -m 0644 priv/erlrtpproxy.sysconfig $(DESTDIR)/etc/sysconfig/$(NAME)
+	install -D -p -m 0644 priv/erlrtpproxy.config $(DESTDIR)/etc/erl$(NAME).config
+	install -D -p -m 0755 priv/erlrtpproxy.init $(DESTDIR)/etc/rc.d/init.d/erl$(NAME)
+	install -D -p -m 0644 priv/erlrtpproxy.sysconfig $(DESTDIR)/etc/sysconfig/erl$(NAME)
 	install -d $(DESTDIR)/var/lib/$(NAME)
 
 test:
