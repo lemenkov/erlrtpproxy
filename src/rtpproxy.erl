@@ -203,7 +203,7 @@ handle_cast({message, #cmd{type = ?CMD_R, origin = #origin{pid = Pid}} = Cmd}, S
 handle_cast({message, #cmd{type = ?CMD_L, origin = #origin{pid = Pid}} = Cmd}, State) ->
 	case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.calls) of
 		{value, CallInfo} ->
-			try gen_server:call(CallInfo#thread.pid, {Cmd#cmd.type, {Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.params}}) of
+			try gen_server:call(CallInfo#thread.pid, {Cmd#cmd.type, Cmd#cmd.addr, Cmd#cmd.to}) of
 				{ok, Reply} ->
 					gen_server:cast(Pid, {reply, Cmd, Reply});
 				{error, not_found} ->
@@ -231,13 +231,14 @@ handle_cast({message, #cmd{type = ?CMD_U, origin = #origin{pid = Pid}, from = {T
 			{CallInfo#thread.pid, State};
 		NoSessionFound ->
 			?INFO("Session not exists. Creating new.", []),
+			% TODO pass Cmd#cmd.params here
 			CPid = pool:pspawn(media, start, [Cmd#cmd.callid, Tag, MediaId]),
 			{CPid, State#state{ calls=lists:append (state#state.calls, [#thread{pid=CPid, callid=Cmd#cmd.callid}])}}
 	end,
 
-	R = try gen_server:call(CallPid, {Cmd#cmd.type, {Cmd#cmd.addr, Cmd#cmd.from, Cmd#cmd.to, Cmd#cmd.params}}) of
-		{ok, new, Reply} -> Reply;
-		{ok, old, Reply} -> Reply;
+	R = try gen_server:call(CallPid, {Cmd#cmd.type, Cmd#cmd.addr, Cmd#cmd.from}) of
+		{ok, Reply} -> Reply;
+		{ok, Reply} -> Reply;
 		{error, not_found} ->
 			?ERR("Session does not exists.", []),
 			?RTPPROXY_ERR_NOSESSION;

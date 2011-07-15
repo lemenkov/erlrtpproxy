@@ -92,22 +92,27 @@ init ([CallID, MediaID, TagFrom]) ->
 			tortcp	= #media{fd=Fd3}
 		}
 	}.
-
-handle_call({?CMD_U, GuessIp, GuessPort, CallID, MediaID, FromTag}, _From, #state{from = #media{fd=F} = From} = State) ->
+handle_call({?CMD_U, {GuessIp, GuessPort}, {FromTag, MediaID}}, _From, #state{from = #media{fd=F} = From, tag_f = FromTag} = State) ->
 	{ok, {I, P}} = inet:sockname(F),
 	{reply, {ok, {I, P}}, State#state{from = From#media{ip=GuessIp, port=GuessPort}}};
 
-handle_call({?CMD_U, GuessIp, GuessPort, CallID, MediaID, ToTag}, _From, #state{to = #media{fd=F} = To} = State) ->
+handle_call({?CMD_U, {GuessIp, GuessPort}, {ToTag, MediaID}}, _From, #state{to = #media{fd=F} = To, tag_t = ToTag} = State) ->
 	{ok, {I, P}} = inet:sockname(F),
 	{reply, {ok, {I, P}}, State#state{to = To#media{ip=GuessIp, port=GuessPort}}};
 
-handle_call({?CMD_L, GuessIp, GuessPort, CallID, MediaID, FromTag}, _From, #state{from = #media{fd=F} = From} = State) ->
+handle_call({?CMD_L, {GuessIp, GuessPort}, {FromTag, MediaID}}, _From, #state{from = #media{fd=F} = From, tag_f = FromTag} = State) ->
 	{ok, {I, P}} = inet:sockname(F),
 	{reply, {ok, {I, P}}, State#state{from = From#media{ip=GuessIp, port=GuessPort}}};
 
-handle_call({?CMD_L, GuessIp, GuessPort, CallID, MediaID, ToTag}, _From, #state{to = #media{fd=F} = To} = State) ->
+% Initial set up of a ToTag
+handle_call({?CMD_L, {GuessIp, GuessPort}, {ToTag, MediaID}}, _From, #state{to = #media{fd=F} = To, tag_t = ToTag} = State) ->
 	{ok, {I, P}} = inet:sockname(F),
 	{reply, {ok, {I, P}}, State#state{to = To#media{ip=GuessIp, port=GuessPort}}};
+
+% Initial set up of a ToTag
+handle_call({?CMD_L, {GuessIp, GuessPort}, {ToTag, MediaID}}, _From, #state{to = #media{fd=F} = To, tag_t = null} = State) ->
+	{ok, {I, P}} = inet:sockname(F),
+	{reply, {ok, {I, P}}, State#state{to = To#media{ip=GuessIp, port=GuessPort}, tag_t = ToTag}};
 
 handle_call(?CMD_Q, _From, #state{started = Started} = State) ->
 	% TODO (acquire information about call state)
