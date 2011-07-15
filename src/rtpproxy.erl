@@ -233,7 +233,7 @@ handle_cast({message, #cmd{type = ?CMD_U, origin = #origin{pid = Pid}, from = {T
 			?INFO("Session not exists. Creating new.", []),
 			% TODO pass Cmd#cmd.params here
 			CPid = pool:pspawn(media, start, [Cmd#cmd.callid, Tag, MediaId]),
-			{CPid, State#state{ calls=lists:append (state#state.calls, [#thread{pid=CPid, callid=Cmd#cmd.callid}])}}
+			{CPid, State#state{ calls=lists:append (State#state.calls, [#thread{pid=CPid, callid=Cmd#cmd.callid}])}}
 	end,
 
 	R = try gen_server:call(CallPid, {Cmd#cmd.type, Cmd#cmd.addr, Cmd#cmd.from}) of
