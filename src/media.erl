@@ -61,7 +61,7 @@
 
 start(CallID, MediaID, TagFrom) ->
 	% TODO run under supervisor maybe?
-	gen_server:start(?MODULE, [[CallID, MediaID, TagFrom]], []).
+	gen_server:start(?MODULE, [CallID, MediaID, TagFrom], []).
 
 init ([CallID, MediaID, TagFrom]) ->
 	% TODO just choose the first IP address for now
