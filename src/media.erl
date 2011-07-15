@@ -66,8 +66,6 @@ start(CallID, MediaID, TagFrom) ->
 init ([CallID, MediaID, TagFrom]) ->
 	% TODO just choose the first IP address for now
 	[MainIp | _Rest ]  = get_ipaddrs(),
-	?INFO("started at ~s", [inet_parse:ntoa(MainIp)]),
-
 	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE*5, ping),
 %	{ok, TRef} = timer:send_interval(?CALL_TIME_TO_LIVE*5, timeout),
 %	{ok, TRef2} = timer:send_interval(?CALL_TIME_TO_LIVE, interim_update),
@@ -78,6 +76,9 @@ init ([CallID, MediaID, TagFrom]) ->
 	end,
 
 	{Fd0, Fd1, Fd2, Fd3} = get_fd_quadruple(MainIp),
+
+	[P0, P1, P2, P3]  = [ P || F <- [Fd0, Fd1, Fd2, Fd3], {ok, {_I, P}} = inet:sockname(F)],
+	?INFO("started at ~s, with  F {~p,~p} T {~p,~p}", [inet_parse:ntoa(MainIp), P0, P1, P2, P3]),
 
 	{ok,
 		#state{
@@ -92,6 +93,7 @@ init ([CallID, MediaID, TagFrom]) ->
 			tortcp	= #media{fd=Fd3}
 		}
 	}.
+
 handle_call({?CMD_U, {GuessIp, GuessPort}, {FromTag, MediaID}}, _From, #state{from = #media{fd=F} = From, tag_f = FromTag} = State) ->
 	{ok, {I, P}} = inet:sockname(F),
 	{reply, {ok, {I, P}}, State#state{from = From#media{ip=GuessIp, port=GuessPort}}};
