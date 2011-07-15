@@ -225,18 +225,31 @@ handle_cast({message, #cmd{type = ?CMD_L, origin = #origin{pid = Pid}} = Cmd}, S
 
 handle_cast({message, #cmd{type = ?CMD_U, origin = #origin{pid = Pid}, from = {Tag, MediaId}} = Cmd}, State) ->
 %	?INFO("Cmd[~p]", [Cmd]),
-	{CallPid, NewState} = case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.calls) of
+	case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.calls) of
 		% Already created session
 		{value, CallInfo} ->
-			{CallInfo#thread.pid, State};
+			R = try gen_server:call(CallInfo#thread.pid, {Cmd#cmd.type, Cmd#cmd.addr, Cmd#cmd.from}) of
+				{ok, Reply} -> Reply;
+				{error, not_found} ->
+					?ERR("Session does not exists.", []),
+					?RTPPROXY_ERR_NOSESSION;
+				{error, udp_error} ->
+					?ERR("error in udp while CMD_U!", []),
+					?RTPPROXY_ERR_SOFTWARE
+			catch
+				Error:ErrorClass ->
+					?ERR("Exception {~p,~p} while CMD_U!", [Error,ErrorClass]),
+					?RTPPROXY_ERR_SOFTWARE
+			end,
+			gen_server:cast(Pid, {reply, Cmd, R});
 		NoSessionFound ->
 			?INFO("Session not exists. Creating new.", []),
-			% TODO pass Cmd#cmd.params here
-			CPid = pool:pspawn(media, start, [Cmd#cmd.callid, Tag, MediaId]),
-			{CPid, State#state{ calls=lists:append (State#state.calls, [#thread{pid=CPid, callid=Cmd#cmd.callid}])}}
+			pool:pspawn(media, start, [Cmd])
 	end,
+	{noreply, State};
 
-	R = try gen_server:call(CallPid, {Cmd#cmd.type, Cmd#cmd.addr, Cmd#cmd.from}) of
+handle_cast({created, #cmd{type = ?CMD_U, origin = #origin{pid = Pid}, from = {Tag, MediaId}} = Cmd, Pid}, State) ->
+	R = try gen_server:call(Pid, {Cmd#cmd.type, Cmd#cmd.addr, Cmd#cmd.from}) of
 		{ok, Reply} -> Reply;
 		{error, not_found} ->
 			?ERR("Session does not exists.", []),
@@ -249,9 +262,8 @@ handle_cast({message, #cmd{type = ?CMD_U, origin = #origin{pid = Pid}, from = {T
 			?ERR("Exception {~p,~p} while CMD_U!", [Error,ErrorClass]),
 			?RTPPROXY_ERR_SOFTWARE
 	end,
-
 	gen_server:cast(Pid, {reply, Cmd, R}),
-	{noreply, NewState};
+	{noreply, State#state{calls=lists:append(State#state.calls, [#thread{pid=Pid, callid=Cmd#cmd.callid}])}};
 
 handle_cast({message, #cmd{origin = #origin{pid = Pid}} = Cmd}, State) ->
 	% Unknown command

@@ -21,7 +21,7 @@
 -author('lemenkov@gmail.com').
 
 -behaviour(gen_server).
--export([start/3]).
+-export([start/1]).
 -export([init/1]).
 -export([handle_call/3]).
 -export([handle_cast/2]).
@@ -59,9 +59,12 @@
 	}
 ).
 
-start(CallID, MediaID, TagFrom) ->
+start(Cmd) ->
 	% TODO run under supervisor maybe?
-	gen_server:start_link(?MODULE, [CallID, MediaID, TagFrom], []).
+	{Tag, MediaId} = Cmd#cmd.from,
+	{ok,Pid} = gen_server:start(?MODULE, [Cmd#cmd.callid, MediaId, Tag], []),
+	gen_server:cast({global,rtpproxy}, {created, Cmd, Pid}).
+
 
 init ([CallID, MediaID, TagFrom]) ->
 	% TODO just choose the first IP address for now
