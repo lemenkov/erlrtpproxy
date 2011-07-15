@@ -170,7 +170,7 @@ handle_cast({message, #cmd{type = ?CMD_Q, origin = #origin{pid = Pid}} = Cmd}, S
 	case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.calls) of
 		{value, CallInfo} ->
 			% TODO
-			{ok, _Reply} = gen_server:call(CallInfo#thread.pid, ?CMD_Q),
+			{ok, Reply} = gen_server:call(CallInfo#thread.pid, ?CMD_Q),
 			gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK});
 		NotFound ->
 			?WARN("Session not exists. Do nothing.", []),
