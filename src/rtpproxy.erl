@@ -57,12 +57,13 @@ init(_Unused) ->
 
 	pool:start(rtpproxy),
 
-	lists:map(fun(N) ->
-			?INFO("Adding node ~p", [N]),
-			rtpproxy_ctl:upgrade(N)
-		end,
-		pool:get_nodes()
-	),
+%	lists:map(fun(N) ->
+%			?INFO("Adding node ~p", [N]),
+%			rtpproxy_ctl:upgrade(N)
+%		end,
+%		pool:get_nodes()
+%	),
+	?INFO("Adding node(s) ~p", [pool:get_nodes()]),
 
 	{ok, #state{}}.
 
@@ -277,7 +278,7 @@ handle_cast({call_terminated, Pid, Reason}, State) ->
 handle_cast({node_add, Node}, State) when is_atom(Node) ->
 	?INFO("add node [~w]", [Node]),
 	pspawn:attach(Node),
-	rtpproxy_ctl:upgrade(Node),
+%	rtpproxy_ctl:upgrade(Node),
 	{noreply, State};
 
 handle_cast(status, State) ->
