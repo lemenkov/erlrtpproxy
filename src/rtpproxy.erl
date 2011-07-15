@@ -238,7 +238,6 @@ handle_cast({message, #cmd{type = ?CMD_U, origin = #origin{pid = Pid}, from = {T
 
 	R = try gen_server:call(CallPid, {Cmd#cmd.type, Cmd#cmd.addr, Cmd#cmd.from}) of
 		{ok, Reply} -> Reply;
-		{ok, Reply} -> Reply;
 		{error, not_found} ->
 			?ERR("Session does not exists.", []),
 			?RTPPROXY_ERR_NOSESSION;
