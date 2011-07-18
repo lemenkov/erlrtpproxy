@@ -287,12 +287,6 @@ handle_cast({call_terminated, Pid, Reason}, State) ->
 			end
 	end;
 
-handle_cast({node_add, Node}, State) when is_atom(Node) ->
-	?INFO("add node [~w]", [Node]),
-	pspawn:attach(Node),
-%	rtpproxy_ctl:upgrade(Node),
-	{noreply, State};
-
 handle_cast(status, State) ->
 	?INFO("Current state - ~p call(s):", [length(State#state.calls)]),
 	lists:foreach(	fun(X) ->
