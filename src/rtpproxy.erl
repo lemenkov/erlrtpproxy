@@ -34,8 +34,8 @@
 -include("../include/common.hrl").
 
 % description of call thread
--record(thread, {pid=null, callid=null}).
--record(state, {calls=[], players=[]}).
+-record(thread, {pid=null, callid=null, mediaid=0}).
+-record(state, {calls=[]}).
 
 start() ->
 	gen_server:start({global, ?MODULE}, ?MODULE, [], []).
@@ -87,7 +87,6 @@ handle_cast({message, #cmd{type = ?CMD_VF, origin = #origin{pid = Pid}} = Cmd}, 
 handle_cast({message, #cmd{type = ?CMD_X, origin = #origin{pid = Pid}} = Cmd}, State) ->
 	% stop all active sessions
 	lists:foreach(fun(X) -> gen_server:cast(X#thread.pid, stop) end, State#state.calls),
-	lists:foreach(fun(X) -> gen_server:cast(X#thread.pid, message_d) end, State#state.players),
 	gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK}),
 	{noreply, State};
 
@@ -99,157 +98,55 @@ handle_cast({message, #cmd{type = ?CMD_I, origin = #origin{pid = Pid}} = Cmd}, S
 	gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK}),
 	{noreply, State};
 
-handle_cast({message, #cmd{origin = #origin{pid = Pid}} = Cmd}, State)  when Cmd#cmd.type == ?CMD_D; Cmd#cmd.type == ?CMD_S ->
-	[CallPid, PlayerPid] = lists:map(fun(List) ->
-						case lists:keysearch(Cmd#cmd.callid, #thread.callid, List) of
-							{value, CI} -> CI#thread.pid;
-							NotFound -> false
-						end
-					end, [State#state.calls, State#state.players]),
-
-	gen_server:cast(CallPid, Cmd#cmd.type),
-	try PlayerPid ! Cmd#cmd.type catch E:C -> ok end,
-
-	case (CallPid == false) and (PlayerPid == false) of
+% First try to find existing session
+handle_cast({message, #cmd{origin = #origin{pid = Pid}} = Cmd}, State) ->
+	case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.calls) of
+		{value, CallInfo} ->
+			% Operate on existing media thread
+			handle_cast({CallInfo#thread.pid, Cmd}, State);
+		false when Cmd#cmd.type == ?CMD_U ->
+			% Create new media thread
+			handle_cast({false, Cmd}, State);
 		false ->
-			gen_server:cast((Cmd#cmd.origin)#origin.pid, {reply, Cmd, ?RTPPROXY_OK});
-		true ->
-			?ERR("CANNOT find thread(s) to stop.", []),
-			gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK})
-%			gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_ERR_NOSESSION})
-	end,
-	{noreply, State};
-
-handle_cast({message, #cmd{type = ?CMD_P, origin = #origin{pid = Pid}} = Cmd}, State) ->
-	case
-		case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.players) of
-			{value, PlayerInfo} ->
-				% Already started player
-				% TODO should we change played music?
-				% we simply kill current thread
-				PlayerInfo#thread.pid ! ?CMD_S,
-				?RTPPROXY_OK;
-			NotFound ->
-				case
-					case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.calls) of
-						{value, CallInfo} ->
-							case gen_server:call(CallInfo#thread.pid, {Cmd#cmd.type, Cmd#cmd.to}) of
-								{ok, A} -> A;
-								{error, not_found} -> {error, not_found}
-							end;
-						_ ->
-							% we must fix OpenSER-rtpproxy protocol to add ip:port of destination
-							% see 'patches' directory for example
-							% TODO probably we need to handle this situation separately
-							% TODO contact sobomax for suggestions
-							{Ip, Port} = Cmd#cmd.addr,
-							{null, Ip, Port}
-					end
-				of
-					{error, notfound} ->
-						?RTPPROXY_ERR_NOSESSION;
-					Addr ->
-						PlayerPid = pool:pspawn(player, start, [Cmd#cmd.filename, Cmd#cmd.codecs, Addr]),
-						NewPlayerThread = #thread{pid=PlayerPid, callid=Cmd#cmd.callid},
-						{?RTPPROXY_OK, State#state{
-							players=lists:append (State#state.players, [NewPlayerThread])
-							}
-						}
-				end
-		end
-	of
-		{Reply, NewState} ->
-			gen_server:cast(Pid, {reply, Cmd, Reply}),
-			{noreply, NewState};
-		Reply ->
-			gen_server:cast(Pid, {reply, Cmd, Reply}),
+			?WARN("Session not exists. Do nothing.", []),
+			gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_ERR_NOSESSION}),
 			{noreply, State}
 	end;
 
-handle_cast({message, #cmd{type = ?CMD_Q, origin = #origin{pid = Pid}} = Cmd}, State) ->
-	case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.calls) of
-		{value, CallInfo} ->
-			% TODO
-			{ok, Reply} = gen_server:call(CallInfo#thread.pid, ?CMD_Q),
-			gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK});
-		NotFound ->
-			?WARN("Session not exists. Do nothing.", []),
-			gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_ERR_NOSESSION})
-	end,
+handle_cast({CallPid, #cmd{origin = #origin{pid = Pid}} = Cmd}, State)  when Cmd#cmd.type == ?CMD_D; Cmd#cmd.type == ?CMD_S ->
+	gen_server:cast(CallPid, Cmd#cmd.type),
+	gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK}),
 	{noreply, State};
 
-handle_cast({message, #cmd{type = ?CMD_C, origin = #origin{pid = Pid}} = Cmd}, State) ->
-	case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.calls) of
-		{value, CallInfo} ->
-			% TODO
-			gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK});
-		NotFound ->
-			?WARN("Session not exists. Do nothing.", []),
-			gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_ERR_NOSESSION})
-	end,
+handle_cast({CallPid, #cmd{type = ?CMD_P, origin = #origin{pid = Pid}} = Cmd}, State) ->
+	gen_server:cast(CallPid, Cmd#cmd.type, Cmd#cmd.filename, Cmd#cmd.codecs),
+	gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK}),
 	{noreply, State};
 
-handle_cast({message, #cmd{type = ?CMD_R, origin = #origin{pid = Pid}} = Cmd}, State) ->
-	case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.calls) of
-		{value, CallInfo} ->
-			gen_server:cast(CallInfo#thread.pid, {Cmd#cmd.type, Cmd#cmd.filename}),
-			gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK});
-		NotFound ->
-			?WARN("Session not exists. Do nothing.", []),
-			gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_ERR_NOSESSION})
-	end,
+handle_cast({CallPid, #cmd{type = ?CMD_Q, origin = #origin{pid = Pid}} = Cmd}, State) ->
+	{ok, Reply} = gen_server:call(CallPid, ?CMD_Q),
+	% TODO
+	gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK}),
 	{noreply, State};
 
-handle_cast({message, #cmd{type = ?CMD_L, origin = #origin{pid = Pid}} = Cmd}, State) ->
-	case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.calls) of
-		{value, CallInfo} ->
-			try gen_server:call(CallInfo#thread.pid, {Cmd#cmd.type, Cmd#cmd.addr, Cmd#cmd.to}) of
-				{ok, Reply} ->
-					gen_server:cast(Pid, {reply, Cmd, Reply});
-				{error, not_found} ->
-					?ERR("error not found while CMD_L!", []),
-					gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_ERR_NOSESSION});
-				{error, udp_error} ->
-					?ERR("error in udp while CMD_L!", []),
-					gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_ERR_SOFTWARE})
-			catch
-				Error:ErrorClass ->
-					?ERR("Exception {~p,~p} while CMD_L!", [Error,ErrorClass]),
-					gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_ERR_SOFTWARE})
-			end;
-		NotFound ->
-			?WARN("Session not exists. Do nothing.", []),
-			gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_ERR_NOSESSION})
-	end,
+handle_cast({CallPid, #cmd{type = ?CMD_C, origin = #origin{pid = Pid}} = Cmd}, State) ->
+	% TODO
+	gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK}),
 	{noreply, State};
 
-handle_cast({message, #cmd{type = ?CMD_U, origin = #origin{pid = Pid}, from = {Tag, MediaId}} = Cmd}, State) ->
-%	?INFO("Cmd[~p]", [Cmd]),
-	case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.calls) of
-		% Already created session
-		{value, CallInfo} ->
-			R = try gen_server:call(CallInfo#thread.pid, {Cmd#cmd.type, Cmd#cmd.addr, Cmd#cmd.from}) of
-				{ok, Reply} -> Reply;
-				{error, not_found} ->
-					?ERR("Session does not exists.", []),
-					?RTPPROXY_ERR_NOSESSION;
-				{error, udp_error} ->
-					?ERR("error in udp while CMD_U!", []),
-					?RTPPROXY_ERR_SOFTWARE
-			catch
-				Error:ErrorClass ->
-					?ERR("Exception {~p,~p} while CMD_U!", [Error,ErrorClass]),
-					?RTPPROXY_ERR_SOFTWARE
-			end,
-			gen_server:cast(Pid, {reply, Cmd, R});
-		NoSessionFound ->
-			?INFO("Session not exists. Creating new.", []),
-			pool:pspawn(media, start, [Cmd])
-	end,
+handle_cast({CallPid, #cmd{type = ?CMD_R, origin = #origin{pid = Pid}} = Cmd}, State) ->
+	gen_server:cast(CallPid, {Cmd#cmd.type, Cmd#cmd.filename}),
+	gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK}),
 	{noreply, State};
 
-handle_cast({created, #cmd{type = ?CMD_U, origin = #origin{pid = Pid}, from = {Tag, MediaId}} = Cmd, Pid}, State) ->
-	R = try gen_server:call(Pid, {Cmd#cmd.type, Cmd#cmd.addr, Cmd#cmd.from}) of
+handle_cast({false, #cmd{type = ?CMD_U, origin = #origin{pid = Pid}, from = {Tag, MediaId}} = Cmd}, State) ->
+	% TODO
+	?INFO("Session not exists. Creating new.", []),
+	pool:pspawn(media, start, [Cmd]),
+	{noreply, State};
+
+handle_cast({CallPid, #cmd{type = ?CMD_U, origin = #origin{pid = Pid}, from = {Tag, MediaId}} = Cmd}, State) ->
+	R = try gen_server:call(CallPid, {Cmd#cmd.type, Cmd#cmd.addr, Cmd#cmd.from}) of
 		{ok, Reply} -> Reply;
 		{error, not_found} ->
 			?ERR("Session does not exists.", []),
@@ -263,9 +160,31 @@ handle_cast({created, #cmd{type = ?CMD_U, origin = #origin{pid = Pid}, from = {T
 			?RTPPROXY_ERR_SOFTWARE
 	end,
 	gen_server:cast(Pid, {reply, Cmd, R}),
-	{noreply, State#state{calls=lists:append(State#state.calls, [#thread{pid=Pid, callid=Cmd#cmd.callid}])}};
+	case lists:keysearch(Cmd#cmd.callid, #thread.callid, State#state.calls) of
+		{value, CallInfo} ->
+			{noreply, State};
+		false ->
+			{noreply, State#state{calls=lists:append(State#state.calls, [#thread{pid=CallPid, callid=Cmd#cmd.callid}])}}
+	end;
 
-handle_cast({message, #cmd{origin = #origin{pid = Pid}} = Cmd}, State) ->
+handle_cast({CallPid, #cmd{type = ?CMD_L, origin = #origin{pid = Pid}} = Cmd}, State) ->
+	R = try gen_server:call(CallPid, {Cmd#cmd.type, Cmd#cmd.addr, Cmd#cmd.to}) of
+		{ok, Reply} -> Reply;
+		{error, not_found} ->
+			?ERR("Session does not exists.", []),
+			?RTPPROXY_ERR_NOSESSION;
+		{error, udp_error} ->
+			?ERR("error in udp while CMD_L!", []),
+			?RTPPROXY_ERR_SOFTWARE
+	catch
+		Error:ErrorClass ->
+			?ERR("Exception {~p,~p} while CMD_L!", [Error,ErrorClass]),
+			?RTPPROXY_ERR_SOFTWARE
+	end,
+	gen_server:cast(Pid, {reply, Cmd, R}),
+	{noreply, State};
+
+handle_cast({_, #cmd{origin = #origin{pid = Pid}} = Cmd}, State) ->
 	% Unknown command
 	gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_ERR_SOFTWARE}),
 	{noreply, State};
@@ -277,14 +196,8 @@ handle_cast({call_terminated, Pid, Reason}, State) ->
 			?INFO("call [~w] closed", [Pid]),
 			{noreply, State#state{calls=OtherCalls}};
 		false ->
-			case lists:keytake(Pid, #thread.pid, State#state.players) of
-				{value, PlayerThread, OtherPlayers} ->
-					?INFO("call [~w] closed", [Pid]),
-					{noreply, State#state{players=OtherPlayers}};
-				false ->
-					?WARN("Cannot find Call or Player with such pid", []),
-					{noreply, State}
-			end
+			?WARN("Cannot find Media with such pid", []),
+			{noreply, State}
 	end;
 
 handle_cast(status, State) ->

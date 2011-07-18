@@ -63,7 +63,7 @@ start(Cmd) ->
 	% TODO run under supervisor maybe?
 	{Tag, MediaId} = Cmd#cmd.from,
 	{ok,Pid} = gen_server:start(?MODULE, [Cmd#cmd.callid, MediaId, Tag], []),
-	gen_server:cast({global,rtpproxy}, {created, Cmd, Pid}).
+	gen_server:cast({global, rtpproxy}, {Pid, Cmd}).
 
 
 init ([CallID, MediaID, TagFrom]) ->
