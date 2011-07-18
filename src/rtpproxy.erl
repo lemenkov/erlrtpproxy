@@ -305,12 +305,6 @@ handle_cast(status, State) ->
 	?INFO("Current state: END.", []),
 	{noreply, State};
 
-handle_cast(close_all, State) ->
-	% stop all active sessions
-	lists:foreach(fun(X) -> gen_server:cast(X#thread.pid, message_d) end, State#state.calls),
-	lists:foreach(fun(X) -> gen_server:cast(X#thread.pid, message_d) end, State#state.players),
-	{noreply, State};
-
 handle_cast(_Other, State) ->
 	{noreply, State}.
 
