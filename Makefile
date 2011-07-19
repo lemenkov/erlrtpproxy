@@ -25,6 +25,8 @@ install: all
 	install -D -p -m 0755 priv/erlrtpproxy.init $(DESTDIR)/etc/rc.d/init.d/erl$(NAME)
 	install -D -p -m 0644 priv/erlrtpproxy.sysconfig $(DESTDIR)/etc/sysconfig/erl$(NAME)
 	install -d $(DESTDIR)/var/lib/erl$(NAME)
+	install -D -p -m 0644 priv/erlang.cookie $(DESTDIR)/var/lib/erl$(NAME)/.erlang.cookie
+	install -D -p -m 0644 priv/hosts.erlang $(DESTDIR)/var/lib/erl$(NAME)/.hosts.erlang
 
 test:
 	$(REBAR) eunit $(REBAR_FLAGS)
