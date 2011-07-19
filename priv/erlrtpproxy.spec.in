@@ -19,6 +19,7 @@ BuildRequires:	erlang
 BuildRequires:	erlang-erlsyslog
 Requires:	erlang
 Requires:	erlang-erlsyslog
+Requires:	erlang-rtplib
 Requires(post): /sbin/chkconfig
 Requires(preun): /sbin/chkconfig
 Requires(preun): /sbin/service
