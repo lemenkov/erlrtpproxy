@@ -61,8 +61,14 @@ init (_Unused) ->
 handle_call(_Other, _From, Fd) ->
 	{noreply, Fd}.
 
-handle_cast({reply, Cmd, Answer}, Fd) ->
+handle_cast({reply, Cmd, Answer}, Fd) when is_list(Answer) ->
 	Origin = Cmd#cmd.origin,
+	gen_udp:send(Fd, Origin#origin.ip, Origin#origin.port, Cmd#cmd.cookie ++ " " ++  Answer ++ "\n"),
+	{noreply, Fd};
+
+handle_cast({reply, Cmd, {{I0,I1,I2,I3} = Ip, Port}}, Fd) when is_integer(I0), is_integer(I1), is_integer(I2), is_integer(I3), is_integer(Port) ->
+	Origin = Cmd#cmd.origin,
+	Answer = integer_to_list(Port) ++ " " ++ inet_parse:ntoa(Ip),
 	gen_udp:send(Fd, Origin#origin.ip, Origin#origin.port, Cmd#cmd.cookie ++ " " ++  Answer ++ "\n"),
 	{noreply, Fd};
 
