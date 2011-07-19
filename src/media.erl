@@ -72,10 +72,7 @@ init (#cmd{type = ?CMD_U, origin = #origin{pid = Pid}, callid = CallId, addr = {
 
 	{TagFrom, MediaId} = Cmd#cmd.from,
 
-	case MediaId of
-		1 -> gen_server:cast({global,radius}, {start, CallId});
-		_ -> ok
-	end,
+	gen_server:cast({global,radius}, {start, CallId, MediaId}),
 
 	{Fd0, Fd1, Fd2, Fd3} = get_fd_quadruple(MainIp),
 
@@ -166,11 +163,14 @@ handle_cast(_Message, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, #state{tref = TimerRef, from = From, fromrtcp = FromRtcp, to = To, tortcp = ToRtcp}) ->
+terminate(Reason, #state{callid = CallId, mediaid = MediaId, tref = TimerRef, from = From, fromrtcp = FromRtcp, to = To, tortcp = ToRtcp}) ->
 	timer:cancel(TimerRef),
 	% TODO we should send RTCP BYE here
 	lists:map(fun (X) -> gen_udp:close(X#media.fd) end, [From, FromRtcp, To, ToRtcp]),
+
 	gen_server:cast({global, rtpproxy}, {'EXIT', self(), Reason}),
+	gen_server:cast({global,radius}, {stop, CallId, MediaId}),
+
 	?ERR("terminated due to reason [~p]", [Reason]).
 
 handle_info({udp, Fd, Ip, Port, Msg}, #state{tortcp = #media{fd = Fd}} = State) ->
