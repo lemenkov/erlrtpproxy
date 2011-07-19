@@ -174,6 +174,7 @@ terminate(Reason, #state{callid = CallId, mediaid = MediaId, tref = TimerRef, fr
 	?ERR("terminated due to reason [~p]", [Reason]).
 
 handle_info({udp, Fd, Ip, Port, Msg}, #state{tortcp = #media{fd = Fd}} = State) ->
+	inet:setopts(Fd, [{active, once}]),
 	% First, we'll try do decode our RCP packet(s)
 	try
 		{ok, Rtcps} = rtcp:decode(Msg),
@@ -188,6 +189,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{tortcp = #media{fd = Fd}} = State) 
 	end;
 
 handle_info({udp, Fd, Ip, Port, Msg}, #state{fromrtcp = #media{fd = Fd}} = State) ->
+	inet:setopts(Fd, [{active, once}]),
 	% First, we'll try do decode our RCP packet(s)
 	try
 		{ok, Rtcps} = rtcp:decode(Msg),
@@ -210,9 +212,11 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fromrtcp = #media{fd = Fd}} = State
 % TODO check that message was arrived from valid {Ip, Port}
 % TODO check whether message is valid rtp stream
 handle_info({udp, Fd, Ip, Port, Msg}, #state{from = #media{fd = Fd}} = State) ->
+	inet:setopts(Fd, [{active, once}]),
 	{noreply, State#state{to = safe_send(State#state.to, State#state.from, Ip, Port, Msg), started=start_acc(State)}};
 
 handle_info({udp, Fd, Ip, Port, Msg}, #state{to = #media{fd = Fd}} = State) ->
+	inet:setopts(Fd, [{active, once}]),
 	{noreply, State#state{from = safe_send(State#state.from, State#state.to, Ip, Port, Msg), started=start_acc(State)}};
 
 handle_info(ping, #state{from = #media{rtpstate = rtp}, to = #media{rtpstate = rtp}} =  State) ->
@@ -306,14 +310,14 @@ get_fd_pair(Ip, 0) ->
 	?ERR("Create new socket at ~p FAILED", [Ip]),
 	error;
 get_fd_pair(Ip, NTry) ->
-	case gen_udp:open(0, [binary, {ip, Ip}, {active, true}, {raw,1,11,<<1:32/native>>}]) of
+	case gen_udp:open(0, [binary, {ip, Ip}, {active, once}, {raw,1,11,<<1:32/native>>}]) of
 		{ok, Fd} ->
 			{ok, {Ip,Port}} = inet:sockname(Fd),
 			Port2 = case Port rem 2 of
 				0 -> Port + 1;
 				1 -> Port - 1
 			end,
-			case gen_udp:open(Port2, [binary, {ip, Ip}, {active, true}, {raw,1,11,<<1:32/native>>}]) of
+			case gen_udp:open(Port2, [binary, {ip, Ip}, {active, once}, {raw,1,11,<<1:32/native>>}]) of
 				{ok, Fd2} ->
 					if
 						Port > Port2 -> {Fd2, Fd};
