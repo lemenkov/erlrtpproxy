@@ -47,7 +47,7 @@ init (_Unused) ->
 
 	error_logger:add_report_handler(erlsyslog, {0, SyslogHost, SyslogPort}),
 
-	net_adm:ping(RtpproxyNode),
+	pong = net_adm:ping(RtpproxyNode),
 
 	case gen_udp:open(Port, [{ip, Ip}, {active, true}, list]) of
 		{ok, Fd} ->
