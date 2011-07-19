@@ -88,7 +88,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 	try ser_proto:parse(Msg, Ip, Port) of
 		Cmd ->
 			?INFO("SER cmd: ~p", [Cmd]),
-			gen_server:cast({global, rtpproxy}, {message, Cmd})
+			gen_server:cast({global, rtpproxy}, Cmd)
 	catch
 		throw:{error_syntax, Error} ->
 			?ERR("Bad syntax. [~s -> ~s]~n", [Msg, Error]),
