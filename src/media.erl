@@ -61,20 +61,19 @@
 
 start(Cmd) ->
 	% TODO run under supervisor maybe?
-	{Tag, MediaId} = Cmd#cmd.from,
-	{ok,Pid} = gen_server:start(?MODULE, [Cmd#cmd.callid, MediaId, Tag], []),
-	gen_server:cast({global, rtpproxy}, {Pid, Cmd}).
+	gen_server:start(?MODULE, Cmd, []).
 
-
-init ([CallID, MediaID, TagFrom]) ->
+init (#cmd{type = ?CMD_U, origin = #origin{pid = Pid}, callid = CallId, addr = {GuessIp, GuessPort}, from = {TagFrom, MediaId}} = Cmd) ->
 	% TODO just choose the first IP address for now
 	[MainIp | _Rest ]  = get_ipaddrs(),
 	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE*5, ping),
 %	{ok, TRef} = timer:send_interval(?CALL_TIME_TO_LIVE*5, timeout),
 %	{ok, TRef2} = timer:send_interval(?CALL_TIME_TO_LIVE, interim_update),
 
-	case MediaID of
-		1 -> gen_server:cast({global,radius}, {start, CallID});
+	{TagFrom, MediaId} = Cmd#cmd.from,
+
+	case MediaId of
+		1 -> gen_server:cast({global,radius}, {start, CallId});
 		_ -> ok
 	end,
 
@@ -83,41 +82,25 @@ init ([CallID, MediaID, TagFrom]) ->
 	[P0, P1, P2, P3]  = lists:map(fun(X) -> {ok, {_I, P}} = inet:sockname(X), P end, [Fd0, Fd1, Fd2, Fd3]),
 	?INFO("started at ~s, with  F {~p,~p} T {~p,~p}", [inet_parse:ntoa(MainIp), P0, P1, P2, P3]),
 
+	% Register at the rtpproxy
+	gen_server:cast({global, rtpproxy}, {created, self(), {CallId, MediaId}}),
+
+	{ok, {I, P}} = inet:sockname(Fd0),
+	gen_server:cast(Pid, {reply, Cmd, {I, P}}),
+
 	{ok,
 		#state{
-			callid	= CallID,
-			mediaid = MediaID,
+			callid	= CallId,
+			mediaid = MediaId,
 			tag_f	= TagFrom,
 			tag_t	= null,
 			tref	= TRef,
-			from	= #media{fd=Fd0},
+			from	= #media{fd=Fd0,ip=GuessIp, port=GuessPort},
 			fromrtcp= #media{fd=Fd1},
 			to	= #media{fd=Fd2},
 			tortcp	= #media{fd=Fd3}
 		}
 	}.
-
-handle_call({?CMD_U, {GuessIp, GuessPort}, {FromTag, MediaID}}, _From, #state{from = #media{fd=F} = From, tag_f = FromTag} = State) ->
-	{ok, {I, P}} = inet:sockname(F),
-	{reply, {ok, {I, P}}, State#state{from = From#media{ip=GuessIp, port=GuessPort}}};
-
-handle_call({?CMD_U, {GuessIp, GuessPort}, {ToTag, MediaID}}, _From, #state{to = #media{fd=F} = To, tag_t = ToTag} = State) ->
-	{ok, {I, P}} = inet:sockname(F),
-	{reply, {ok, {I, P}}, State#state{to = To#media{ip=GuessIp, port=GuessPort}}};
-
-handle_call({?CMD_L, {GuessIp, GuessPort}, {FromTag, MediaID}}, _From, #state{from = #media{fd=F} = From, tag_f = FromTag} = State) ->
-	{ok, {I, P}} = inet:sockname(F),
-	{reply, {ok, {I, P}}, State#state{from = From#media{ip=GuessIp, port=GuessPort}}};
-
-% Initial set up of a ToTag
-handle_call({?CMD_L, {GuessIp, GuessPort}, {ToTag, MediaID}}, _From, #state{to = #media{fd=F} = To, tag_t = ToTag} = State) ->
-	{ok, {I, P}} = inet:sockname(F),
-	{reply, {ok, {I, P}}, State#state{to = To#media{ip=GuessIp, port=GuessPort}}};
-
-% Initial set up of a ToTag
-handle_call({?CMD_L, {GuessIp, GuessPort}, {ToTag, MediaID}}, _From, #state{to = #media{fd=F} = To, tag_t = null} = State) ->
-	{ok, {I, P}} = inet:sockname(F),
-	{reply, {ok, {I, P}}, State#state{to = To#media{ip=GuessIp, port=GuessPort}, tag_t = ToTag}};
 
 handle_call(?CMD_Q, _From, #state{started = Started} = State) ->
 	% TODO (acquire information about call state)
@@ -127,25 +110,57 @@ handle_call(?CMD_Q, _From, #state{started = Started} = State) ->
 	Reply = io_lib:format("CallDuration: ~w", [case Started of null -> "<not started yet>"; _ -> trunc(0.5 + timer:now_diff(erlang:now(), Started) / 1000000) end]),
 	{reply, {ok, Reply}, State}.
 
-handle_cast(stop, State) ->
-	{stop, stop, State};
+handle_cast(
+		#cmd{type = ?CMD_U, origin = #origin{pid = Pid}, callid = CallId, addr = {GuessIp, GuessPort}, from = {Tag, MediaId}} = Cmd,
+		#state{callid = CallId, mediaid = MediaId, from = #media{fd=F} = From, tag_f = Tag} = State
+	) ->
+	{ok, {I, P}} = inet:sockname(F),
+	gen_server:cast(Pid, {reply, Cmd, {I, P}}),
+	{noreply, State#state{from = From#media{ip=GuessIp, port=GuessPort}}};
 
-handle_cast(hold, #state{holdstate = false} = State) ->
-	?INFO("HOLD on", []),
-	% We should suppress timer since we shouldn't care this mediastream
-	{noreply, State#state{holdstate=true}};
+handle_cast(
+		#cmd{type = ?CMD_U, origin = #origin{pid = Pid}, callid = CallId, addr = {GuessIp, GuessPort}, from = {Tag, MediaId}} = Cmd,
+		#state{callid = CallId, mediaid = MediaId, to = #media{fd=F} = To, tag_t = Tag} = State
+	) ->
+	{ok, {I, P}} = inet:sockname(F),
+	gen_server:cast(Pid, {reply, Cmd, {I, P}}),
+	{noreply, State#state{to = To#media{ip=GuessIp, port=GuessPort}}};
 
-handle_cast(hold, #state{holdstate = true} = State) ->
-	?INFO("HOLD off", []),
-	% since we suppressed timer earlier, we need to restart it
-	{noreply, State#state{holdstate=false}};
+handle_cast(
+		#cmd{type = ?CMD_L, origin = #origin{pid = Pid}, callid = CallId, addr = {GuessIp, GuessPort}, to = {Tag, MediaId}} = Cmd,
+		#state{callid = CallId, mediaid = MediaId, from = #media{fd=F} = From, tag_f = Tag} = State
+	) ->
+	{ok, {I, P}} = inet:sockname(F),
+	gen_server:cast(Pid, {reply, Cmd, {I, P}}),
+	{noreply, State#state{from = From#media{ip=GuessIp, port=GuessPort}}};
 
-handle_cast({recording, {start, _Filename}}, State) ->
-	% TODO set flag to record this stream RTP
-	{noreply, State};
+handle_cast(
+		#cmd{type = ?CMD_L, origin = #origin{pid = Pid}, callid = CallId, addr = {GuessIp, GuessPort}, to = {Tag, MediaId}} = Cmd,
+		#state{callid = CallId, mediaid = MediaId, to = #media{fd=F} = To, tag_t = Tag} = State
+	) ->
+	{ok, {I, P}} = inet:sockname(F),
+	gen_server:cast(Pid, {reply, Cmd, {I, P}}),
+	{noreply, State#state{to = To#media{ip=GuessIp, port=GuessPort}}};
 
-handle_cast({recording, stop}, State) ->
-	% TODO stop recording of RTP
+% Initial set up of a ToTag
+handle_cast(
+		#cmd{type = ?CMD_L, origin = #origin{pid = Pid}, callid = CallId, addr = {GuessIp, GuessPort}, to = {Tag, MediaId}} = Cmd,
+		#state{callid = CallId, mediaid = MediaId, to = #media{fd=F} = To, tag_t = null} = State
+	) ->
+	{ok, {I, P}} = inet:sockname(F),
+	gen_server:cast(Pid, {reply, Cmd, {I, P}}),
+	{noreply, State#state{to = To#media{ip=GuessIp, port=GuessPort}, tag_t = Tag}};
+
+handle_cast(
+		#cmd{type = ?CMD_D, origin = #origin{pid = Pid}, callid = CallId, from = {TagFrom, 0}, to = To} = Cmd,
+		#state{callid = CallId, tag_f = TagFrom, tag_t = TagTo} = State
+	) ->
+	case To of
+		null -> {stop, cancel, State};
+		{TagTo, 0} -> {stop, bye, State}
+	end;
+
+handle_cast(_Message, State) ->
 	{noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -155,6 +170,7 @@ terminate(Reason, #state{tref = TimerRef, from = From, fromrtcp = FromRtcp, to =
 	timer:cancel(TimerRef),
 	% TODO we should send RTCP BYE here
 	lists:map(fun (X) -> gen_udp:close(X#media.fd) end, [From, FromRtcp, To, ToRtcp]),
+	gen_server:cast({global, rtpproxy}, {'EXIT', self(), Reason}),
 	?ERR("terminated due to reason [~p]", [Reason]).
 
 handle_info({udp, Fd, Ip, Port, Msg}, #state{tortcp = #media{fd = Fd}} = State) ->
