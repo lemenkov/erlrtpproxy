@@ -55,13 +55,7 @@ init(_Unused) ->
 
 	pool:start(rtpproxy),
 
-%	lists:map(fun(N) ->
-%			?INFO("Adding node ~p", [N]),
-%			rtpproxy_ctl:upgrade(N)
-%		end,
-%		pool:get_nodes()
-%	),
-	?INFO("Adding node(s) ~p", [pool:get_nodes()]),
+	?INFO("Available node(s) ~p", [pool:get_nodes()]),
 
 	{ok, #state{}}.
 
@@ -139,21 +133,20 @@ handle_cast(status, State) ->
 
 % Call died (due to timeout)
 handle_cast({'EXIT', Pid, Reason}, State) ->
-	?INFO("received 'EXIT' from ~p, closing due to [~p]", [Pid, Reason]),
 	case lists:keysearch(Pid, #thread.pid, State#state.calls) of
 		{value, CallThread} ->
-			?INFO("call [~w] closed", [Pid]),
+			?INFO("received 'EXIT' from ~p due to [~p]", [Pid, Reason]),
 			{noreply, State#state{calls=lists:delete(CallThread, State#state.calls)}};
 		false ->
 			{noreply, State}
 	end;
 
-handle_cast(_Other, State) ->
+handle_cast(Other, State) ->
+	?WARN("Other cast [~p], State [~p]", [Other, State]),
 	{noreply, State}.
 
-% Call died (due to timeout)
 handle_info(Info, State) ->
-	?INFO("received Info ~p", [Info]),
+	?WARN("Other Info [~p], State [~p]", [Other, State]),
 	{noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->
