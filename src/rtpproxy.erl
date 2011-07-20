@@ -153,7 +153,8 @@ handle_cast(_Other, State) ->
 
 % Call died (due to timeout)
 handle_info(Info, State) ->
-	?INFO("received Info ~p", [Info]).
+	?INFO("received Info ~p", [Info]),
+	{noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
