@@ -145,7 +145,7 @@ handle_cast(Other, State) ->
 	?WARN("Other cast [~p], State [~p]", [Other, State]),
 	{noreply, State}.
 
-handle_info(Info, State) ->
+handle_info(Other, State) ->
 	?WARN("Other Info [~p], State [~p]", [Other, State]),
 	{noreply, State}.
 
