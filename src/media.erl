@@ -157,7 +157,8 @@ handle_cast(
 		{TagTo, 0} -> {stop, bye, State}
 	end;
 
-handle_cast(_Message, State) ->
+handle_cast(Other, State) ->
+	?WARN("Other cast [~p], State [~p]", [Other, State]),
 	{noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->
