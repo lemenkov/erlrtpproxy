@@ -32,12 +32,13 @@
 -include("../include/common.hrl").
 
 % Milliseconds
--define(RTP_TIME_TO_LIVE, 30000).
+-define(RTP_TIME_TO_LIVE, 150000).
 
 % Microseconds
 -define(RTCP_TIME_TO_LIVE, 10000000).
 
--define(CALL_TIME_TO_LIVE, 30000).
+% Milliseconds
+-define(INTERIM_UPDATE, 30000).
 
 %-include("rtcp.hrl").
 
@@ -74,9 +75,9 @@ start(Cmd) ->
 init (#cmd{type = ?CMD_U, origin = #origin{pid = Pid}, callid = CallId, addr = {GuessIp, GuessPort}, from = {TagFrom, MediaId}} = Cmd) ->
 	% TODO just choose the first IP address for now
 	[MainIp | _Rest ]  = get_ipaddrs(),
-	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE*5, ping),
+	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE, ping),
 %	{ok, TRef} = timer:send_interval(?CALL_TIME_TO_LIVE*5, timeout),
-%	{ok, TRef2} = timer:send_interval(?CALL_TIME_TO_LIVE, interim_update),
+%	{ok, TRef2} = timer:send_interval(?INTERIM_UPDATE, interim_update),
 
 	{TagFrom, MediaId} = Cmd#cmd.from,
 
