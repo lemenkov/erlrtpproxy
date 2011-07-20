@@ -299,15 +299,15 @@ get_ipaddrs() ->
 				({[{{127, _, _, _}, _Bcast,_Mask} | Rest], X}) ->
 					F({Rest, X});
 				% RFC 1918, 10.0.0.0 - 10.255.255.255
-				({[{{10,_,_,_}, _Bcast,_Mask} | Rest], X}) ->
+				({[{{10, _, _, _}, _Bcast,_Mask} | Rest], X}) ->
 					F({Rest, X});
 				% RFC 1918, 172.16.0.0 - 172.31.255.255
-				({[{{172, A ,_,_}, _Bcast,_Mask} | Rest], X}) when A > 15 , A < 32 ->
+				({[{{172, A, _, _}, _Bcast,_Mask} | Rest], X}) when A > 15 , A < 32 ->
 					F({Rest, X});
 				% RFC 1918, 192.168.0.0 - 192.168.255.255
-				({[{{192, 168,_,_}, _Bcast,_Mask} | Rest], X}) ->
+				({[{{192, 168, _, _}, _Bcast,_Mask} | Rest], X}) ->
 					F({Rest, X});
-				({[ {IPv4, _Bcast,_Mask} | Rest], X}) ->
+				({[ {IPv4, _Bcast, _Mask} | Rest], X}) ->
 					F({Rest, X ++ [IPv4]})
 			end
 	end,
