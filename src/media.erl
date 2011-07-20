@@ -53,6 +53,7 @@
 		tag_f,
 		tag_t,
 		tref,
+		tref2,
 		from,
 		fromrtcp,
 		to,
@@ -77,11 +78,9 @@ init (#cmd{type = ?CMD_U, origin = #origin{pid = Pid}, callid = CallId, addr = {
 	[MainIp | _Rest ]  = get_ipaddrs(),
 	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE, ping),
 %	{ok, TRef} = timer:send_interval(?CALL_TIME_TO_LIVE*5, timeout),
-%	{ok, TRef2} = timer:send_interval(?INTERIM_UPDATE, interim_update),
+	{ok, TRef2} = timer:send_interval(?INTERIM_UPDATE, interim_update),
 
 	{TagFrom, MediaId} = Cmd#cmd.from,
-
-	gen_server:cast({global,radius}, {start, CallId, MediaId}),
 
 	{Fd0, Fd1, Fd2, Fd3} = get_fd_quadruple(MainIp),
 
@@ -101,6 +100,7 @@ init (#cmd{type = ?CMD_U, origin = #origin{pid = Pid}, callid = CallId, addr = {
 			tag_f	= TagFrom,
 			tag_t	= null,
 			tref	= TRef,
+			tref2	= TRef2,
 			from	= #media{fd=Fd0,ip=GuessIp, port=GuessPort},
 			fromrtcp= #media{fd=Fd1},
 			to	= #media{fd=Fd2},
@@ -173,8 +173,9 @@ handle_cast(Other, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, #state{callid = CallId, mediaid = MediaId, tref = TimerRef, from = From, fromrtcp = FromRtcp, to = To, tortcp = ToRtcp}) ->
+terminate(Reason, #state{callid = CallId, mediaid = MediaId, tref = TimerRef, tref2 = TimerRef2, from = From, fromrtcp = FromRtcp, to = To, tortcp = ToRtcp}) ->
 	timer:cancel(TimerRef),
+	timer:cancel(TimerRef2),
 	% TODO we should send RTCP BYE here
 	lists:map(fun (X) -> gen_udp:close(X#media.fd) end, [From, FromRtcp, To, ToRtcp]),
 
@@ -233,6 +234,11 @@ handle_info(ping, #state{from = #media{rtpstate = rtp}, to = #media{rtpstate = r
 	% Both sides are active, so we just set state to 'nortp' and continue
 	{noreply, State#state{from=(State#state.from)#media{rtpstate=nortp}, to=(State#state.to)#media{rtpstate=nortp}}};
 
+handle_info(interim_update, #state{callid = CallId, mediaid = MediaId, from = #media{rtpstate = rtp}, to = #media{rtpstate = rtp}} =  State) ->
+	% Both sides are active, so we need to send interim update here
+	gen_server:cast({global, radius}, {interim_update, CallId, MediaId}),
+	{noreply, State};
+
 handle_info(ping, State) ->
 	% We didn't get new RTP messages since last ping - we should close this mediastream
 	% we should rely on rtcp
@@ -261,7 +267,9 @@ safe_send (Var1, Var2, Ip, Port, Msg) ->
 	Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()}.
 
 % Define function for safe determinin of starting media
-start_acc (#state{started = null, from = #media{rtpstate = rtp}, to = #media{rtpstate = rtp}}) ->
+start_acc (#state{started = null, callid = CallId, mediaid = MediaId, from = #media{rtpstate = rtp}, to = #media{rtpstate = rtp}}) ->
+	% FIXME perhaps this should be optional
+	gen_server:cast({global, radius}, {start, CallId, MediaId}),
 	now();
 start_acc (S) ->
 	S#state.started.
