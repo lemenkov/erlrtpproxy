@@ -90,8 +90,9 @@ init (#cmd{type = ?CMD_U, origin = #origin{pid = Pid}, callid = CallId, addr = {
 	% Register at the rtpproxy
 	gen_server:cast({global, rtpproxy}, {created, self(), {CallId, MediaId}}),
 
-	{ok, {I, P}} = inet:sockname(Fd0),
-	gen_server:cast(Pid, {reply, Cmd, {I, P}}),
+	{ok, {I0, P0}} = inet:sockname(Fd0),
+	{ok, {I2, P2}} = inet:sockname(Fd0),
+	gen_server:cast(Pid, {reply, Cmd, {I0, P0}, {I2, P2}}),
 
 	{ok,
 		#state{
