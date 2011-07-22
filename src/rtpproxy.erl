@@ -132,11 +132,11 @@ handle_cast(status, State) ->
 	{noreply, State};
 
 % Call died (due to timeout)
-handle_cast({'EXIT', Pid, Reason}, State) ->
-	case lists:keysearch(Pid, #thread.pid, State#state.calls) of
+handle_cast({'EXIT', Pid, Reason}, #state{calls = Calls} = State) ->
+	case lists:keysearch(Pid, #thread.pid, Calls) of
 		{value, CallThread} ->
 			?INFO("received 'EXIT' from ~p due to [~p]", [Pid, Reason]),
-			{noreply, State#state{calls=lists:delete(CallThread, State#state.calls)}};
+			{noreply, State#state{calls=lists:delete(CallThread, Calls)}};
 		false ->
 			{noreply, State}
 	end;
