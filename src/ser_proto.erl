@@ -241,25 +241,65 @@ parse_media_id(ProbableMediaId) ->
 			throw({error_syntax, "Wrong MediaID"})
 	end.
 
-% a - asymmetric
-% e - external network
-% i - internal (RFC1918) network
-% 6 - IPv6
-% s - symmetric
-% w - weak
+parse_params(A) ->
+	parse_params(A, []).
+
+parse_params([], Result) ->
+	Result;
+% Asymmetric
+parse_params([$A|Rest], Result) ->
+	parse_params(Rest, Result ++ [asymmetric]);
+% c0,101,100 - Codecs (a bit tricky)
+parse_params([$C|Rest], Result) ->
+	case string:span(Rest, "0123456789,") of
+		0 ->
+			% Bogus - skip incomplete modifier
+			parse_params(Rest, Result);
+		Ret ->
+			Rest1 = string:substr(Rest, Ret + 1),
+			Codecs = lists:map(fun(X) -> {Y, _} = string:to_integer(X), Y end, string:tokens(string:substr(Rest, 1, Ret), ",")),
+			parse_params(Rest1, Result ++ [{codecs, Codecs}])
+	end;
+% IPv6
+parse_params([$6|Rest], Result) ->
+	parse_params(Rest, Result ++ [ipv6]);
+% Internal (RFC1918) network
+parse_params([$I|Rest], Result) ->
+	parse_params(Rest, Result ++ [internal]);
+% External (non-RFC1918) network
+parse_params([$E|Rest], Result) ->
+	parse_params(Rest, Result ++ [external]);
+% Symmetric
+parse_params([$S|Rest], Result) ->
+	parse_params(Rest, Result ++ [symmetric]);
+% Weak
+parse_params([$W|Rest], Result) ->
+	parse_params(Rest, Result ++ [weak]);
 % zNN - repacketization, NN in msec, for the most codecs its value should be
 %       in 10ms increments, however for some codecs the increment could differ
 %       (e.g. 30ms for GSM or 20ms for G.723).
-% c - codecs
-% l - lock
+parse_params([$Z|Rest], Result) ->
+	case string:span(Rest, "0123456789") of
+		0 ->
+			% Bogus - skip incomplete modifier
+			parse_params(Rest, Result);
+		Ret ->
+			Rest1 = string:substr(Rest, Ret + 1),
+			Value = string:to_integer(string:substr(Rest, 1, Ret)),
+			parse_params(Rest1, Result ++ [{repacketize, Value}])
+	end;
+% Lock
+parse_params([$L|Rest], Result) ->
+	parse_params(Rest, Result ++ [lock]);
 % r - remote address (?)
-parse_params(A) ->
-	{Mod, _} = lists:unzip(lists:filter(fun({_, Sym}) -> lists:member(Sym, A) end, ?MOD_LIST)),
-	Mod.
+parse_params([_|Rest], Result) ->
+	% Unknown parameter - just skip it
+	parse_params(Rest, Result).
 
 %%
 %% Tests
 %%
+
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 

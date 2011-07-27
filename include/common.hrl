@@ -19,8 +19,6 @@
 -define(RTPPROXY_ERR_SOFTWARE,  "E7").
 -define(RTPPROXY_ERR_NOSESSION, "E8").
 
--define (MOD_LIST, [{mod_asymmetric, $A}, {mod_e, $E}, {mod_i, $I}, {mod_ipv6, $6}, {mod_symmetric, $S}, {mod_weak, $W}, {mod_z, $Z}]).
-
 -define(CMD_V, message_v).
 -define(CMD_VF,message_vf).
 -define(CMD_U, message_u).
