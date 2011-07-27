@@ -26,6 +26,10 @@ run: rel
 	chmod 755 ./rel/ser/bin/ser
 	./rel/ser/bin/ser start
 
+test:
+	$(REBAR) eunit $(REBAR_FLAGS)
+
+
 install: all
 	install -D -p -m 0644 $(APP_FILE) $(DESTDIR)$(ERLDIR)/$(APP_FILE)
 	install -p -m 0644 $(ERL_OBJECTS) $(DESTDIR)$(ERLDIR)/$(EBIN_DIR)
