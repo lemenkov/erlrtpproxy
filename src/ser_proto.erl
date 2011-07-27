@@ -110,22 +110,20 @@ parse_splitted([[$L|Args], CallId, ProbableIp, ProbablePort, FromTag, FromMediaI
 	};
 
 % delete session (no MediaIds and no ToTag) - Cancel
-parse_splitted([[$D|Args], CallId, FromTag]) ->
+parse_splitted(["D", CallId, FromTag]) ->
 	#cmd{
 		type=?CMD_D,
 		callid=CallId,
-		from={FromTag, 0},
-		params=parse_params(Args)
+		from={FromTag, 0}
 	};
 
 % delete session (no MediaIds) - Bye
-parse_splitted([[$D|Args], CallId, FromTag, ToTag]) ->
+parse_splitted(["D", CallId, FromTag, ToTag]) ->
 	#cmd{
 		type=?CMD_D,
 		callid=CallId,
 		from={FromTag, 0},
-		to={ToTag, 0},
-		params=parse_params(Args)
+		to={ToTag, 0}
 	};
 
 % Record (obsoleted)
