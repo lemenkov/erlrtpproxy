@@ -75,14 +75,14 @@ start(Cmd) ->
 
 init (#cmd{type = ?CMD_U, origin = #origin{pid = Pid}, callid = CallId, addr = {GuessIp, GuessPort}, from = {TagFrom, MediaId}} = Cmd) ->
 	% TODO just choose the first IP address for now
-	[MainIp | _Rest ]  = get_ipaddrs(),
+	[MainIp | _Rest ]  = media_utils:get_ipaddrs(),
 	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE, ping),
 %	{ok, TRef} = timer:send_interval(?CALL_TIME_TO_LIVE*5, timeout),
 	{ok, TRef2} = timer:send_interval(?INTERIM_UPDATE, interim_update),
 
 	{TagFrom, MediaId} = Cmd#cmd.from,
 
-	{Fd0, Fd1, Fd2, Fd3} = get_fd_quadruple(MainIp),
+	{Fd0, Fd1, Fd2, Fd3} = media_utils:get_fd_quadruple(MainIp),
 
 	[P0, P1, P2, P3]  = lists:map(fun(X) -> {ok, {_I, P}} = inet:sockname(X), P end, [Fd0, Fd1, Fd2, Fd3]),
 	?INFO("started at ~s, with  F {~p,~p} T {~p,~p}", [inet_parse:ntoa(MainIp), P0, P1, P2, P3]),
@@ -296,71 +296,3 @@ rtcp_process ([Rtcp | Rest], Processed) ->
 	end,
 	rtcp_process (Rest, Processed ++ [NewRtcp]).
 
-%% Determine the list of suitable IP addresses
-get_ipaddrs() ->
-	% TODO IPv4 only
-	{ok, IPv4List} = inet:getif(),
-	FilterIP = fun (F) ->
-			fun
-				({[], X}) ->
-					X;
-				% Loopback
-				({[{{127, _, _, _}, _Bcast,_Mask} | Rest], X}) ->
-					F({Rest, X});
-				% RFC 1918, 10.0.0.0 - 10.255.255.255
-				({[{{10, _, _, _}, _Bcast,_Mask} | Rest], X}) ->
-					F({Rest, X});
-				% RFC 1918, 172.16.0.0 - 172.31.255.255
-				({[{{172, A, _, _}, _Bcast,_Mask} | Rest], X}) when A > 15 , A < 32 ->
-					F({Rest, X});
-				% RFC 1918, 192.168.0.0 - 192.168.255.255
-				({[{{192, 168, _, _}, _Bcast,_Mask} | Rest], X}) ->
-					F({Rest, X});
-				({[ {IPv4, _Bcast, _Mask} | Rest], X}) ->
-					F({Rest, X ++ [IPv4]})
-			end
-	end,
-	(y:y(FilterIP))({IPv4List, []}).
-
-%% Open a pair of UDP ports - N and N+1 (for RTP and RTCP consequently)
-get_fd_pair(Ip) ->
-	get_fd_pair(Ip, 10).
-get_fd_pair(Ip, 0) ->
-	?ERR("Create new socket at ~p FAILED", [Ip]),
-	error;
-get_fd_pair(Ip, NTry) ->
-	case gen_udp:open(0, [binary, {ip, Ip}, {active, once}, {raw,1,11,<<1:32/native>>}]) of
-		{ok, Fd} ->
-			{ok, {Ip,Port}} = inet:sockname(Fd),
-			Port2 = case Port rem 2 of
-				0 -> Port + 1;
-				1 -> Port - 1
-			end,
-			case gen_udp:open(Port2, [binary, {ip, Ip}, {active, once}, {raw,1,11,<<1:32/native>>}]) of
-				{ok, Fd2} ->
-					if
-						Port > Port2 -> {Fd2, Fd};
-						Port < Port2 -> {Fd, Fd2}
-					end;
-				{error, _} ->
-					gen_udp:close(Fd),
-					get_fd_pair(Ip, NTry - 1)
-			end;
-		{error, _} ->
-			get_fd_pair(Ip, NTry - 1)
-	end.
-
-%% Get a two pairs of UDP ports
-get_fd_quadruple(Ip) ->
-	case get_fd_pair(Ip) of
-		{Fd0, Fd1} ->
-			case get_fd_pair(Ip) of
-				{Fd2, Fd3} ->
-					{Fd0, Fd1, Fd2, Fd3};
-				error ->
-					gen_udp:close(Fd0),
-					gen_udp:close(Fd1),
-					error
-			end;
-		error -> error
-	end.

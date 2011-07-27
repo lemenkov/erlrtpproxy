@@ -83,6 +83,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_ctl.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_sup.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/media.beam
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/media_utils.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/y.beam
 
 %dir %attr(0755,%{name},%{name}) %{_localstatedir}/lib/%{name}
