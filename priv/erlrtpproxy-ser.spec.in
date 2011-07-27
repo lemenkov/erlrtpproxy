@@ -1,5 +1,7 @@
-%define debug_package %{nil}
-%define realname ser
+%global realname ser
+%global debug_package %{nil}
+%global git_tag 1234567
+%global patchnumber 0
 
 
 Name:		erlrtpproxy-ser
@@ -8,8 +10,9 @@ Release:	1%{?dist}
 Summary:	RTP proxying daemon interface
 Group:		Applications/Internet
 License:	GPLv3+
-URL:		http://code.google.com/p/erlrtpproxy/
-Source0:	%{name}-%{version}.tar.bz2
+URL:		https://github.com/lemenkov/erlrtpproxy-ser
+# wget --no-check-certificate https://github.com/lemenkov/erlrtpproxy-ser/tarball/%VSN%
+Source0:	lemenkov-%{realname}-%{version}-%{patchnumber}-g%{git_tag}.tar.gz
 BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 BuildRequires:	erlang
@@ -28,7 +31,7 @@ OpenSER/OpenSIPs/Kamailio/SIP-Router nathelper module.
 
 
 %prep
-%setup -q
+%setup -q -n lemenkov-%{realname}-%{git_tag}
 
 
 %build
