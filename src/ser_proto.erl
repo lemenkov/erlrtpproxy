@@ -38,8 +38,8 @@ parse(Msg,Ip, Port) ->
 		}
 	}.
 
+% Request basic supported rtpproxy protocol version
 parse_splitted(["V"]) ->
-	% Request basic supported rtpproxy protocol version
 	#cmd{
 		type=?CMD_V
 	};
@@ -73,8 +73,8 @@ parse_splitted(["VF", "20090810"]) ->
 	% Support for automatic bridging
 	#cmd{type=?CMD_VF, params="20090810"};
 
+% Update / create session
 parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, FromMediaId]) ->
-	% update/create session
 	{GuessIp, GuessPort} = parse_addr(ProbableIp, ProbablePort),
 	#cmd{
 		type=?CMD_U,
@@ -84,8 +84,8 @@ parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, FromMediaI
 		params=parse_params(Args)
 	};
 
+% Reinvite, Hold and Resume
 parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, FromMediaId, ToTag, ToMediaId]) ->
-	% Reinvite, Hold and Resume
 	{GuessIp, GuessPort} = parse_addr(ProbableIp, ProbablePort),
 	#cmd{
 		type=?CMD_U,
@@ -96,8 +96,8 @@ parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, FromMediaI
 		params=parse_params(Args)
 	};
 
+% Lookup existing session
 parse_splitted([[$L|Args], CallId, ProbableIp, ProbablePort, FromTag, FromMediaId, ToTag, ToMediaId]) ->
-	% lookup existing session
 	% TODO should both MediaIds be equal?
 	{GuessIp, GuessPort} = parse_addr(ProbableIp, ProbablePort),
 	#cmd{
@@ -109,8 +109,8 @@ parse_splitted([[$L|Args], CallId, ProbableIp, ProbablePort, FromTag, FromMediaI
 		params=parse_params(Args)
 	};
 
+% delete session (no MediaIds and no ToTag) - Cancel
 parse_splitted([[$D|Args], CallId, FromTag]) ->
-	% delete session (no MediaIds and no ToTag)
 	#cmd{
 		type=?CMD_D,
 		callid=CallId,
@@ -118,8 +118,8 @@ parse_splitted([[$D|Args], CallId, FromTag]) ->
 		params=parse_params(Args)
 	};
 
+% delete session (no MediaIds) - Bye
 parse_splitted([[$D|Args], CallId, FromTag, ToTag]) ->
-	% delete session (no MediaIds)
 	#cmd{
 		type=?CMD_D,
 		callid=CallId,
@@ -128,8 +128,8 @@ parse_splitted([[$D|Args], CallId, FromTag, ToTag]) ->
 		params=parse_params(Args)
 	};
 
+% Record (obsoleted)
 parse_splitted(["R", CallId, FromTag, FromMediaId, ToTag, ToMediaId]) ->
-	% record (obsoleted)
 	% TODO should both MediaIds be equal?
 	#cmd{
 		type=?CMD_R,
@@ -138,8 +138,8 @@ parse_splitted(["R", CallId, FromTag, FromMediaId, ToTag, ToMediaId]) ->
 		to={ToTag, parse_media_id(ToMediaId)}
 	};
 
+% Playback pre-recorded audio (Music-on-hold and resume)
 parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, FromMediaId, ToTag, ToMediaId]) ->
-	% playback pre-recorded audio
 	% TODO should both MediaIds be equal?
 	#cmd{
 		type=?CMD_P,
@@ -150,8 +150,8 @@ parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, FromMediaId, ToTag
 		filename=PlayName,
 		codecs=Codecs
 	};
+% Playback pre-recorded audio (Music-on-hold and resume)
 parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, FromMediaId, ToTag, ToMediaId, ProbableIp, ProbablePort]) ->
-	% playback pre-recorded audio (Hold and Resume)
 	% TODO should both MediaIds be equal?
 	{GuessIp, GuessPort} = parse_addr(ProbableIp, ProbablePort),
 	#cmd{
@@ -165,8 +165,8 @@ parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, FromMediaId, ToTag
 		addr={GuessIp, GuessPort}
 	};
 
+% Stop playback or record
 parse_splitted(["S", CallId, FromTag, FromMediaId, ToTag, ToMediaId]) ->
-	% stop playback or record
 	% TODO should both MediaIds be equal?
 	#cmd{
 		type=?CMD_S,
@@ -175,8 +175,8 @@ parse_splitted(["S", CallId, FromTag, FromMediaId, ToTag, ToMediaId]) ->
 		to={ToTag, parse_media_id(ToMediaId)}
 	};
 
+% Copy session (same as record, which is now obsolete)
 parse_splitted(["C", CallId, RecordName, FromTag, FromMediaId, ToTag, ToMediaId]) ->
-	% copy session (same as record?)
 	% TODO should both MediaIds be equal?
 	#cmd{
 		type=?CMD_C,
@@ -186,8 +186,8 @@ parse_splitted(["C", CallId, RecordName, FromTag, FromMediaId, ToTag, ToMediaId]
 		filename=RecordName
 	};
 
+% Query information about one particular session
 parse_splitted(["Q", CallId, FromTag, FromMediaId, ToTag, ToMediaId]) ->
-	% query
 	% TODO should both MediaIds be equal?
 	#cmd{
 		type=?CMD_Q,
@@ -196,14 +196,14 @@ parse_splitted(["Q", CallId, FromTag, FromMediaId, ToTag, ToMediaId]) ->
 		to={ToTag, parse_media_id(ToMediaId)}
 	};
 
+% Stop all active sessions
 parse_splitted(["X"]) ->
-	% stop all active sessions
 	#cmd{
 		type=?CMD_X
 	};
 
+% Get overall statistics
 parse_splitted(["I"]) ->
-	% Get overall statistics
 	#cmd{
 		type=?CMD_I
 	};
@@ -241,6 +241,18 @@ parse_media_id(ProbableMediaId) ->
 			throw({error_syntax, "Wrong MediaID"})
 	end.
 
+% a - asymmetric
+% e - external network
+% i - internal (RFC1918) network
+% 6 - IPv6
+% s - symmetric
+% w - weak
+% zNN - repacketization, NN in msec, for the most codecs its value should be
+%       in 10ms increments, however for some codecs the increment could differ
+%       (e.g. 30ms for GSM or 20ms for G.723).
+% c - codecs
+% l - lock
+% r - remote address (?)
 parse_params(A) ->
 	{Mod, _} = lists:unzip(lists:filter(fun({_, Sym}) -> lists:member(Sym, A) end, ?MOD_LIST)),
 	Mod.
@@ -252,6 +264,15 @@ parse_params(A) ->
 -include_lib("eunit/include/eunit.hrl").
 
 % TODO
+% 24390_0 V
+% 24393_1 VF 20050322
+% 24393_4 Uc0,8,18,101 0003e30c-c50c00f7-123e8bd9-542f2edf@192.168.0.100 192.168.0.100 27686 0003e30cc50cd69210b8c36b-0ecf0120;1
+% 438_41061 Uc8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1
+% 413_40797 Lc0,101,100 452ca314-3bbcf0ea@192.168.0.2 192.168.100.4 17050 e4920d0cb29cf52o0;1 8d11d16a3b56fcd588d72b3d359cc4e1;1
+% 418_41111 LIc8,101,100 a68e961-5f6a75e5-356cafd9-3562@192.168.100.6 192.168.100.4 18756 1372466422;1 60753eabbd87fe6f34068e9d80a9fc1c;1
+% 441_40922 D 2498331773@192.168.1.37 8edccef4eb1a16b8cef7192b77b7951a 1372466422
+% 437_40882 D 7adc6214-268583a6-1b74a438-3548@192.168.100.6 1372466422 9c56ba15bd794082ce6b166dba6c9c2
+% E448_40701 D 255765531@10.10.10.19 953707145
 
 -endif.
 
