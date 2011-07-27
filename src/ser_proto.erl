@@ -26,8 +26,8 @@
 
 parse(Msg,Ip, Port) ->
 	% TODO pass modifiers as atoms (not as string)
-	[Cookie|Rest] = string:tokens(Msg, " ;"),
-	Cmd = parse_splitted(Rest),
+	[Cookie,C|Rest] = string:tokens(Msg, " ;"),
+	Cmd = parse_splitted([string:to_upper(C)|Rest]),
 	Cmd#cmd{
 		cookie=Cookie,
 		origin=#origin{
