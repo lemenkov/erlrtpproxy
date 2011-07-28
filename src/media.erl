@@ -190,7 +190,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{tortcp = #media{fd = Fd}} = State) 
 	% First, we'll try do decode our RCP packet(s)
 	try
 		{ok, Rtcps} = rtcp:decode(Msg),
-		?INFO("RTCP from ~s: ~p", [State#state.callid, lists:map (fun rtp_utils:pp/1, Rtcps)]),
+		?INFO("RTCP from ~s: ~s", [State#state.callid, lists:map (fun rtp_utils:pp/1, Rtcps)]),
 		Msg2 = rtcp_process (Rtcps),
 		{noreply, State#state{fromrtcp=safe_send(State#state.fromrtcp, State#state.tortcp, Ip, Port, Msg2)}}
 	catch
@@ -205,7 +205,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fromrtcp = #media{fd = Fd}} = State
 	% First, we'll try do decode our RCP packet(s)
 	try
 		{ok, Rtcps} = rtcp:decode(Msg),
-		?INFO("RTCP from ~s: ~p", [State#state.callid, lists:map (fun rtp_utils:pp/1, Rtcps)]),
+		?INFO("RTCP from ~s: ~s", [State#state.callid, lists:map (fun rtp_utils:pp/1, Rtcps)]),
 		Msg2 = rtcp_process (Rtcps),
 		{noreply, State#state{tortcp=safe_send(State#state.tortcp, State#state.fromrtcp, Ip, Port, Msg2)}}
 	catch
