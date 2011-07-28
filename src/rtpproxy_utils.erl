@@ -24,9 +24,12 @@
 
 -export([get_fd_quadruple/1]).
 -export([get_ipaddrs/0]).
+-export([get_ipaddrs/1]).
 
 %% Determine the list of suitable IP addresses
 get_ipaddrs() ->
+	get_ipaddrs([external, ipv4]).
+get_ipaddrs(Options) ->
 	% TODO IPv4 only
 	{ok, IPv4List} = inet:getif(),
 	FilterIP = fun (F) ->
