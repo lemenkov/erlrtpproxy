@@ -1,0 +1,12 @@
+{application, rtpproxy_radius,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { rtpproxy_radius_app, []}},
+  {env, []}
+ ]}.
