@@ -75,14 +75,14 @@ start(Cmd) ->
 
 init (#cmd{type = ?CMD_U, origin = #origin{pid = Pid}, callid = CallId, addr = {GuessIp, GuessPort}, from = {TagFrom, MediaId}} = Cmd) ->
 	% TODO just choose the first IP address for now
-	[MainIp | _Rest ]  = media_utils:get_ipaddrs(),
+	[MainIp | _Rest ]  = rtpproxy_utils:get_ipaddrs(),
 	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE, ping),
 %	{ok, TRef} = timer:send_interval(?CALL_TIME_TO_LIVE*5, timeout),
 	{ok, TRef2} = timer:send_interval(?INTERIM_UPDATE, interim_update),
 
 	{TagFrom, MediaId} = Cmd#cmd.from,
 
-	{Fd0, Fd1, Fd2, Fd3} = media_utils:get_fd_quadruple(MainIp),
+	{Fd0, Fd1, Fd2, Fd3} = rtpproxy_utils:get_fd_quadruple(MainIp),
 
 	[P0, P1, P2, P3]  = lists:map(fun(X) -> {ok, {_I, P}} = inet:sockname(X), P end, [Fd0, Fd1, Fd2, Fd3]),
 	?INFO("started at ~s, with  F {~p,~p} T {~p,~p}", [inet_parse:ntoa(MainIp), P0, P1, P2, P3]),
