@@ -143,14 +143,10 @@ code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 terminate({ErrorClass, {Module,Function, [Pid, Message]}}, State) ->
-	?ERR("RTPPROXY terminated due to Error [~p] in ~p:~p(...) with Msg[~p] from Pid ~p", [ErrorClass, Module, Function, Message, Pid]),
-	error_logger:delete_report_handler(erlsyslog),
-	error_logger:tty(true);
+	?ERR("RTPPROXY terminated due to Error [~p] in ~p:~p(...) with Msg[~p] from Pid ~p", [ErrorClass, Module, Function, Message, Pid]);
 
 terminate(Reason, State) ->
-	?ERR("RTPPROXY terminated due to reason [~w]", [Reason]),
-	error_logger:delete_report_handler(erlsyslog),
-	error_logger:tty(true).
+	?ERR("RTPPROXY terminated due to reason [~w]", [Reason]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 %% Internal functions %%

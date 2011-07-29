@@ -11,7 +11,6 @@ start() ->
 	{ok, {SyslogHost, SyslogPort}} = application:get_env(erlsyslog, syslog_address),
 	% Replace logger with erlsyslog
 	error_logger:add_report_handler(erlsyslog, {0, SyslogHost, SyslogPort}),
-	error_logger:tty(false),
 
 	% Start our pool
 	pool:start(rtpproxy),
