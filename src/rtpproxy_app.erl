@@ -13,7 +13,8 @@ start() ->
 	error_logger:add_report_handler(erlsyslog, {0, SyslogHost, SyslogPort}),
 
 	% Start our pool
-	pool:start(rtpproxy),
+	{ok,[[ConfigPath]]} = init:get_argument(config),
+	pool:start(rtpproxy, " -config " ++ ConfigPath ++ " "),
 	?INFO("Available node(s) ~p", [pool:get_nodes()]),
 
 	% Run RADIUS client on each node
