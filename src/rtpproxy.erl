@@ -47,16 +47,6 @@ start_link(Args) ->
 	gen_server:start_link({global, ?MODULE}, ?MODULE, Args, []).
 
 init(_Unused) ->
-	% Load parameters
-	{ok, {SyslogHost, SyslogPort}} = application:get_env(erlsyslog, syslog_address),
-
-	error_logger:add_report_handler(erlsyslog, {0, SyslogHost, SyslogPort}),
-	error_logger:tty(false),
-
-	pool:start(rtpproxy),
-
-	?INFO("Available node(s) ~p", [pool:get_nodes()]),
-
 	{ok, #state{}}.
 
 handle_call(_Message, _From , State) ->
