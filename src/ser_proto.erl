@@ -255,6 +255,10 @@ parse_params([$C|Rest], Result) ->
 			parse_params(Rest, Result);
 		Ret ->
 			Rest1 = string:substr(Rest, Ret + 1),
+			% FIXME use atoms instead of numbers where possible
+			% grep "a=rtpmap:" /var/log/messages | sed -e 's,.*a=rtpmap:,,g' | sort | uniq | sort -n
+			% http://www.iana.org/assignments/rtp-parameters
+			% http://www.iana.org/assignments/media-types/audio/index.html
 			Codecs = lists:map(fun(X) -> {Y, _} = string:to_integer(X), Y end, string:tokens(string:substr(Rest, 1, Ret), ",")),
 			parse_params(Rest1, Result ++ [{codecs, Codecs}])
 	end;
