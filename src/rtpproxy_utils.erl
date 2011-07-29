@@ -17,7 +17,7 @@
 %%%
 %%%----------------------------------------------------------------------
 
--module(media_utils).
+-module(rtpproxy_utils).
 -author('lemenkov@gmail.com').
 
 -include("../include/common.hrl").
