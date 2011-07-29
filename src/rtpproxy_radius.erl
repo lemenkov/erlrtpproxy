@@ -18,18 +18,21 @@ start_link(Args) ->
 	gen_server:start_link({local, ?MODULE}, ?MODULE, Args, []).
 
 init(_) ->
+	error_logger:info_msg("Starting rtpproxy_radius at ~p~n", [node()]),
 	{ok, RadAcctServers} = application:get_env(?MODULE, radacct_servers),
 	eradius_dict:start(),
 	eradius_dict:load_tables(["dictionary", "dictionary_cisco"]),
 	eradius_acc:start(),
 	?MODULE = ets:new(?MODULE, [public, named_table]),
+	error_logger:info_msg("Started rtpproxy_radius at ~p~n", [node()]),
 	{ok, #rad_accreq{servers=RadAcctServers}}.
 
 handle_call(Message, From, State) ->
-	error_logger:warning_msg("Bogus call: ~p from ~p~n", [Message, From]),
+	error_logger:warning_msg("Bogus call: ~p from ~p at ~p~n", [Message, From, node()]),
 	{reply, {error, unknown_call}, State}.
 
 handle_cast({start, CallId, MediaId}, State) ->
+	error_logger:info_msg("Got start from ~s ~p at ~p~n", [CallId, MediaId, node()]),
 	case ets:lookup(?MODULE, {callid, CallId, mediaid, MediaId}) of
 		[] ->
 			Req = State#rad_accreq{
@@ -46,6 +49,7 @@ handle_cast({start, CallId, MediaId}, State) ->
 	{noreply, State};
 
 handle_cast({interim_update, CallId, MediaId}, State) ->
+	error_logger:info_msg("Got interim update from ~s ~p at ~p~n", [CallId, MediaId, node()]),
 	case ets:lookup(?MODULE, {callid, CallId, mediaid, MediaId}) of
 		[{{callid,CallId,mediaid,MediaId},{req,Req0}}] ->
 			eradius_acc:acc_update(Req0);
@@ -56,6 +60,7 @@ handle_cast({interim_update, CallId, MediaId}, State) ->
 	{noreply, State};
 
 handle_cast({stop, CallId, MediaId}, State) ->
+	error_logger:info_msg("Got stop from ~s ~p at ~p~n", [CallId, MediaId, node()]),
 	case ets:lookup(?MODULE, {callid, CallId, mediaid, MediaId}) of
 		[{{callid,CallId,mediaid,MediaId},{req,Req0}}] ->
 			Req1 = eradius_acc:set_logout_time(Req0),
@@ -71,18 +76,18 @@ handle_cast({stop, CallId, MediaId}, State) ->
 	{noreply, State};
 
 handle_cast(Other, State) ->
-	error_logger:warning_msg("Bogus cast: ~p~n", [Other]),
+	error_logger:warning_msg("Bogus cast: ~p at ~p~n", [Other, node()]),
 	{noreply, State}.
 
 handle_info(Other, State) ->
-	error_logger:warning_msg("Bogus info: ~p~n", [Other]),
+	error_logger:warning_msg("Bogus info: ~p at ~p~n", [Other, node()]),
 	{noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 terminate(Reason, _State) ->
-	error_logger:error_msg("Terminated: ~p~n", [Reason]),
+	error_logger:error_msg("Terminated: ~p at ~p~n", [Reason, node()]),
 	ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%
