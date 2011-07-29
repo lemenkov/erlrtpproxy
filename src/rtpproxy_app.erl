@@ -19,7 +19,9 @@ start() ->
 %	mnesia:create_schema([node()]),
 %	mnesia:start(),
 %	mnesia:wait_for_tables(mnesia:system_info(local_tables), infinity),
-	application:start(rtpproxy).
+
+	% Load main module
+	pool:pspawn(application, start, [rtpproxy]).
 
 start(_Type, _StartArgs) ->
 	rtpproxy_sup:start_link().
