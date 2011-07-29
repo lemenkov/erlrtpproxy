@@ -91,7 +91,7 @@ init (#cmd{type = ?CMD_U, origin = #origin{pid = Pid}, callid = CallId, addr = {
 	gen_server:cast({global, rtpproxy}, {created, self(), {CallId, MediaId}}),
 
 	{ok, {I0, P0}} = inet:sockname(Fd0),
-	{ok, {I2, P2}} = inet:sockname(Fd0),
+	{ok, {I2, P2}} = inet:sockname(Fd2),
 	gen_server:cast(Pid, {reply, Cmd, {I0, P0}, {I2, P2}}),
 
 	{ok,
