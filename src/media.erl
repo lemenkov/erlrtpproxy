@@ -181,7 +181,7 @@ terminate(Reason, #state{callid = CallId, mediaid = MediaId, tref = TimerRef, tr
 	lists:map(fun (X) -> gen_udp:close(X#media.fd) end, [From, FromRtcp, To, ToRtcp]),
 
 	gen_server:cast({global, rtpproxy}, {'EXIT', self(), Reason}),
-	gen_server:cast({global,radius}, {stop, CallId, MediaId}),
+	gen_server:cast({local, rtpproxy_radius}, {stop, CallId, MediaId}),
 
 	?ERR("terminated due to reason [~p]", [Reason]).
 
@@ -237,7 +237,7 @@ handle_info(ping, #state{from = #media{rtpstate = rtp}, to = #media{rtpstate = r
 
 handle_info(interim_update, #state{callid = CallId, mediaid = MediaId, from = #media{rtpstate = rtp}, to = #media{rtpstate = rtp}} =  State) ->
 	% Both sides are active, so we need to send interim update here
-	gen_server:cast({global, radius}, {interim_update, CallId, MediaId}),
+	gen_server:cast({local, rtpproxy_radius}, {interim_update, CallId, MediaId}),
 	{noreply, State};
 
 handle_info(ping, State) ->
@@ -270,7 +270,7 @@ safe_send (Var1, Var2, Ip, Port, Msg) ->
 % Define function for safe determinin of starting media
 start_acc (#state{started = null, callid = CallId, mediaid = MediaId, from = #media{rtpstate = rtp}, to = #media{rtpstate = rtp}}) ->
 	% FIXME perhaps this should be optional
-	gen_server:cast({global, radius}, {start, CallId, MediaId}),
+	gen_server:cast({local, rtpproxy_radius}, {start, CallId, MediaId}),
 	now();
 start_acc (S) ->
 	S#state.started.
