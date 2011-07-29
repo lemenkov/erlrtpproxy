@@ -16,6 +16,9 @@ start() ->
 	pool:start(rtpproxy),
 	?INFO("Available node(s) ~p", [pool:get_nodes()]),
 
+	% Run RADIUS client on each node
+	lists:foreach(fun(X) -> rpc:call(X, application, start, [rtpproxy_radius]) end, pool:get_nodes()),
+
 %	mnesia:create_schema([node()]),
 %	mnesia:start(),
 %	mnesia:wait_for_tables(mnesia:system_info(local_tables), infinity),
