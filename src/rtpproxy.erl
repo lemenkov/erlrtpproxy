@@ -48,7 +48,7 @@ start_link(Args) ->
 
 init(_Unused) ->
 	% Load parameters
-	{ok, {SyslogHost, SyslogPort}} = application:get_env(?MODULE, syslog_address),
+	{ok, {SyslogHost, SyslogPort}} = application:get_env(erlsyslog, syslog_address),
 
 	error_logger:add_report_handler(erlsyslog, {0, SyslogHost, SyslogPort}),
 	error_logger:tty(false),
