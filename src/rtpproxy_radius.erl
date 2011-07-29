@@ -22,38 +22,67 @@ init(_) ->
 	eradius_dict:start(),
 	eradius_dict:load_tables(["dictionary", "dictionary_cisco"]),
 	eradius_acc:start(),
+	?MODULE = ets:new(?MODULE, [public, named_table]),
 	{ok, #rad_accreq{servers=RadAcctServers}}.
 
-handle_call(_Message, _From , State) ->
+handle_call(Message, From, State) ->
+	error_logger:warning_msg("Bogus call: ~p from ~p~n", [Message, From]),
 	{reply, {error, unknown_call}, State}.
 
+handle_cast({start, CallId, MediaId}, State) ->
+	case ets:lookup(?MODULE, {callid, CallId, mediaid, MediaId}) of
+		[] ->
+			Req = State#rad_accreq{
+				login_time = erlang:now(),
+				std_attrs=[{?Acct_Session_Id, CallId}],
+				vend_attrs = [{?Cisco, [{?h323_connect_time, date_time_fmt()}]}]
+			},
+			eradius_acc:acc_start(Req),
+			ets:insert_new(?MODULE, {{callid, CallId, mediaid, MediaId}, {req, Req}});
+		_ ->
+			% Already sent - discard
+			ok
+	end,
+	{noreply, State};
+
+handle_cast({interim_update, CallId, MediaId}, State) ->
+	case ets:lookup(?MODULE, {callid, CallId, mediaid, MediaId}) of
+		[{{callid,CallId,mediaid,MediaId},{req,Req0}}] ->
+			eradius_acc:acc_update(Req0);
+		_ ->
+			% Bogus - discard
+			ok
+	end,
+	{noreply, State};
+
+handle_cast({stop, CallId, MediaId}, State) ->
+	case ets:lookup(?MODULE, {callid, CallId, mediaid, MediaId}) of
+		[{{callid,CallId,mediaid,MediaId},{req,Req0}}] ->
+			Req1 = eradius_acc:set_logout_time(Req0),
+			Req2 = Req1#rad_accreq{
+				vend_attrs = [{?Cisco, [{?h323_disconnect_time, date_time_fmt()}]}]
+			},
+			eradius_acc:acc_stop(Req2),
+			ets:delete(?MODULE, {callid, CallId, mediaid, MediaId});
+		_ ->
+			% Bogus - discard
+			ok
+	end,
+	{noreply, State};
+
 handle_cast(Other, State) ->
-	CallID = "test",
-
-	Req0 = State#rad_accreq{
-		login_time = erlang:now(),
-		std_attrs=[{?Acct_Session_Id, CallID}],
-		vend_attrs = [{?Cisco, [{?h323_connect_time, date_time_fmt()}]}]
-	},
-	eradius_acc:acc_start(Req0),
-
-	eradius_acc:acc_update(Req0),
-
-	Req1 = eradius_acc:set_logout_time(Req0),
-	Req2 = Req1#rad_accreq{
-		vend_attrs = [{?Cisco, [{?h323_disconnect_time, date_time_fmt()}]}]
-	},
-	eradius_acc:acc_stop(Req2),
-
+	error_logger:warning_msg("Bogus cast: ~p~n", [Other]),
 	{noreply, State}.
 
 handle_info(Other, State) ->
+	error_logger:warning_msg("Bogus info: ~p~n", [Other]),
 	{noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, State) ->
+terminate(Reason, _State) ->
+	error_logger:error_msg("Terminated: ~p~n", [Reason]),
 	ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%
