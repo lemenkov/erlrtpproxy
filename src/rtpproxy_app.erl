@@ -5,21 +5,20 @@
 -include("../include/common.hrl").
 
 start() ->
-	application:start(erlsyslog),
+	% Start our pool
+	{ok,[[ConfigPath]]} = init:get_argument(config),
+	Nodes = pool:start(rtpproxy, " -config " ++ ConfigPath ++ " "),
 
+	application:start(erlsyslog),
 	% Load erlsyslog parameters
 	{ok, {SyslogHost, SyslogPort}} = application:get_env(erlsyslog, syslog_address),
 	% Replace logger with erlsyslog
-	error_logger:add_report_handler(erlsyslog, {0, SyslogHost, SyslogPort}),
-
-	% Start our pool
-	{ok,[[ConfigPath]]} = init:get_argument(config),
-	pool:start(rtpproxy, " -config " ++ ConfigPath ++ " "),
-	?INFO("Available node(s) ~p", [pool:get_nodes()]),
+	rpc:multicall(Nodes, error_logger, add_report_handler, [erlsyslog, {0, SyslogHost, SyslogPort}]),
 
 	% Run RADIUS client on each node
-	lists:foreach(fun(X) -> rpc:call(X, application, start, [rtpproxy_radius]) end, pool:get_nodes()),
+	rpc:multicall(Nodes, application, start, [rtpproxy_radius]),
 
+	?INFO("Available node(s) ~p", [Nodes]),
 %	mnesia:create_schema([node()]),
 %	mnesia:start(),
 %	mnesia:wait_for_tables(mnesia:system_info(local_tables), infinity),
