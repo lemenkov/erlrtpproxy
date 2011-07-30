@@ -45,6 +45,8 @@ rm -rf $RPM_BUILD_ROOT
 %files
 %defattr(-,root,root,-)
 %config(noreplace) %{_sysconfdir}/erl%{realname}.config
+%dir %{_libdir}/erlang/lib/%{realname}-%{version}
+%dir %{_libdir}/erlang/lib/%{realname}-%{version}/ebin
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}.app
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_app.beam
