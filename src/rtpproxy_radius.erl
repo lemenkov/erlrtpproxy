@@ -2,7 +2,7 @@
 
 -behaviour(gen_server).
 
--export([start_link/1]).
+-export([start_link/0]).
 -export([init/1]).
 -export([handle_call/3]).
 -export([handle_cast/2]).
@@ -14,8 +14,8 @@
 -include_lib("eradius/include/dictionary.hrl").
 -include_lib("eradius/include/dictionary_cisco.hrl").
 
-start_link(Args) ->
-	gen_server:start_link({local, ?MODULE}, ?MODULE, Args, []).
+start_link() ->
+	gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init(_) ->
 	error_logger:info_msg("Starting rtpproxy_radius at ~p~n", [node()]),
