@@ -59,13 +59,7 @@
 		to,
 		tortcp,
 		holdstate=false,
-		started=false,
-		mod_e=false,
-		mod_i=false,
-		mod_ipv6=false,
-		mod_symmetric=true,
-		mod_weak=false,
-		mod_z=false
+		started=false
 	}
 ).
 
