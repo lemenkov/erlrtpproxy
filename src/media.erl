@@ -268,7 +268,7 @@ safe_send (Var1, Var2, Ip, Port, Msg) ->
 	Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()}.
 
 % Define function for safe determinin of starting media
-start_acc (#state{started = null, callid = CallId, mediaid = MediaId, from = #media{rtpstate = rtp}, to = #media{rtpstate = rtp}}) ->
+start_acc (#state{started = false, callid = CallId, mediaid = MediaId, from = #media{rtpstate = rtp}, to = #media{rtpstate = rtp}}) ->
 	% FIXME perhaps this should be optional
 	gen_server:cast(rtpproxy_radius, {start, CallId, MediaId}),
 	now();
