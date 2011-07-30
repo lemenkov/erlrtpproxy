@@ -67,7 +67,7 @@ start(Cmd) ->
 	% TODO run under supervisor maybe?
 	gen_server:start(?MODULE, Cmd, []).
 
-init (#cmd{type = ?CMD_U, origin = #origin{pid = Pid}, callid = CallId, addr = {GuessIp, GuessPort}, from = {TagFrom, MediaId}} = Cmd) ->
+init (#cmd{type = ?CMD_U, origin = #origin{pid = Pid}, callid = CallId, addr = {GuessIp, GuessPort}, from = {TagFrom, MediaId}, params = Params} = Cmd) ->
 	% TODO just choose the first IP address for now
 	[MainIp | _Rest ]  = rtpproxy_utils:get_ipaddrs(),
 	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE, ping),
