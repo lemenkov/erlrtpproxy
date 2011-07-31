@@ -11,9 +11,11 @@ start() ->
 	% Load erlsyslog parameters
 	{ok, {SyslogHost, SyslogPort}} = application:get_env(erlsyslog, syslog_address),
 	% Replace logger with erlsyslog
+	error_logger:add_report_handler(erlsyslog, {0, SyslogHost, SyslogPort}),
 	rpc:multicall(Nodes, error_logger, add_report_handler, [erlsyslog, {0, SyslogHost, SyslogPort}]),
 
 	% Run RADIUS client on each node
+	application:start(rtpproxy_radius),
 	rpc:multicall(Nodes, application, start, [rtpproxy_radius]),
 
 %	mnesia:create_schema([node()]),
