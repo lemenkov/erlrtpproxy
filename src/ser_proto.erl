@@ -74,38 +74,37 @@ parse_splitted(["VF", "20090810"]) ->
 	#cmd{type=?CMD_VF, params="20090810"};
 
 % Update / create session
-parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, FromMediaId]) ->
+parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId]) ->
 	{GuessIp, GuessPort} = parse_addr(ProbableIp, ProbablePort),
 	#cmd{
 		type=?CMD_U,
 		callid=CallId,
 		addr={GuessIp, GuessPort},
-		from={FromTag, parse_media_id(FromMediaId)},
+		from={FromTag, parse_media_id(MediaId)},
 		params=parse_params(Args)
 	};
 
 % Reinvite, Hold and Resume
-parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, FromMediaId, ToTag, ToMediaId]) ->
+parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, ToTag, MediaId]) ->
 	{GuessIp, GuessPort} = parse_addr(ProbableIp, ProbablePort),
 	#cmd{
 		type=?CMD_U,
 		callid=CallId,
 		addr={GuessIp, GuessPort},
-		from={FromTag, parse_media_id(FromMediaId)},
-		to={ToTag, parse_media_id(ToMediaId)},
+		from={FromTag, parse_media_id(MediaId)},
+		to={ToTag, parse_media_id(MediaId)},
 		params=parse_params(Args)
 	};
 
 % Lookup existing session
-parse_splitted([[$L|Args], CallId, ProbableIp, ProbablePort, FromTag, FromMediaId, ToTag, ToMediaId]) ->
-	% TODO should both MediaIds be equal?
+parse_splitted([[$L|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, ToTag, MediaId]) ->
 	{GuessIp, GuessPort} = parse_addr(ProbableIp, ProbablePort),
 	#cmd{
 		type=?CMD_L,
 		callid=CallId,
 		addr={GuessIp, GuessPort},
-		from={FromTag, parse_media_id(FromMediaId)},
-		to={ToTag, parse_media_id(ToMediaId)},
+		from={FromTag, parse_media_id(MediaId)},
+		to={ToTag, parse_media_id(MediaId)},
 		params=parse_params(Args)
 	};
 
@@ -127,36 +126,33 @@ parse_splitted(["D", CallId, FromTag, ToTag]) ->
 	};
 
 % Record (obsoleted)
-parse_splitted(["R", CallId, FromTag, FromMediaId, ToTag, ToMediaId]) ->
-	% TODO should both MediaIds be equal?
+parse_splitted(["R", CallId, FromTag, MediaId, ToTag, MediaId]) ->
 	#cmd{
 		type=?CMD_R,
 		callid=CallId,
-		from={FromTag, parse_media_id(FromMediaId)},
-		to={ToTag, parse_media_id(ToMediaId)}
+		from={FromTag, parse_media_id(MediaId)},
+		to={ToTag, parse_media_id(MediaId)}
 	};
 
 % Playback pre-recorded audio (Music-on-hold and resume)
-parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, FromMediaId, ToTag, ToMediaId]) ->
-	% TODO should both MediaIds be equal?
+parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, MediaId, ToTag, MediaId]) ->
 	#cmd{
 		type=?CMD_P,
 		callid=CallId,
-		from={FromTag, parse_media_id(FromMediaId)},
-		to={ToTag, parse_media_id(ToMediaId)},
+		from={FromTag, parse_media_id(MediaId)},
+		to={ToTag, parse_media_id(MediaId)},
 		params=parse_params(Args),
 		filename=PlayName,
 		codecs=Codecs
 	};
 % Playback pre-recorded audio (Music-on-hold and resume)
-parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, FromMediaId, ToTag, ToMediaId, ProbableIp, ProbablePort]) ->
-	% TODO should both MediaIds be equal?
+parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, MediaId, ToTag, MediaId, ProbableIp, ProbablePort]) ->
 	{GuessIp, GuessPort} = parse_addr(ProbableIp, ProbablePort),
 	#cmd{
 		type=?CMD_P,
 		callid=CallId,
-		from={FromTag, parse_media_id(FromMediaId)},
-		to={ToTag, parse_media_id(ToMediaId)},
+		from={FromTag, parse_media_id(MediaId)},
+		to={ToTag, parse_media_id(MediaId)},
 		params=parse_params(Args),
 		filename=PlayName,
 		codecs=Codecs,
@@ -164,34 +160,31 @@ parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, FromMediaId, ToTag
 	};
 
 % Stop playback or record
-parse_splitted(["S", CallId, FromTag, FromMediaId, ToTag, ToMediaId]) ->
-	% TODO should both MediaIds be equal?
+parse_splitted(["S", CallId, FromTag, MediaId, ToTag, MediaId]) ->
 	#cmd{
 		type=?CMD_S,
 		callid=CallId,
-		from={FromTag, parse_media_id(FromMediaId)},
-		to={ToTag, parse_media_id(ToMediaId)}
+		from={FromTag, parse_media_id(MediaId)},
+		to={ToTag, parse_media_id(MediaId)}
 	};
 
 % Copy session (same as record, which is now obsolete)
-parse_splitted(["C", CallId, RecordName, FromTag, FromMediaId, ToTag, ToMediaId]) ->
-	% TODO should both MediaIds be equal?
+parse_splitted(["C", CallId, RecordName, FromTag, MediaId, ToTag, MediaId]) ->
 	#cmd{
 		type=?CMD_C,
 		callid=CallId,
-		from={FromTag, parse_media_id(FromMediaId)},
-		to={ToTag, parse_media_id(ToMediaId)},
+		from={FromTag, parse_media_id(MediaId)},
+		to={ToTag, parse_media_id(MediaId)},
 		filename=RecordName
 	};
 
 % Query information about one particular session
-parse_splitted(["Q", CallId, FromTag, FromMediaId, ToTag, ToMediaId]) ->
-	% TODO should both MediaIds be equal?
+parse_splitted(["Q", CallId, FromTag, MediaId, ToTag, MediaId]) ->
 	#cmd{
 		type=?CMD_Q,
 		callid=CallId,
-		from={FromTag, parse_media_id(FromMediaId)},
-		to={ToTag, parse_media_id(ToMediaId)}
+		from={FromTag, parse_media_id(MediaId)},
+		to={ToTag, parse_media_id(MediaId)}
 	};
 
 % Stop all active sessions
