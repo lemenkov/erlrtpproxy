@@ -25,6 +25,7 @@
 -export([get_fd_quadruple/1]).
 -export([get_ipaddrs/0]).
 -export([get_ipaddrs/1]).
+-export([is_rfc1918/1]).
 
 %% Determine the list of suitable IP addresses
 get_ipaddrs() ->
@@ -97,3 +98,51 @@ get_fd_quadruple(Ip) ->
 		error -> error
 	end.
 
+% TODO only IPv4 for now
+is_rfc1918({I0,I1,I2,I3} = Ip) when	is_integer(I0), I0 > 0, I0 < 256,
+					is_integer(I1), I1 >= 0, I1 < 256,
+					is_integer(I2), I2 >= 0, I2 < 256,
+					is_integer(I3), I3 >= 0, I3 < 256
+				->
+	is_rfc1918_guarded(Ip);
+is_rfc1918(_) ->
+	throw({error, "Not a valid IPv4 address"}).
+
+% Loopback (actually, it's not a RFC1918 network)
+is_rfc1918_guarded({127,_,_,_}) ->
+	true;
+% RFC 1918, 10.0.0.0 - 10.255.255.255
+is_rfc1918_guarded({10,_,_,_}) ->
+	true;
+% RFC 1918, 172.16.0.0 - 172.31.255.255
+is_rfc1918_guarded({172,I1,_,_}) when I1 > 15, I1 < 32 ->
+	true;
+% RFC 1918, 192.168.0.0 - 192.168.255.255
+is_rfc1918_guarded({192,168,_,_}) ->
+	true;
+is_rfc1918_guarded(_) ->
+	false.
+
+%%
+%% Tests
+%%
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+is_rfc1918_1_test() ->
+	?assertEqual(true, is_rfc1918({127,1,2,3})).
+is_rfc1918_2_test() ->
+	?assertEqual(true, is_rfc1918({10,0,127,3})).
+is_rfc1918_3_test() ->
+	?assertEqual(true, is_rfc1918({172,16,127,3})).
+is_rfc1918_4_test() ->
+	?assertEqual(true, is_rfc1918({192,168,127,3})).
+is_rfc1918_5_test() ->
+	?assertEqual(false, is_rfc1918({172,168,127,3})).
+is_rfc1918_6_test() ->
+	?assertEqual(false, is_rfc1918({192,169,127,3})).
+is_rfc1918_7_test() ->
+	?assertThrow({error, "Not a valid IPv4 address"}, is_rfc1918("::1")).
+
+-endif.
