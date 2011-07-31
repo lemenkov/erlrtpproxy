@@ -67,14 +67,20 @@ start(Cmd) ->
 	% TODO run under supervisor maybe?
 	gen_server:start(?MODULE, Cmd, []).
 
-init (#cmd{type = ?CMD_U, origin = #origin{pid = Pid}, callid = CallId, addr = {GuessIp, GuessPort}, from = {TagFrom, MediaId}, params = Params} = Cmd) ->
+init (
+	#cmd{
+		type = ?CMD_U,
+		origin = #origin{pid = Pid},
+		callid = CallId,
+		mediaid = MediaId,
+		from = #party{tag = TagFrom, addr = {GuessIp, GuessPort}},
+		params = Params} = Cmd
+	) ->
 	% TODO just choose the first IP address for now
 	[MainIp | _Rest ]  = rtpproxy_utils:get_ipaddrs(),
 	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE, ping),
 %	{ok, TRef} = timer:send_interval(?CALL_TIME_TO_LIVE*5, timeout),
 	{ok, TRef2} = timer:send_interval(?INTERIM_UPDATE, interim_update),
-
-	{TagFrom, MediaId} = Cmd#cmd.from,
 
 	{Fd0, Fd1, Fd2, Fd3} = rtpproxy_utils:get_fd_quadruple(MainIp),
 
@@ -112,7 +118,13 @@ handle_call(?CMD_Q, _From, #state{started = Started} = State) ->
 	{reply, {ok, Reply}, State}.
 
 handle_cast(
-		#cmd{type = ?CMD_U, origin = #origin{pid = Pid}, callid = CallId, addr = {GuessIp, GuessPort}, from = {Tag, MediaId}} = Cmd,
+		#cmd{
+			type = ?CMD_U,
+			origin = #origin{pid = Pid},
+			callid = CallId,
+			mediaid = MediaId,
+			from = #party{tag = Tag, addr = {GuessIp, GuessPort}},
+			params = Params} = Cmd,
 		#state{callid = CallId, mediaid = MediaId, from = #media{fd=F} = From, tag_f = Tag} = State
 	) ->
 	{ok, {I, P}} = inet:sockname(F),
@@ -120,7 +132,13 @@ handle_cast(
 	{noreply, State#state{from = From#media{ip=GuessIp, port=GuessPort}}};
 
 handle_cast(
-		#cmd{type = ?CMD_U, origin = #origin{pid = Pid}, callid = CallId, addr = {GuessIp, GuessPort}, from = {Tag, MediaId}} = Cmd,
+		#cmd{
+			type = ?CMD_U,
+			origin = #origin{pid = Pid},
+			callid = CallId,
+			mediaid = MediaId,
+			from = #party{tag = Tag, addr = {GuessIp, GuessPort}},
+			params = Params} = Cmd,
 		#state{callid = CallId, mediaid = MediaId, to = #media{fd=F} = To, tag_t = Tag} = State
 	) ->
 	{ok, {I, P}} = inet:sockname(F),
@@ -128,7 +146,13 @@ handle_cast(
 	{noreply, State#state{to = To#media{ip=GuessIp, port=GuessPort}}};
 
 handle_cast(
-		#cmd{type = ?CMD_L, origin = #origin{pid = Pid}, callid = CallId, addr = {GuessIp, GuessPort}, to = {Tag, MediaId}} = Cmd,
+		#cmd{
+			type = ?CMD_L,
+			origin = #origin{pid = Pid},
+			callid = CallId,
+			mediaid = MediaId,
+			to = #party{tag = Tag, addr = {GuessIp, GuessPort}},
+			params = Params} = Cmd,
 		#state{callid = CallId, mediaid = MediaId, from = #media{fd=F} = From, tag_f = Tag} = State
 	) ->
 	{ok, {I, P}} = inet:sockname(F),
@@ -136,7 +160,13 @@ handle_cast(
 	{noreply, State#state{from = From#media{ip=GuessIp, port=GuessPort}}};
 
 handle_cast(
-		#cmd{type = ?CMD_L, origin = #origin{pid = Pid}, callid = CallId, addr = {GuessIp, GuessPort}, to = {Tag, MediaId}} = Cmd,
+		#cmd{
+			type = ?CMD_L,
+			origin = #origin{pid = Pid},
+			callid = CallId,
+			mediaid = MediaId,
+			to = #party{tag = Tag, addr = {GuessIp, GuessPort}},
+			params = Params} = Cmd,
 		#state{callid = CallId, mediaid = MediaId, to = #media{fd=F} = To, tag_t = Tag} = State
 	) ->
 	{ok, {I, P}} = inet:sockname(F),
@@ -145,7 +175,13 @@ handle_cast(
 
 % Initial set up of a ToTag
 handle_cast(
-		#cmd{type = ?CMD_L, origin = #origin{pid = Pid}, callid = CallId, addr = {GuessIp, GuessPort}, to = {Tag, MediaId}} = Cmd,
+		#cmd{
+			type = ?CMD_L,
+			origin = #origin{pid = Pid},
+			callid = CallId,
+			mediaid = MediaId,
+			to = #party{tag = Tag, addr = {GuessIp, GuessPort}},
+			params = Params} = Cmd,
 		#state{callid = CallId, mediaid = MediaId, to = #media{fd=F} = To, tag_t = null} = State
 	) ->
 	{ok, {I, P}} = inet:sockname(F),
@@ -153,12 +189,17 @@ handle_cast(
 	{noreply, State#state{to = To#media{ip=GuessIp, port=GuessPort}, tag_t = Tag}};
 
 handle_cast(
-		#cmd{type = ?CMD_D, origin = #origin{pid = Pid}, callid = CallId, from = {TagFrom, 0}, to = To} = Cmd,
+		#cmd{
+			type = ?CMD_D,
+			origin = #origin{pid = Pid},
+			callid = CallId,
+			from = #party{tag = TagFrom},
+			to = To} = Cmd,
 		#state{callid = CallId, tag_f = TagFrom, tag_t = TagTo} = State
 	) ->
 	case To of
 		null -> {stop, cancel, State};
-		{TagTo, 0} -> {stop, bye, State}
+		_ -> {stop, bye, State}
 	end;
 
 handle_cast(Other, State) ->

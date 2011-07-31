@@ -3,15 +3,14 @@
 		origin=null,
 		type=null,
 		callid=null,
-		addr=null,
+		mediaid=0,
 		from=null,
 		to=null,
-		filename=null,
-		codecs=null,
 		params=null
 	}).
 
 -record(origin, {type, pid, ip, port}).
+-record(party, {tag, addr=null, rtcpaddr=null}).
 
 -define(RTPPROXY_OK, "0").
 
@@ -24,7 +23,6 @@
 -define(CMD_U, message_u).
 -define(CMD_L, message_l).
 -define(CMD_D, message_d).
--define(CMD_R, message_r).
 -define(CMD_P, message_p).
 -define(CMD_S, message_s).
 -define(CMD_C, message_c).

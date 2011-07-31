@@ -81,7 +81,7 @@ handle_cast(#cmd{type = ?CMD_I, origin = #origin{pid = Pid}} = Cmd, State) ->
 	{noreply, State};
 
 % First try to find existing session
-handle_cast(#cmd{origin = #origin{pid = Pid}, callid = CallId, from = {Tag, MediaId}} = Cmd, #state{calls = Calls} = State) ->
+handle_cast(#cmd{origin = #origin{pid = Pid}, callid = CallId, mediaid = MediaId} = Cmd, #state{calls = Calls} = State) ->
 	case get_media(CallId, MediaId, Calls) of
 		{value, MediaThread} ->
 			% Operate on existing media thread
