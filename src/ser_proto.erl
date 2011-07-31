@@ -146,9 +146,7 @@ parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, MediaId, ToTag, Me
 		mediaid=parse_media_id(MediaId),
 		from={FromTag},
 		to={ToTag},
-		params=parse_params(Args),
-		filename=PlayName,
-		codecs=Codecs
+		params=parse_params(Args) ++ [{filename, PlayName}, {codecs, Codecs}]
 	};
 % Playback pre-recorded audio (Music-on-hold and resume)
 parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, MediaId, ToTag, MediaId, ProbableIp, ProbablePort]) ->
@@ -159,10 +157,7 @@ parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, MediaId, ToTag, Me
 		mediaid=parse_media_id(MediaId),
 		from={FromTag},
 		to={ToTag},
-		params=parse_params(Args),
-		filename=PlayName,
-		codecs=Codecs,
-		addr={GuessIp, GuessPort}
+		params=parse_params(Args) ++ [{filename, PlayName}, {codecs, Codecs}, {addr, {GuessIp, GuessPort}}]
 	};
 
 % Stop playback or record
@@ -183,7 +178,7 @@ parse_splitted(["C", CallId, RecordName, FromTag, MediaId, ToTag, MediaId]) ->
 		mediaid=parse_media_id(MediaId),
 		from={FromTag},
 		to={ToTag},
-		filename=RecordName
+		params=[{filename, RecordName}]
 	};
 
 % Query information about one particular session

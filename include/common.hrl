@@ -7,8 +7,6 @@
 		addr=null,
 		from=null,
 		to=null,
-		filename=null,
-		codecs=null,
 		params=null
 	}).
 
