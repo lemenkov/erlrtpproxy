@@ -80,8 +80,7 @@ parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId]) 
 		type=?CMD_U,
 		callid=CallId,
 		mediaid=parse_media_id(MediaId),
-		addr={GuessIp, GuessPort},
-		from={FromTag},
+		from=#party{tag=FromTag, addr={GuessIp, GuessPort}},
 		params=parse_params(Args)
 	};
 
@@ -92,9 +91,8 @@ parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, T
 		type=?CMD_U,
 		callid=CallId,
 		mediaid=parse_media_id(MediaId),
-		addr={GuessIp, GuessPort},
-		from={FromTag},
-		to={ToTag},
+		from=#party{tag=FromTag, addr={GuessIp, GuessPort}},
+		to=#party{tag=ToTag},
 		params=parse_params(Args)
 	};
 
@@ -105,9 +103,8 @@ parse_splitted([[$L|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, T
 		type=?CMD_L,
 		callid=CallId,
 		mediaid=parse_media_id(MediaId),
-		addr={GuessIp, GuessPort},
-		from={FromTag},
-		to={ToTag},
+		from=#party{tag=FromTag, addr={GuessIp, GuessPort}},
+		to=#party{tag=ToTag},
 		params=parse_params(Args)
 	};
 
@@ -116,7 +113,7 @@ parse_splitted(["D", CallId, FromTag]) ->
 	#cmd{
 		type=?CMD_D,
 		callid=CallId,
-		from={FromTag}
+		from=#party{tag=FromTag}
 	};
 
 % delete session (no MediaIds) - Bye
@@ -124,8 +121,8 @@ parse_splitted(["D", CallId, FromTag, ToTag]) ->
 	#cmd{
 		type=?CMD_D,
 		callid=CallId,
-		from={FromTag},
-		to={ToTag}
+		from=#party{tag=FromTag},
+		to=#party{tag=ToTag}
 	};
 
 % Record (obsoleted in favor of Copy)
@@ -134,8 +131,8 @@ parse_splitted(["R", CallId, FromTag, MediaId, ToTag, MediaId]) ->
 		type=?CMD_C,
 		callid=CallId,
 		mediaid=parse_media_id(MediaId),
-		from={FromTag},
-		to={ToTag}
+		from=#party{tag=FromTag},
+		to=#party{tag=ToTag}
 	};
 
 % Playback pre-recorded audio (Music-on-hold and resume)
@@ -144,8 +141,8 @@ parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, MediaId, ToTag, Me
 		type=?CMD_P,
 		callid=CallId,
 		mediaid=parse_media_id(MediaId),
-		from={FromTag},
-		to={ToTag},
+		from=#party{tag=FromTag},
+		to=#party{tag=ToTag},
 		params=parse_params(Args) ++ [{filename, PlayName}, {codecs, Codecs}]
 	};
 % Playback pre-recorded audio (Music-on-hold and resume)
@@ -155,8 +152,8 @@ parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, MediaId, ToTag, Me
 		type=?CMD_P,
 		callid=CallId,
 		mediaid=parse_media_id(MediaId),
-		from={FromTag},
-		to={ToTag},
+		from=#party{tag=FromTag},
+		to=#party{tag=ToTag},
 		params=parse_params(Args) ++ [{filename, PlayName}, {codecs, Codecs}, {addr, {GuessIp, GuessPort}}]
 	};
 
@@ -166,8 +163,8 @@ parse_splitted(["S", CallId, FromTag, MediaId, ToTag, MediaId]) ->
 		type=?CMD_S,
 		callid=CallId,
 		mediaid=parse_media_id(MediaId),
-		from={FromTag},
-		to={ToTag}
+		from=#party{tag=FromTag},
+		to=#party{tag=ToTag}
 	};
 
 % Copy session (same as record, which is now obsolete)
@@ -176,8 +173,8 @@ parse_splitted(["C", CallId, RecordName, FromTag, MediaId, ToTag, MediaId]) ->
 		type=?CMD_C,
 		callid=CallId,
 		mediaid=parse_media_id(MediaId),
-		from={FromTag},
-		to={ToTag},
+		from=#party{tag=FromTag},
+		to=#party{tag=ToTag},
 		params=[{filename, RecordName}]
 	};
 
@@ -187,8 +184,8 @@ parse_splitted(["Q", CallId, FromTag, MediaId, ToTag, MediaId]) ->
 		type=?CMD_Q,
 		callid=CallId,
 		mediaid=parse_media_id(MediaId),
-		from={FromTag},
-		to={ToTag}
+		from=#party{tag=FromTag},
+		to=#party{tag=ToTag}
 	};
 
 % Stop all active sessions

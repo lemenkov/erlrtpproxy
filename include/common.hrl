@@ -4,13 +4,13 @@
 		type=null,
 		callid=null,
 		mediaid=0,
-		addr=null,
 		from=null,
 		to=null,
 		params=null
 	}).
 
 -record(origin, {type, pid, ip, port}).
+-record(party, {tag, addr=null, rtcpaddr=null}).
 
 -define(RTPPROXY_OK, "0").
 
