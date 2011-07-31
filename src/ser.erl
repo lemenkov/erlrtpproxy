@@ -43,9 +43,6 @@ init (_Unused) ->
 	% Load parameters
 	{ok, {Ip, Port}} = application:get_env(?MODULE, listen_address),
 	{ok, RtpproxyNode} = application:get_env(?MODULE, rtpproxy_node),
-	{ok, {SyslogHost, SyslogPort}} = application:get_env(?MODULE, syslog_address),
-
-	error_logger:add_report_handler(erlsyslog, {0, SyslogHost, SyslogPort}),
 
 	pong = net_adm:ping(RtpproxyNode),
 
