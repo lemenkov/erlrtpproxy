@@ -3,6 +3,7 @@
 		origin=null,
 		type=null,
 		callid=null,
+		mediaid=0,
 		addr=null,
 		from=null,
 		to=null,
