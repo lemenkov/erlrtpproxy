@@ -94,6 +94,14 @@ init (
 	{ok, {I2, P2}} = inet:sockname(Fd2),
 	gen_server:cast(Pid, {reply, Cmd, {I0, P0}, {I2, P2}}),
 
+	FromRtp = case rtpproxy_utils:is_rfc1918(GuessIp) of
+		true ->
+			% FIXME check for bridging between internal (RFC 1918) and public networks
+			#media{fd=Fd0};
+		_ ->
+			#media{fd=Fd0, ip=GuessIp, port=GuessPort}
+	end,
+
 	{ok,
 		#state{
 			callid	= CallId,
@@ -102,7 +110,7 @@ init (
 			tag_t	= null,
 			tref	= TRef,
 			tref2	= TRef2,
-			from	= #media{fd=Fd0,ip=GuessIp, port=GuessPort},
+			from	= FromRtp,
 			fromrtcp= #media{fd=Fd1},
 			to	= #media{fd=Fd2},
 			tortcp	= #media{fd=Fd3}
@@ -129,7 +137,13 @@ handle_cast(
 	) ->
 	{ok, {I, P}} = inet:sockname(F),
 	gen_server:cast(Pid, {reply, Cmd, {I, P}}),
-	{noreply, State#state{from = From#media{ip=GuessIp, port=GuessPort}}};
+	case rtpproxy_utils:is_rfc1918(GuessIp) of
+		true ->
+			% FIXME check for bridging between internal (RFC 1918) and public networks
+			{noreply, State};
+		_ ->
+			{noreply, State#state{from = From#media{ip=GuessIp, port=GuessPort}}}
+	end;
 
 handle_cast(
 		#cmd{
@@ -143,7 +157,13 @@ handle_cast(
 	) ->
 	{ok, {I, P}} = inet:sockname(F),
 	gen_server:cast(Pid, {reply, Cmd, {I, P}}),
-	{noreply, State#state{to = To#media{ip=GuessIp, port=GuessPort}}};
+	case rtpproxy_utils:is_rfc1918(GuessIp) of
+		true ->
+			% FIXME check for bridging between internal (RFC 1918) and public networks
+			{noreply, State};
+		_ ->
+			{noreply, State#state{to = To#media{ip=GuessIp, port=GuessPort}}}
+	end;
 
 handle_cast(
 		#cmd{
@@ -157,7 +177,13 @@ handle_cast(
 	) ->
 	{ok, {I, P}} = inet:sockname(F),
 	gen_server:cast(Pid, {reply, Cmd, {I, P}}),
-	{noreply, State#state{from = From#media{ip=GuessIp, port=GuessPort}}};
+	case rtpproxy_utils:is_rfc1918(GuessIp) of
+		true ->
+			% FIXME check for bridging between internal (RFC 1918) and public networks
+			{noreply, State};
+		_ ->
+			{noreply, State#state{from = From#media{ip=GuessIp, port=GuessPort}}}
+	end;
 
 handle_cast(
 		#cmd{
@@ -171,7 +197,13 @@ handle_cast(
 	) ->
 	{ok, {I, P}} = inet:sockname(F),
 	gen_server:cast(Pid, {reply, Cmd, {I, P}}),
-	{noreply, State#state{to = To#media{ip=GuessIp, port=GuessPort}}};
+	case rtpproxy_utils:is_rfc1918(GuessIp) of
+		true ->
+			% FIXME check for bridging between internal (RFC 1918) and public networks
+			{noreply, State};
+		_ ->
+			{noreply, State#state{to = To#media{ip=GuessIp, port=GuessPort}}}
+	end;
 
 % Initial set up of a ToTag
 handle_cast(
@@ -186,7 +218,13 @@ handle_cast(
 	) ->
 	{ok, {I, P}} = inet:sockname(F),
 	gen_server:cast(Pid, {reply, Cmd, {I, P}}),
-	{noreply, State#state{to = To#media{ip=GuessIp, port=GuessPort}, tag_t = Tag}};
+	case rtpproxy_utils:is_rfc1918(GuessIp) of
+		true ->
+			% FIXME check for bridging between internal (RFC 1918) and public networks
+			{noreply, State#state{tag_t = Tag}};
+		_ ->
+			{noreply, State#state{to = To#media{ip=GuessIp, port=GuessPort}, tag_t = Tag}}
+	end;
 
 handle_cast(
 		#cmd{
