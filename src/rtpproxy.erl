@@ -47,6 +47,7 @@ start_link(Args) ->
 	gen_server:start_link({global, ?MODULE}, ?MODULE, Args, []).
 
 init(_Unused) ->
+	?INFO("rtpproxy started at ~p", [node()]),
 	{ok, #state{}}.
 
 handle_call(_Message, _From , State) ->

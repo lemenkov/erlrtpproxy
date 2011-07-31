@@ -2,8 +2,6 @@
 -behaviour(application).
 -export([start/0, start/2, stop/1]).
 
--include("../include/common.hrl").
-
 start() ->
 	% Start our pool
 	{ok,[[ConfigPath]]} = init:get_argument(config),
@@ -18,7 +16,6 @@ start() ->
 	% Run RADIUS client on each node
 	rpc:multicall(Nodes, application, start, [rtpproxy_radius]),
 
-	?INFO("Available node(s) ~p", [Nodes]),
 %	mnesia:create_schema([node()]),
 %	mnesia:start(),
 %	mnesia:wait_for_tables(mnesia:system_info(local_tables), infinity),
