@@ -96,15 +96,16 @@ parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, T
 		params=parse_params(Args)
 	};
 
-% Lookup existing session
-parse_splitted([[$L|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, ToTag, MediaId]) ->
+% Lookup existing session (first tag is To tag and not a From tag - be careful!)
+% FIXME - check tag orded in case of REINVITEs and M-o-H
+parse_splitted([[$L|Args], CallId, ProbableIp, ProbablePort, ToTag, MediaId, FromTag, MediaId]) ->
 	{GuessIp, GuessPort} = parse_addr(ProbableIp, ProbablePort),
 	#cmd{
 		type=?CMD_L,
 		callid=CallId,
 		mediaid=parse_media_id(MediaId),
-		from=#party{tag=FromTag, addr={GuessIp, GuessPort}},
-		to=#party{tag=ToTag},
+		from=#party{tag=FromTag},
+		to=#party{tag=ToTag, addr={GuessIp, GuessPort}},
 		params=parse_params(Args)
 	};
 
@@ -348,8 +349,8 @@ cmd_l_1_test() ->
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="452ca314-3bbcf0ea@192.168.0.2",
 			mediaid=1,
-			from=#party{tag="e4920d0cb29cf52o0",addr={{192,168,100,4}, 17050}},
-			to=#party{tag="8d11d16a3b56fcd588d72b3d359cc4e1"},
+			from=#party{tag="8d11d16a3b56fcd588d72b3d359cc4e1"},
+			to=#party{tag="e4920d0cb29cf52o0",addr={{192,168,100,4}, 17050}},
 			params=[{codecs,[0,101,100]}]
 		}, parse("413_40797 Lc0,101,100 452ca314-3bbcf0ea@192.168.0.2 192.168.100.4 17050 e4920d0cb29cf52o0;1 8d11d16a3b56fcd588d72b3d359cc4e1;1", {127,0,0,1}, 1234)).
 
@@ -361,8 +362,8 @@ cmd_l_2_test() ->
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="a68e961-5f6a75e5-356cafd9-3562@192.168.100.6",
 			mediaid=1,
-			from=#party{tag="1372466422",addr={{192,168,100,4}, 18756}},
-			to=#party{tag="60753eabbd87fe6f34068e9d80a9fc1c"},
+			from=#party{tag="60753eabbd87fe6f34068e9d80a9fc1c"},
+			to=#party{tag="1372466422",addr={{192,168,100,4}, 18756}},
 			params=[internal, {codecs,[8,101,100]}]
 		}, parse("418_41111 LIc8,101,100 a68e961-5f6a75e5-356cafd9-3562@192.168.100.6 192.168.100.4 18756 1372466422;1 60753eabbd87fe6f34068e9d80a9fc1c;1", {127,0,0,1}, 1234)).
 
