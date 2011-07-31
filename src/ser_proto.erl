@@ -128,10 +128,10 @@ parse_splitted(["D", CallId, FromTag, ToTag]) ->
 		to={ToTag}
 	};
 
-% Record (obsoleted)
+% Record (obsoleted in favor of Copy)
 parse_splitted(["R", CallId, FromTag, MediaId, ToTag, MediaId]) ->
 	#cmd{
-		type=?CMD_R,
+		type=?CMD_C,
 		callid=CallId,
 		mediaid=parse_media_id(MediaId),
 		from={FromTag},
