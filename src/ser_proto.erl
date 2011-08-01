@@ -407,5 +407,11 @@ parse_cmd_d_2_test() ->
 			to=#party{tag="9c56ba15bd794082ce6b166dba6c9c2"}
 		}, parse("437_40882 D 7adc6214-268583a6-1b74a438-3548@192.168.100.6 1372466422 9c56ba15bd794082ce6b166dba6c9c2", {127,0,0,1}, 1234)).
 
+encode_ok_test() ->
+	?assertEqual("438_41067 0\n", encode(#cmd{cookie="438_41067"}, ok)).
+
+encode_ip_test() ->
+	?assertEqual("8411_41413 41212 192.168.100.4\n", encode(#cmd{cookie="8411_41413"}, {{192,168,100,4},41212})).
+
 -endif.
 

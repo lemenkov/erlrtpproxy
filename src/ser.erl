@@ -58,10 +58,12 @@ init (_Unused) ->
 handle_call(_Other, _From, Fd) ->
 	{noreply, Fd}.
 
+% Got two addresses (initial Media stream creation)
 handle_cast({reply, #cmd{origin = #origin{ip = Ip, port = Port}} = Cmd, Answer, _}, Fd) ->
 	Data = ser_proto:encode(Cmd, Answer),
 	gen_udp:send(Fd, Ip, Port, Data),
 	{noreply, Fd};
+% TODO deprecate this case
 handle_cast({reply, #cmd{origin = #origin{ip = Ip, port = Port}} = Cmd, Answer}, Fd) ->
 	Data = ser_proto:encode(Cmd, Answer),
 	gen_udp:send(Fd, Ip, Port, Data),
