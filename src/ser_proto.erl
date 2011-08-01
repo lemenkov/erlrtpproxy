@@ -21,6 +21,7 @@
 -author('lemenkov@gmail.com').
 
 -export([parse/3]).
+-export([encode/2]).
 
 -include("common.hrl").
 
@@ -37,6 +38,23 @@ parse(Msg,Ip, Port) ->
 			port=Port
 		}
 	}.
+
+encode(Cmd, Answer) when is_list(Answer) ->
+	Cmd#cmd.cookie ++ " " ++ Answer ++ "\n";
+encode(Cmd, {version, Version}) ->
+	Cmd#cmd.cookie ++ " " ++ Version ++ "\n";
+encode(Cmd, {supported, Version}) ->
+	Cmd#cmd.cookie ++ ?RTPPROXY_VER_SUPPORTED;
+encode(Cmd, ok) ->
+	Cmd#cmd.cookie ++ ?RTPPROXY_OK;
+encode(Cmd, {error, notfound}) ->
+	Cmd#cmd.cookie ++ ?RTPPROXY_ERR_NOSESSION;
+encode(Cmd, {{I0,I1,I2,I3} = Ip, Port}) when is_integer(I0), is_integer(I1), is_integer(I2), is_integer(I3), is_integer(Port) ->
+	Cmd#cmd.cookie ++ " " ++ integer_to_list(Port) ++ " " ++ inet_parse:ntoa(Ip) ++ "\n".
+
+%%
+%% Private functions
+%%
 
 % Request basic supported rtpproxy protocol version
 parse_splitted(["V"]) ->

@@ -58,21 +58,13 @@ init (_Unused) ->
 handle_call(_Other, _From, Fd) ->
 	{noreply, Fd}.
 
-handle_cast({reply, Cmd, Answer}, Fd) when is_list(Answer) ->
-	Origin = Cmd#cmd.origin,
-	gen_udp:send(Fd, Origin#origin.ip, Origin#origin.port, Cmd#cmd.cookie ++ " " ++  Answer ++ "\n"),
+handle_cast({reply, #cmd{origin = #origin{ip = Ip, port = Port}} = Cmd, Answer, _}, Fd) ->
+	Data = ser_proto:encode(Cmd, Answer),
+	gen_udp:send(Fd, Ip, Port, Data),
 	{noreply, Fd};
-
-handle_cast({reply, Cmd, {{I0,I1,I2,I3} = Ip, Port}}, Fd) when is_integer(I0), is_integer(I1), is_integer(I2), is_integer(I3), is_integer(Port) ->
-	Origin = Cmd#cmd.origin,
-	Answer = integer_to_list(Port) ++ " " ++ inet_parse:ntoa(Ip),
-	gen_udp:send(Fd, Origin#origin.ip, Origin#origin.port, Cmd#cmd.cookie ++ " " ++  Answer ++ "\n"),
-	{noreply, Fd};
-
-handle_cast({reply, Cmd, {{I0,I1,I2,I3} = Ip, Port}, _}, Fd) when is_integer(I0), is_integer(I1), is_integer(I2), is_integer(I3), is_integer(Port) ->
-	Origin = Cmd#cmd.origin,
-	Answer = integer_to_list(Port) ++ " " ++ inet_parse:ntoa(Ip),
-	gen_udp:send(Fd, Origin#origin.ip, Origin#origin.port, Cmd#cmd.cookie ++ " " ++  Answer ++ "\n"),
+handle_cast({reply, #cmd{origin = #origin{ip = Ip, port = Port}} = Cmd, Answer}, Fd) ->
+	Data = ser_proto:encode(Cmd, Answer),
+	gen_udp:send(Fd, Ip, Port, Data),
 	{noreply, Fd};
 
 handle_cast(_Request, Fd) ->
@@ -96,11 +88,11 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 		throw:{error_syntax, Error} ->
 			?ERR("Bad syntax. [~s -> ~s]~n", [Msg, Error]),
 			[Cookie|_Rest] = string:tokens(Msg, " ;"),
-			gen_udp:send(Fd, Ip, Port, Cookie ++ " " ++  ?RTPPROXY_ERR_SYNTAX ++ "\n");
+			gen_udp:send(Fd, Ip, Port, Cookie ++ ?RTPPROXY_ERR_SYNTAX);
 		E:C ->
 			?ERR("Exceptiond. [~s -> ~p:~p]~n", [Msg, E, C]),
 			[Cookie|_Rest] = string:tokens(Msg, " ;"),
-			gen_udp:send(Fd, Ip, Port, Cookie ++ " " ++  ?RTPPROXY_ERR_SYNTAX ++ "\n")
+			gen_udp:send(Fd, Ip, Port, Cookie ++ ?RTPPROXY_ERR_SYNTAX)
 	end,
 	{noreply, Fd};
 
