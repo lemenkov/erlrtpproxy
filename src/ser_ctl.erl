@@ -26,7 +26,12 @@
 -export([reload/0]).
 
 start() ->
+	% Load erlsyslog parameters
 	application:start(erlsyslog),
+	{ok, {SyslogHost, SyslogPort}} = application:get_env(erlsyslog, syslog_address),
+	% Replace logger with erlsyslog
+	error_logger:add_report_handler(erlsyslog, {0, SyslogHost, SyslogPort}),
+
 	application:start(ser).
 
 stop() ->
