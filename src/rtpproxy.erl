@@ -51,26 +51,26 @@ init(_Unused) ->
 	{ok, #state{}}.
 
 handle_call(_Message, _From , State) ->
-	{reply, ?RTPPROXY_ERR_SOFTWARE, State}.
+	{reply, error, State}.
 
 handle_cast(#cmd{type = ?CMD_V, origin = #origin{pid = Pid}} = Cmd, State) ->
 	% Request basic supported rtpproxy protocol version
 	% see available versions here:
 	% http://sippy.git.sourceforge.net/git/gitweb.cgi?p=sippy/rtpproxy;a=blob;f=rtpp_command.c#l58
 	% We, curently, provide only basic functionality
-	gen_server:cast(Pid, {reply, Cmd, "20040107"}),
+	gen_server:cast(Pid, {reply, Cmd, {version, "20040107"}}),
 	{noreply, State};
 
-handle_cast(#cmd{type = ?CMD_VF, origin = #origin{pid = Pid}} = Cmd, State) ->
+handle_cast(#cmd{type = ?CMD_VF, origin = #origin{pid = Pid}, params=Version} = Cmd, State) ->
 	% Request additional rtpproxy protocol extensions
 	% TODO we should check version capabilities here
-	gen_server:cast(Pid, {reply, Cmd, "1"}),
+	gen_server:cast(Pid, {reply, Cmd, {supported, Version}}),
 	{noreply, State};
 
 handle_cast(#cmd{type = ?CMD_X, origin = #origin{pid = Pid}} = Cmd, State) ->
 	% stop all active sessions
 	lists:foreach(fun(X) -> gen_server:cast(X#thread.pid, stop) end, State#state.calls),
-	gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK}),
+	gen_server:cast(Pid, {reply, Cmd, ok}),
 	{noreply, State};
 
 handle_cast(#cmd{type = ?CMD_I, origin = #origin{pid = Pid}} = Cmd, State) ->
@@ -78,7 +78,7 @@ handle_cast(#cmd{type = ?CMD_I, origin = #origin{pid = Pid}} = Cmd, State) ->
 	Stats = lists:map(fun(X) -> gen_server:call(X#thread.pid, ?CMD_Q) end, State#state.calls),
 	% "sessions created: %llu\nactive sessions: %d\n active streams: %d\n"
 	% foreach session "%s/%s: caller = %s:%d/%s, callee = %s:%d/%s, stats = %lu/%lu/%lu/%lu, ttl = %d/%d\n"
-	gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK}),
+	gen_server:cast(Pid, {reply, Cmd, ok}),
 	{noreply, State};
 
 % First try to find existing session
@@ -90,14 +90,14 @@ handle_cast(#cmd{origin = #origin{pid = Pid}, callid = CallId, mediaid = MediaId
 		{list, MediaThreads} ->
 			lists:foreach(fun(X) -> gen_server:cast(X#thread.pid, Cmd) end, MediaThreads),
 			% FIXME is it a correct behaviour?
-			gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_OK});
+			gen_server:cast(Pid, {reply, Cmd, ok});
 		false when Cmd#cmd.type == ?CMD_U ->
 			% Create new media thread
 			?INFO("Media stream does not exist. Creating new.", []),
 			pool:pspawn(media, start, [Cmd]);
 		false ->
 			?WARN("Media stream does not exist. Do nothing.", []),
-			gen_server:cast(Pid, {reply, Cmd, ?RTPPROXY_ERR_NOSESSION})
+			gen_server:cast(Pid, {reply, Cmd, {error, notfound}})
 	end,
 	{noreply, State};
 
