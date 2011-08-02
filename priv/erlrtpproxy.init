@@ -40,7 +40,7 @@ start() {
 		-rsh $RSH \
 		-config $CONFIG_FILE \
 		-detached \
-		-s rtpproxy_app"
+		-s rtpproxy_ctl"
 	retval=$?
 	echo
 	[ $retval -eq 0 ] && touch $lockfile
