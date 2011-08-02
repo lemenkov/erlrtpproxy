@@ -31,6 +31,7 @@
 -export([terminate/2]).
 
 -include("common.hrl").
+-include("ser_proto.hrl").
 -include_lib("erlsyslog/include/erlsyslog.hrl").
 
 start(Args) ->

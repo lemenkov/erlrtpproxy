@@ -1,3 +1,5 @@
+% FIXME deprecate this file
+
 -record(cmd, {
 		cookie=null,
 		origin=null,
@@ -11,12 +13,6 @@
 
 -record(origin, {type, pid, ip, port}).
 -record(party, {tag, addr=null, rtcpaddr=null}).
-
--define(RTPPROXY_OK, " 0\n").
--define(RTPPROXY_VER_SUPPORTED, " 1\n").
--define(RTPPROXY_ERR_SYNTAX,    " E1\n").
--define(RTPPROXY_ERR_SOFTWARE,  " E7\n").
--define(RTPPROXY_ERR_NOSESSION, " E8\n").
 
 -define(CMD_V, message_v).
 -define(CMD_VF,message_vf).

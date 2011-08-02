@@ -24,6 +24,7 @@
 -export([encode/2]).
 
 -include("common.hrl").
+-include("ser_proto.hrl").
 
 parse(Msg,Ip, Port) ->
 	% TODO pass modifiers as atoms (not as string)
