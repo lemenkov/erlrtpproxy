@@ -143,10 +143,10 @@ handle_info(Other, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate({ErrorClass, {Module,Function, [Pid, Message]}}, State) ->
+terminate({ErrorClass, {Module,Function, [Pid, Message]}}, _State) ->
 	?ERR("RTPPROXY terminated due to Error [~p] in ~p:~p(...) with Msg[~p] from Pid ~p", [ErrorClass, Module, Function, Message, Pid]);
 
-terminate(Reason, State) ->
+terminate(Reason, _State) ->
 	?ERR("RTPPROXY terminated due to reason [~w]", [Reason]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%

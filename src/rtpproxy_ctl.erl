@@ -53,11 +53,11 @@ stop() ->
 		[NodeStr] ->
 			Node = list_to_atom(NodeStr),
 			try rpc:call(Node, application, stop, [rtpproxy], 5000) of
-				{badrpc, Reason} ->
+				{badrpc, _} ->
 					2;
 				_ ->
 					case rpc:call(Node, init, stop, [], 5000) of
-						{badrpc, Reason} ->
+						{badrpc, _} ->
 							2;
 						_ ->
 							0
@@ -75,7 +75,7 @@ status() ->
 		[NodeStr] ->
 			Node = list_to_atom(NodeStr),
 			try rpc:call(Node, application, get_application, [rtpproxy], 5000) of
-				{badrpc, Reason} ->
+				{badrpc, _} ->
 					4;
 				{ok, rtpproxy} ->
 					rpc:call(Node, gen_server, cast, [{global,rtpproxy}, status], 5000),
