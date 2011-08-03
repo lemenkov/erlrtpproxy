@@ -231,10 +231,12 @@ handle_cast(
 			type = ?CMD_D,
 			origin = #origin{pid = Pid},
 			callid = CallId,
+			mediaid = 0,
 			from = #party{tag = TagFrom},
 			to = To} = Cmd,
-		#state{callid = CallId, tag_f = TagFrom, tag_t = TagTo} = State
+		#state{callid = CallId, tag_f = TagF, tag_t = TagT} = State
 	) ->
+	% FIXME consider checking for direction (is TagFrom  equals to TagF or not?)
 	case To of
 		null -> {stop, cancel, State};
 		_ -> {stop, bye, State}
