@@ -353,7 +353,7 @@ start_acc (S) ->
 rtcp_process (Rtcps) ->
 	rtcp_process (Rtcps, []).
 rtcp_process ([], Rtcps) ->
-	lists:map(fun rtcp:encode/1, Rtcps);
+	rtcp:encode(Rtcps);
 rtcp_process ([Rtcp | Rest], Processed) ->
 	NewRtcp = case rtp_utils:get_type(Rtcp) of
 		sr -> Rtcp;
