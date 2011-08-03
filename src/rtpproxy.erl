@@ -62,9 +62,7 @@ handle_call(status, _From, #state{calls = Calls} = State) ->
 			MediaInfo
 		end,
 	Calls),
-	Footer = "Current state: END.",
-	?INFO(Footer, []),
-	{reply, [Header] ++ MediaInfos ++ [Footer], State};
+	{reply, [Header] ++ MediaInfos, State};
 
 handle_call(_Message, _From , State) ->
 	{reply, error, State}.

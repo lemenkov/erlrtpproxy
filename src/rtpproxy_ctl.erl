@@ -81,7 +81,7 @@ status() ->
 					% No idea why but w/o this sleep call to gen_server:call/2 fails
 					timer:sleep(2000),
 					Ret = gen_server:call({global,rtpproxy}, status),
-					ok = io:format("~s~n", [lists:flatten(Ret)]),
+					ok = io:format("~s", [lists:flatten(Ret)]),
 					0;
 				undefined ->
 					3
