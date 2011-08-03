@@ -78,7 +78,10 @@ status() ->
 				{badrpc, _} ->
 					4;
 				{ok, rtpproxy} ->
-					rpc:call(Node, gen_server, cast, [{global,rtpproxy}, status], 5000),
+					% No idea why but w/o this sleep call to gen_server:call/2 fails
+					timer:sleep(2000),
+					Ret = gen_server:call({global,rtpproxy}, status),
+					ok = io:format("~s~n", [lists:flatten(Ret)]),
 					0;
 				undefined ->
 					3

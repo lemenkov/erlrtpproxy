@@ -50,6 +50,21 @@ init(_Unused) ->
 	?INFO("rtpproxy started at ~p", [node()]),
 	{ok, #state{}}.
 
+handle_call(status, _From, #state{calls = Calls} = State) ->
+	Header = io_lib:format("Current state - ~p media stream(s):~n", [length(Calls)]),
+	?INFO(Header, []),
+	MediaInfos = lists:map(fun(X) ->
+			% TODO fix this strange situation
+			{ok, Reply} = try gen_server:call(X#thread.pid, ?CMD_Q) catch E:C -> {ok, [["died (shouldn't happend)"]]} end,
+			MediaInfo = io_lib:format("* Pid: ~p, ID: ~p, State: ~s~n", [X#thread.pid, X#thread.id, Reply]),
+			?INFO(MediaInfo, []),
+			MediaInfo
+		end,
+	Calls),
+	Footer = "Current state: END.",
+	?INFO(Footer, []),
+	{reply, [Header] ++ MediaInfos ++ [Footer], State};
+
 handle_call(_Message, _From , State) ->
 	{reply, error, State}.
 
@@ -103,24 +118,6 @@ handle_cast(#cmd{origin = #origin{pid = Pid}, callid = CallId, mediaid = MediaId
 
 handle_cast({created, CallPid, {CallId, MediaId}}, #state{calls = Calls} = State) ->
 	{noreply, State#state{calls=lists:append(Calls, [#thread{pid=CallPid, id={CallId, MediaId}}])}};
-
-handle_cast(status, State) ->
-	?INFO("Current state - ~p media stream(s):", [length(State#state.calls)]),
-	lists:foreach(	fun(X) ->
-				% TODO fix this strange situation
-				{ok, Reply} = try gen_server:call(X#thread.pid, ?CMD_I) catch E:C -> {ok, [["died (shouldn't happend)"]]} end,
-				?INFO("* Pid: ~p, ID: ~p, State:", [X#thread.pid, X#thread.id]),
-				lists:foreach(	fun(Y) ->
-							lists:foreach(	fun(Z) ->
-										?INFO("---> ~s", [Z])
-									end,
-								Y)
-							end,
-					Reply)
-			end,
-		State#state.calls),
-	?INFO("Current state: END.", []),
-	{noreply, State};
 
 % Call died (due to timeout)
 handle_cast({'EXIT', Pid, Reason}, #state{calls = Calls} = State) ->
