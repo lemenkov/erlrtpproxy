@@ -74,17 +74,23 @@ force_reload() {
 	restart
 }
 
+rh_status_verbose() {
+	/sbin/runuser -s /bin/bash $USER -c "erl -noinput $ERL_PARAMETERS -name status@$ERL_NODE -s rtpproxy_ctl status -extra $prog@$ERL_NODE"
+	return $?
+}
+
 rh_status() {
-	echo -n $"Getting $prog status (see in syslog): "
-	daemon --user $USER "erl -noinput $ERL_PARAMETERS -name status@$ERL_NODE -s rtpproxy_ctl status -extra $prog@$ERL_NODE"
+	echo -n $"Getting $prog status: "
+	rh_status_verbose >/dev/null 2>&1
+	retval=$?
+	[ $retval = 0 ] && success || failure
 	echo
 	return $?
 }
 
 rh_status_q() {
-	rh_status >/dev/null 2>&1
+	rh_status_verbose >/dev/null 2>&1
 }
-
 
 case "$1" in
     start)
@@ -106,6 +112,10 @@ case "$1" in
         ;;
     status)
         rh_status
+        ;;
+    # Specially for NRPE
+    status_verbose)
+        rh_status_verbose
         ;;
     condrestart|try-restart)
         rh_status_q || exit 0
