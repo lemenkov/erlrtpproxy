@@ -56,7 +56,7 @@ handle_call(status, _From, #state{calls = Calls} = State) ->
 	MediaInfos = lists:map(fun(X) ->
 			% TODO fix this strange situation
 			{ok, Reply} = try gen_server:call(X#thread.pid, ?CMD_Q) catch E:C -> {ok, [["died (shouldn't happend)"]]} end,
-			MediaInfo = io_lib:format("* Pid: ~p, ID: ~p, State: ~s~n", [X#thread.pid, X#thread.id, Reply]),
+			MediaInfo = io_lib:format("* ID: ~p, State: ~s~n", [X#thread.id, Reply]),
 			?INFO(MediaInfo, []),
 			MediaInfo
 		end,
