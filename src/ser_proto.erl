@@ -163,6 +163,15 @@ parse_splitted(["R", CallId, FromTag, ToTag]) ->
 		to=#party{tag=ToTag}
 	};
 
+% Playback pre-recorded audio (Music-on-hold and resume, no ToTag)
+parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, MediaId]) ->
+	#cmd{
+		type=?CMD_P,
+		callid=CallId,
+		mediaid=parse_media_id(MediaId),
+		from=#party{tag=FromTag},
+		params=parse_playcount(Args) ++ [{filename, PlayName}, {codecs, Codecs}]
+	};
 % Playback pre-recorded audio (Music-on-hold and resume)
 parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, MediaId, ToTag, MediaId]) ->
 	#cmd{
@@ -451,6 +460,19 @@ parse_cmd_r_2_test() ->
 		}, parse("32711_5 R 0003e30c-c50c016a-35dc4387-58a65654@192.168.0.100 eb1f1ca7e74cf0fc8a81ea331486452a 0003e30cc50ccbed0342cc8d-0bddf550", {127,0,0,1}, 1234)).
 
 parse_cmd_p_1_test() ->
+	?assertEqual(
+		#cmd{
+			type=?CMD_P,
+			cookie="2154_5",
+			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
+			callid="0003e30c-c50c0171-35b90751-013a3ef6@192.168.0.100",
+			mediaid=1,
+			from=#party{tag="0003e30cc50ccc9f743d4fa6-38d0bd14"},
+			to=null,
+			params=[{playcount, 20}, {filename,"/var/run/tmp/hello_uac.wav"},{codecs,"session"}]
+		}, parse("2154_5 P20 0003e30c-c50c0171-35b90751-013a3ef6@192.168.0.100 /var/run/tmp/hello_uac.wav session 0003e30cc50ccc9f743d4fa6-38d0bd14;1", {127,0,0,1}, 1234)).
+
+parse_cmd_p_2_test() ->
 	?assertEqual(
 		#cmd{
 			type=?CMD_P,
