@@ -145,11 +145,20 @@ parse_splitted(["D", CallId, FromTag, ToTag]) ->
 	};
 
 % Record (obsoleted in favor of Copy)
-parse_splitted(["R", CallId, FromTag, MediaId, ToTag, MediaId]) ->
+% No MediaIds and no ToTag
+parse_splitted(["R", CallId, FromTag]) ->
 	#cmd{
 		type=?CMD_C,
 		callid=CallId,
-		mediaid=parse_media_id(MediaId),
+		from=#party{tag=FromTag}
+	};
+
+% Record (obsoleted in favor of Copy)
+% No MediaIds
+parse_splitted(["R", CallId, FromTag, ToTag]) ->
+	#cmd{
+		type=?CMD_C,
+		callid=CallId,
 		from=#party{tag=FromTag},
 		to=#party{tag=ToTag}
 	};
@@ -407,6 +416,31 @@ parse_cmd_d_2_test() ->
 			from=#party{tag="1372466422"},
 			to=#party{tag="9c56ba15bd794082ce6b166dba6c9c2"}
 		}, parse("437_40882 D 7adc6214-268583a6-1b74a438-3548@192.168.100.6 1372466422 9c56ba15bd794082ce6b166dba6c9c2", {127,0,0,1}, 1234)).
+
+
+parse_cmd_r_1_test() ->
+	?assertEqual(
+		#cmd{
+			type=?CMD_C,
+			cookie="393_6",
+			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
+			callid="0003e348-e21901f6-29cc58a1-379f3ffd@192.168.0.1",
+			mediaid=0,
+			from=#party{tag="0003e348e219767510f1e38f-47c56231"},
+			to=null
+		}, parse("393_6 R 0003e348-e21901f6-29cc58a1-379f3ffd@192.168.0.1 0003e348e219767510f1e38f-47c56231", {127,0,0,1}, 1234)).
+
+parse_cmd_r_2_test() ->
+	?assertEqual(
+		#cmd{
+			type=?CMD_C,
+			cookie="32711_5",
+			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
+			callid="0003e30c-c50c016a-35dc4387-58a65654@192.168.0.100",
+			mediaid=0,
+			from=#party{tag="eb1f1ca7e74cf0fc8a81ea331486452a"},
+			to=#party{tag="0003e30cc50ccbed0342cc8d-0bddf550"}
+		}, parse("32711_5 R 0003e30c-c50c016a-35dc4387-58a65654@192.168.0.100 eb1f1ca7e74cf0fc8a81ea331486452a 0003e30cc50ccbed0342cc8d-0bddf550", {127,0,0,1}, 1234)).
 
 encode_ok_test() ->
 	?assertEqual("438_41067 0\n", encode(#cmd{cookie="438_41067"}, ok)).
