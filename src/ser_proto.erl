@@ -171,7 +171,7 @@ parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, MediaId, ToTag, Me
 		mediaid=parse_media_id(MediaId),
 		from=#party{tag=FromTag},
 		to=#party{tag=ToTag},
-		params=parse_params(Args) ++ [{filename, PlayName}, {codecs, Codecs}]
+		params=parse_playcount(Args) ++ [{filename, PlayName}, {codecs, Codecs}]
 	};
 % Playback pre-recorded audio (Music-on-hold and resume)
 parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, MediaId, ToTag, MediaId, ProbableIp, ProbablePort]) ->
@@ -182,7 +182,7 @@ parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, MediaId, ToTag, Me
 		mediaid=parse_media_id(MediaId),
 		from=#party{tag=FromTag},
 		to=#party{tag=ToTag},
-		params=parse_params(Args) ++ [{filename, PlayName}, {codecs, Codecs}, {addr, {GuessIp, GuessPort}}]
+		params=parse_playcount(Args) ++ [{filename, PlayName}, {codecs, Codecs}, {addr, {GuessIp, GuessPort}}]
 	};
 
 % Stop playback or record
@@ -260,6 +260,14 @@ parse_media_id(ProbableMediaId) ->
 		_:_ ->
 			throw({error_syntax, "Wrong MediaID"})
 	end.
+
+parse_playcount(ProbablePlayCount) ->
+	try [{playcount, list_to_integer (ProbablePlayCount)}]
+	catch
+		_:_ ->
+			throw({error_syntax, "Wrong PlayCount"})
+	end.
+
 
 parse_params(A) ->
 	parse_params(A, []).
@@ -441,6 +449,19 @@ parse_cmd_r_2_test() ->
 			from=#party{tag="eb1f1ca7e74cf0fc8a81ea331486452a"},
 			to=#party{tag="0003e30cc50ccbed0342cc8d-0bddf550"}
 		}, parse("32711_5 R 0003e30c-c50c016a-35dc4387-58a65654@192.168.0.100 eb1f1ca7e74cf0fc8a81ea331486452a 0003e30cc50ccbed0342cc8d-0bddf550", {127,0,0,1}, 1234)).
+
+parse_cmd_p_1_test() ->
+	?assertEqual(
+		#cmd{
+			type=?CMD_P,
+			cookie="1389_5",
+			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
+			callid="0003e30c-c50c016d-46bbcf2e-6369eecf@192.168.0.100",
+			mediaid=1,
+			from=#party{tag="0003e30cc50ccc5416857d59-357336dc"},
+			to=#party{tag="28d49e51a95d5a31d09b31ccc63c5f4b"},
+			params=[{playcount, 10}, {filename,"/var/tmp/rtpproxy_test/media/01.wav"},{codecs,"session"}]
+		}, parse("1389_5 P10 0003e30c-c50c016d-46bbcf2e-6369eecf@192.168.0.100 /var/tmp/rtpproxy_test/media/01.wav session 0003e30cc50ccc5416857d59-357336dc;1 28d49e51a95d5a31d09b31ccc63c5f4b;1", {127,0,0,1}, 1234)).
 
 encode_ok_test() ->
 	?assertEqual("438_41067 0\n", encode(#cmd{cookie="438_41067"}, ok)).
