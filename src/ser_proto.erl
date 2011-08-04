@@ -194,6 +194,15 @@ parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, MediaId, ToTag, Me
 		params=parse_playcount(Args) ++ [{filename, PlayName}, {codecs, Codecs}, {addr, {GuessIp, GuessPort}}]
 	};
 
+% Stop playback or record (no ToTag)
+parse_splitted(["S", CallId, FromTag, MediaId]) ->
+	#cmd{
+		type=?CMD_S,
+		callid=CallId,
+		mediaid=parse_media_id(MediaId),
+		from=#party{tag=FromTag}
+	};
+
 % Stop playback or record
 parse_splitted(["S", CallId, FromTag, MediaId, ToTag, MediaId]) ->
 	#cmd{
@@ -484,6 +493,18 @@ parse_cmd_p_2_test() ->
 			to=#party{tag="28d49e51a95d5a31d09b31ccc63c5f4b"},
 			params=[{playcount, 10}, {filename,"/var/tmp/rtpproxy_test/media/01.wav"},{codecs,"session"}]
 		}, parse("1389_5 P10 0003e30c-c50c016d-46bbcf2e-6369eecf@192.168.0.100 /var/tmp/rtpproxy_test/media/01.wav session 0003e30cc50ccc5416857d59-357336dc;1 28d49e51a95d5a31d09b31ccc63c5f4b;1", {127,0,0,1}, 1234)).
+
+parse_cmd_s_1_test() ->
+	?assertEqual(
+		#cmd{
+			type=?CMD_S,
+			cookie="2154_6",
+			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
+			callid="0003e30c-c50c0171-35b90751-013a3ef6@192.168.0.100",
+			mediaid=1,
+			from=#party{tag="0003e30cc50ccc9f743d4fa6-38d0bd14"},
+			to=null
+		}, parse("2154_6 S 0003e30c-c50c0171-35b90751-013a3ef6@192.168.0.100 0003e30cc50ccc9f743d4fa6-38d0bd14;1", {127,0,0,1}, 1234)).
 
 encode_ok_test() ->
 	?assertEqual("438_41067 0\n", encode(#cmd{cookie="438_41067"}, ok)).
