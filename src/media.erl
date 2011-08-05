@@ -92,8 +92,8 @@ init (
 	gen_server:cast({global, rtpproxy}, {created, self(), {CallId, MediaId}}),
 
 	SendFun = case proplists:get_value(weack, Params) of
-		true -> send_simple;
-		_ -> send_locked
+		true -> fun send_simple/5;
+		_ -> fun send_locked/5
 	end,
 
 	{ok, {I0, P0}} = inet:sockname(Fd0),
