@@ -65,7 +65,8 @@ handle_call(status, _From, #state{calls = Calls} = State) ->
 	Calls),
 	{reply, [Header] ++ MediaInfos, State};
 
-handle_call(_Message, _From , State) ->
+handle_call(Other, _From, State) ->
+	?WARN("Other call [~p], State [~p]", [Other, State]),
 	{reply, error, State}.
 
 handle_cast(#cmd{type = ?CMD_X, origin = #origin{pid = Pid}} = Cmd, State) ->
