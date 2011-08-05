@@ -265,11 +265,6 @@ handle_info(ping, #state{from = #media{rtpstate = rtp}, to = #media{rtpstate = r
 	% Both sides are active, so we just set state to 'nortp' and continue
 	{noreply, State#state{from=(State#state.from)#media{rtpstate=nortp}, to=(State#state.to)#media{rtpstate=nortp}}};
 
-handle_info(interim_update, #state{callid = CallId, mediaid = MediaId, from = #media{rtpstate = rtp}, to = #media{rtpstate = rtp}} =  State) ->
-	% Both sides are active, so we need to send interim update here
-	gen_server:cast(rtpproxy_radius, {interim_update, CallId, MediaId}),
-	{noreply, State};
-
 handle_info(ping, State) ->
 	% We didn't get new RTP messages since last ping - we should close this mediastream
 	% we should rely on rtcp
@@ -280,6 +275,13 @@ handle_info(ping, State) ->
 %			{noreply, State}
 %	end
 	{stop, nortp, State};
+
+% Interim update
+handle_info(interim_update, #state{callid = CallId, mediaid = MediaId, from = #media{rtpstate = rtp}, to = #media{rtpstate = rtp}} =  State) ->
+	% Both sides are active, so we need to send interim update here
+	gen_server:cast(rtpproxy_radius, {interim_update, CallId, MediaId}),
+	{noreply, State};
+
 
 handle_info(Other, State) ->
 	?WARN("Other Info [~p], State [~p]", [Other, State]),
