@@ -135,11 +135,11 @@ handle_call(?CMD_Q, _From, #state{started = Started} = State) ->
 % FIXME move some logic into frontend - leave here only common part
 handle_cast(
 		#cmd{
-			type = Type,
+			type = ?CMD_U,
 			origin = #origin{pid = Pid},
 			callid = CallId,
 			mediaid = MediaId,
-			from = CmdFrom,
+			from = #party{tag = Tag, addr = {GuessIp, GuessPort}},
 			to = CmdTo,
 			params = Params} = Cmd,
 		#state{
@@ -149,16 +149,12 @@ handle_cast(
 			to = #media{fd=FdT} = To,
 			tag_f = TagF,
 			tag_t = TagT} = State
-	) when Type == ?CMD_U; Type == ?CMD_L ->
-	{Tag, {GuessIp, GuessPort}} = case Type of
-		?CMD_U -> {CmdFrom#party.tag, CmdFrom#party.addr};
-		?CMD_L -> {CmdTo#party.tag, CmdTo#party.addr}
-	end,
+	) ->
 	{Dir, Fd} = case Tag of
 		TagF -> {from, FdF};
 		TagT -> {to, FdT};
 		% Initial set up of a tag_t
-		_ when TagT == null, Type == ?CMD_L -> {to, FdT};
+		_ when TagT == null -> {to, FdT};
 		_ -> {notfound, notfound}
 	end,
 	case Dir of
