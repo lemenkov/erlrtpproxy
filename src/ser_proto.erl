@@ -44,7 +44,7 @@ encode(Cmd, Answer) when is_list(Answer) ->
 	Cmd#cmd.cookie ++ " " ++ Answer ++ "\n";
 encode(Cmd, {version, Version}) ->
 	Cmd#cmd.cookie ++ " " ++ Version ++ "\n";
-encode(Cmd, {supported, Version}) ->
+encode(Cmd, {supported, _Version}) ->
 	Cmd#cmd.cookie ++ ?RTPPROXY_VER_SUPPORTED;
 encode(Cmd, ok) ->
 	Cmd#cmd.cookie ++ ?RTPPROXY_OK;
