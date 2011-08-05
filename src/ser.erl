@@ -84,6 +84,18 @@ terminate(Reason, Fd) ->
 % Brief introduction of protocol is here: http://rtpproxy.org/wiki/RTPproxyProtocol
 handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 	try ser_proto:parse(Msg, Ip, Port) of
+		#cmd{type = ?CMD_V} = Cmd ->
+			% Request basic supported rtpproxy protocol version
+			% see available versions here:
+			% http://sippy.git.sourceforge.net/git/gitweb.cgi?p=sippy/rtpproxy;a=blob;f=rtpp_command.c#l58
+			% We provide only basic functionality, currently.
+			Data = ser_proto:encode(Cmd, {version, "20040107"}),
+			gen_udp:send(Fd, Ip, Port, Data);
+		#cmd{type = ?CMD_VF, params=Version} = Cmd ->
+			% Request additional rtpproxy protocol extensions
+			% TODO we should check version capabilities here
+			Data = ser_proto:encode(Cmd, {supported, Version}),
+			gen_udp:send(Fd, Ip, Port, Data);
 		Cmd ->
 			?INFO("SER cmd: ~p", [Cmd]),
 			gen_server:cast({global, rtpproxy}, Cmd)
