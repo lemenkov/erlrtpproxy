@@ -93,7 +93,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 			[Cookie|_Rest] = string:tokens(Msg, " ;"),
 			gen_udp:send(Fd, Ip, Port, Cookie ++ ?RTPPROXY_ERR_SYNTAX);
 		E:C ->
-			?ERR("Exceptiond. [~s -> ~p:~p]~n", [Msg, E, C]),
+			?ERR("Exception. [~s -> ~p:~p]~n", [Msg, E, C]),
 			[Cookie|_Rest] = string:tokens(Msg, " ;"),
 			gen_udp:send(Fd, Ip, Port, Cookie ++ ?RTPPROXY_ERR_SYNTAX)
 	end,
