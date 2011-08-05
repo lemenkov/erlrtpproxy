@@ -31,7 +31,6 @@
 -export([terminate/2]).
 
 -include("common.hrl").
--include("ser_proto.hrl").
 -include_lib("erlsyslog/include/erlsyslog.hrl").
 
 start(Args) ->
@@ -103,11 +102,13 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 		throw:{error_syntax, Error} ->
 			?ERR("Bad syntax. [~s -> ~s]~n", [Msg, Error]),
 			[Cookie|_Rest] = string:tokens(Msg, " ;"),
-			gen_udp:send(Fd, Ip, Port, Cookie ++ ?RTPPROXY_ERR_SYNTAX);
+			Data = ser_proto:encode(Cookie, {error, syntax}),
+			gen_udp:send(Fd, Ip, Port, Data);
 		E:C ->
 			?ERR("Exception. [~s -> ~p:~p]~n", [Msg, E, C]),
 			[Cookie|_Rest] = string:tokens(Msg, " ;"),
-			gen_udp:send(Fd, Ip, Port, Cookie ++ ?RTPPROXY_ERR_SYNTAX)
+			Data = ser_proto:encode(Cookie, {error, syntax}),
+			gen_udp:send(Fd, Ip, Port, Data)
 	end,
 	{noreply, Fd};
 
