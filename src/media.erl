@@ -91,7 +91,7 @@ init (
 	% Register at the rtpproxy
 	gen_server:cast({global, rtpproxy}, {created, self(), {CallId, MediaId}}),
 
-	SendFun = case proplists:get_value(weack, Params) of
+	SendFun = case proplists:get_value(weak, Params) of
 		true -> fun send_simple/5;
 		_ -> fun send_locked/5
 	end,
