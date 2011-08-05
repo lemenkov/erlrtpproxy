@@ -50,6 +50,7 @@ init(_Unused) ->
 	?INFO("rtpproxy started at ~p", [node()]),
 	{ok, #state{}}.
 
+% FIXME this must be reworked (no preformatted strings - just plain stats)
 handle_call(status, _From, #state{calls = Calls} = State) ->
 	Header = io_lib:format("Current state - ~p media stream(s):~n", [length(Calls)]),
 	?INFO(Header, []),
