@@ -74,6 +74,8 @@ rm -rf $RPM_BUILD_ROOT
 %{_initrddir}/%{realname}
 %config(noreplace) %{_sysconfdir}/%{realname}.config
 %config(noreplace) %{_sysconfdir}/sysconfig/%{realname}
+%dir %{_libdir}/erlang/lib/%{realname}-%{version}
+%dir %{_libdir}/erlang/lib/%{realname}-%{version}/ebin
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}.app
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_app.beam
