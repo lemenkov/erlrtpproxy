@@ -59,6 +59,7 @@
 		to,
 		tortcp,
 		hold=false,
+		send_fun=send_locked,
 		started=false
 	}
 ).
@@ -90,6 +91,11 @@ init (
 	% Register at the rtpproxy
 	gen_server:cast({global, rtpproxy}, {created, self(), {CallId, MediaId}}),
 
+	SendFun = case proplists:get_value(weack, Params) of
+		true -> send_simple;
+		_ -> send_locked
+	end,
+
 	{ok, {I0, P0}} = inet:sockname(Fd0),
 	{ok, {I2, P2}} = inet:sockname(Fd2),
 	gen_server:cast(Pid, {reply, Cmd, {I0, P0}, {I2, P2}}),
@@ -113,7 +119,8 @@ init (
 			from	= FromRtp,
 			fromrtcp= #media{fd=Fd1},
 			to	= #media{fd=Fd2},
-			tortcp	= #media{fd=Fd3}
+			tortcp	= #media{fd=Fd3},
+			send_fun= SendFun
 		}
 	}.
 
@@ -207,14 +214,14 @@ terminate(Reason, #state{callid = CallId, mediaid = MediaId, tref = TimerRef, tr
 
 	?ERR("terminated due to reason [~p]", [Reason]).
 
-handle_info({udp, Fd, Ip, Port, Msg}, #state{tortcp = #media{fd = Fd}} = State) ->
+handle_info({udp, Fd, Ip, Port, Msg}, #state{tortcp = #media{fd = Fd}, send_fun = SendFun} = State) ->
 	inet:setopts(Fd, [{active, once}]),
 	% First, we'll try do decode our RCP packet(s)
 	try
 		{ok, Rtcps} = rtcp:decode(Msg),
 		?INFO("RTCP from ~s: ~s", [State#state.callid, lists:map (fun rtp_utils:pp/1, Rtcps)]),
 		Msg2 = rtcp_process (Rtcps),
-		{noreply, State#state{fromrtcp=safe_send(State#state.fromrtcp, State#state.tortcp, Ip, Port, Msg2)}}
+		{noreply, State#state{fromrtcp=SendFun(State#state.fromrtcp, State#state.tortcp, Ip, Port, Msg2)}}
 	catch
 		E:C ->
 			rtp_utils:dump_packet(node(), self(), Msg),
@@ -222,14 +229,14 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{tortcp = #media{fd = Fd}} = State) 
 			{noreply, State}
 	end;
 
-handle_info({udp, Fd, Ip, Port, Msg}, #state{fromrtcp = #media{fd = Fd}} = State) ->
+handle_info({udp, Fd, Ip, Port, Msg}, #state{fromrtcp = #media{fd = Fd}, send_fun = SendFun} = State) ->
 	inet:setopts(Fd, [{active, once}]),
 	% First, we'll try do decode our RCP packet(s)
 	try
 		{ok, Rtcps} = rtcp:decode(Msg),
 		?INFO("RTCP from ~s: ~s", [State#state.callid, lists:map (fun rtp_utils:pp/1, Rtcps)]),
 		Msg2 = rtcp_process (Rtcps),
-		{noreply, State#state{tortcp=safe_send(State#state.tortcp, State#state.fromrtcp, Ip, Port, Msg2)}}
+		{noreply, State#state{tortcp=SendFun(State#state.tortcp, State#state.fromrtcp, Ip, Port, Msg2)}}
 	catch
 		E:C ->
 			rtp_utils:dump_packet(node(), self(), Msg),
@@ -245,13 +252,13 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fromrtcp = #media{fd = Fd}} = State
 
 % TODO check that message was arrived from valid {Ip, Port}
 % TODO check whether message is valid rtp stream
-handle_info({udp, Fd, Ip, Port, Msg}, #state{from = #media{fd = Fd}} = State) ->
+handle_info({udp, Fd, Ip, Port, Msg}, #state{from = #media{fd = Fd}, send_fun = SendFun} = State) ->
 	inet:setopts(Fd, [{active, once}]),
-	{noreply, State#state{to = safe_send(State#state.to, State#state.from, Ip, Port, Msg), started=start_acc(State)}};
+	{noreply, State#state{to = SendFun(State#state.to, State#state.from, Ip, Port, Msg), started=start_acc(State)}};
 
-handle_info({udp, Fd, Ip, Port, Msg}, #state{to = #media{fd = Fd}} = State) ->
+handle_info({udp, Fd, Ip, Port, Msg}, #state{to = #media{fd = Fd}, send_fun = SendFun} = State) ->
 	inet:setopts(Fd, [{active, once}]),
-	{noreply, State#state{from = safe_send(State#state.from, State#state.to, Ip, Port, Msg), started=start_acc(State)}};
+	{noreply, State#state{from = SendFun(State#state.from, State#state.to, Ip, Port, Msg), started=start_acc(State)}};
 
 handle_info(ping, #state{from = #media{rtpstate = rtp}, to = #media{rtpstate = rtp}} =  State) ->
 	% Both sides are active, so we just set state to 'nortp' and continue
@@ -281,13 +288,22 @@ handle_info(Other, State) ->
 %% Internal functions %%
 %%%%%%%%%%%%%%%%%%%%%%%%
 
-% Define function for sending RTP/RTCP and updating state
-safe_send (Var1, #media{ip = null, port = null}, Ip, Port, _Msg) ->
+% Define functions for sending RTP/RTCP and updating state
+send_simple (Var1, #media{ip = null, port = null}, Ip, Port, _Msg) ->
 	% Probably RTP or RTCP, but we CANNOT send yet.
 	Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()};
-safe_send (Var1, Var2, Ip, Port, Msg) ->
+send_simple (Var1, Var2, Ip, Port, Msg) ->
 	gen_udp:send(Var1#media.fd, Var2#media.ip, Var2#media.port, Msg),
 	Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()}.
+
+send_locked (Var1, #media{ip = null, port = null}, Ip, Port, _Msg) ->
+	% Probably RTP or RTCP, but we CANNOT send yet.
+	Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()};
+send_locked (#media{fd = Fd, ip = Ip, port = Port} = Var1, Var2, Ip, Port, Msg) ->
+	gen_udp:send(Fd, Var2#media.ip, Var2#media.port, Msg),
+	Var1#media{rtpstate=rtp, lastseen=now()};
+send_locked (Var1, _, _, _, _) ->
+	Var1.
 
 % Define function for safe determinin of starting media
 start_acc (#state{started = false, callid = CallId, mediaid = MediaId, from = #media{rtpstate = rtp}, to = #media{rtpstate = rtp}}) ->
