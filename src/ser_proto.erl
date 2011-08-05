@@ -50,6 +50,8 @@ encode(Cmd, ok) ->
 	Cmd#cmd.cookie ++ ?RTPPROXY_OK;
 encode(Cmd, {error, notfound}) ->
 	Cmd#cmd.cookie ++ ?RTPPROXY_ERR_NOSESSION;
+encode(Cookie, {error, syntax}) ->
+	Cookie ++ ?RTPPROXY_ERR_SYNTAX;
 encode(Cmd, {{I0,I1,I2,I3} = Ip, Port}) when is_integer(I0), is_integer(I1), is_integer(I2), is_integer(I3), is_integer(Port) ->
 	Cmd#cmd.cookie ++ " " ++ integer_to_list(Port) ++ " " ++ inet_parse:ntoa(Ip) ++ "\n".
 
