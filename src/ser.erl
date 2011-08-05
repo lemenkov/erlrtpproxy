@@ -88,11 +88,13 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 			% see available versions here:
 			% http://sippy.git.sourceforge.net/git/gitweb.cgi?p=sippy/rtpproxy;a=blob;f=rtpp_command.c#l58
 			% We provide only basic functionality, currently.
+			?INFO("SER cmd: ~p", [Cmd]),
 			Data = ser_proto:encode(Cmd, {version, "20040107"}),
 			gen_udp:send(Fd, Ip, Port, Data);
 		#cmd{type = ?CMD_VF, params=Version} = Cmd ->
 			% Request additional rtpproxy protocol extensions
 			% TODO we should check version capabilities here
+			?INFO("SER cmd: ~p", [Cmd]),
 			Data = ser_proto:encode(Cmd, {supported, Version}),
 			gen_udp:send(Fd, Ip, Port, Data);
 		Cmd ->
