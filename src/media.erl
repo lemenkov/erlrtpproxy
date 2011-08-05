@@ -299,14 +299,17 @@ send_simple (Var1, Var2, Ip, Port, Msg) ->
 	gen_udp:send(Var1#media.fd, Var2#media.ip, Var2#media.port, Msg),
 	Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()}.
 
-send_locked (Var1, #media{ip = null, port = null}, Ip, Port, _Msg) ->
+send_locked (#media{fd = Fd, ip = Ip, port = Port} = Party, #media{ip = I, port = P}, Ip, Port, Msg) when I /= null, port /= null ->
+	gen_udp:send(Fd, I, P, Msg),
+	Party#media{rtpstate=rtp, lastseen=now()};
+send_locked (#media{fd = Fd, ip = null, port = null, rtpstate = nortp} = Party, #media{ip = null, port = null, rtpstate = nortp}, Ip, Port, Msg) ->
 	% Probably RTP or RTCP, but we CANNOT send yet.
-	Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()};
-send_locked (#media{fd = Fd, ip = Ip, port = Port} = Var1, Var2, Ip, Port, Msg) ->
-	gen_udp:send(Fd, Var2#media.ip, Var2#media.port, Msg),
-	Var1#media{rtpstate=rtp, lastseen=now()};
-send_locked (Var1, _, _, _, _) ->
-	Var1.
+	Party#media{ip = Ip, port = Port, rtpstate=rtp, lastseen=now()};
+send_locked (#media{fd = Fd, ip = null, port = null, rtpstate = nortp} = Party, #media{ip = I, port = P}, Ip, Port, Msg) when I /= null, port /= null ->
+	gen_udp:send(Fd, I, P, Msg),
+	Party#media{ip = Ip, port = Port, rtpstate=rtp, lastseen=now()};
+send_locked (Party, _, _, _, _) ->
+	Party.
 
 % Define function for safe determinin of starting media
 start_acc (#state{started = false, callid = CallId, mediaid = MediaId, from = #media{rtpstate = rtp}, to = #media{rtpstate = rtp}}) ->
