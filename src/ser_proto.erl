@@ -117,16 +117,9 @@ parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, T
 	};
 
 % Lookup existing session
+% In fact it differs from CMD_U only by the order of tags
 parse_splitted([[$L|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, ToTag, MediaId]) ->
-	{GuessIp, GuessPort} = parse_addr(ProbableIp, ProbablePort),
-	#cmd{
-		type=?CMD_L,
-		callid=CallId,
-		mediaid=parse_media_id(MediaId),
-		from=#party{tag=FromTag},
-		to=#party{tag=ToTag, addr={GuessIp, GuessPort}},
-		params=parse_params(Args)
-	};
+	parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, ToTag, MediaId, FromTag, MediaId]);
 
 % delete session (no MediaIds and no ToTag) - Cancel
 parse_splitted(["D", CallId, FromTag]) ->
