@@ -92,6 +92,9 @@ rh_status_q() {
 	rh_status_verbose >/dev/null 2>&1
 }
 
+# To prevent "File operation error: eacces" issues
+cd /
+
 case "$1" in
     start)
 #        rh_status_q && exit 0
