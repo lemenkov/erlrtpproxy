@@ -260,6 +260,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{to = #media{fd = Fd}, send_fun = Se
 	inet:setopts(Fd, [{active, once}]),
 	{noreply, State#state{from = SendFun(State#state.from, State#state.to, Ip, Port, Msg), started=start_acc(State)}};
 
+% Ping message
 handle_info(ping, #state{from = #media{rtpstate = rtp}, to = #media{rtpstate = rtp}} =  State) ->
 	% Both sides are active, so we just set state to 'nortp' and continue
 	{noreply, State#state{from=(State#state.from)#media{rtpstate=nortp}, to=(State#state.to)#media{rtpstate=nortp}}};
