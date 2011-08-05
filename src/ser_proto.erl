@@ -31,6 +31,8 @@
 -define(RTPPROXY_ERR_SOFTWARE,  " E7\n").
 -define(RTPPROXY_ERR_NOSESSION, " E8\n").
 
+-define(SAFE_PARTY(Val), case Val of null -> null; _ -> #party{tag=Val} end).
+
 parse(Msg,Ip, Port) ->
 	% TODO pass modifiers as atoms (not as string)
 	[Cookie,C|Rest] = string:tokens(Msg, " ;"),
@@ -99,27 +101,19 @@ parse_splitted(["VF", "20090810"]) ->
 	% Support for automatic bridging
 	#cmd{type=?CMD_VF, params="20090810"};
 
-% Update / create session
+% Create session (no ToTag)
 parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId]) ->
-	{GuessIp, GuessPort} = parse_addr(ProbableIp, ProbablePort),
-	#cmd{
-		type=?CMD_U,
-		callid=CallId,
-		mediaid=parse_media_id(MediaId),
-		from=#party{tag=FromTag, addr={GuessIp, GuessPort}},
-		params=parse_params(Args)
-	};
-
+	parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, null, MediaId]);
 % Reinvite, Hold and Resume
 parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, ToTag, MediaId]) ->
 	{GuessIp, GuessPort} = parse_addr(ProbableIp, ProbablePort),
 	#cmd{
-		type=?CMD_U,
-		callid=CallId,
-		mediaid=parse_media_id(MediaId),
-		from=#party{tag=FromTag, addr={GuessIp, GuessPort}},
-		to=#party{tag=ToTag},
-		params=parse_params(Args)
+		type = ?CMD_U,
+		callid = CallId,
+		mediaid	= parse_media_id(MediaId),
+		from = #party{tag=FromTag, addr={GuessIp, GuessPort}},
+		to = ?SAFE_PARTY(ToTag),
+		params	= parse_params(Args)
 	};
 
 % Lookup existing session
@@ -136,38 +130,14 @@ parse_splitted([[$L|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, T
 
 % delete session (no MediaIds and no ToTag) - Cancel
 parse_splitted(["D", CallId, FromTag]) ->
-	#cmd{
-		type=?CMD_D,
-		callid=CallId,
-		from=#party{tag=FromTag}
-	};
-
+	parse_splitted(["D", CallId, FromTag, null]);
 % delete session (no MediaIds) - Bye
 parse_splitted(["D", CallId, FromTag, ToTag]) ->
 	#cmd{
 		type=?CMD_D,
 		callid=CallId,
 		from=#party{tag=FromTag},
-		to=#party{tag=ToTag}
-	};
-
-% Record (obsoleted in favor of Copy)
-% No MediaIds and no ToTag
-parse_splitted(["R", CallId, FromTag]) ->
-	#cmd{
-		type=?CMD_C,
-		callid=CallId,
-		from=#party{tag=FromTag}
-	};
-
-% Record (obsoleted in favor of Copy)
-% No MediaIds
-parse_splitted(["R", CallId, FromTag, ToTag]) ->
-	#cmd{
-		type=?CMD_C,
-		callid=CallId,
-		from=#party{tag=FromTag},
-		to=#party{tag=ToTag}
+		to = ?SAFE_PARTY(ToTag)
 	};
 
 % Playback pre-recorded audio (Music-on-hold and resume, no ToTag)
@@ -203,13 +173,7 @@ parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, MediaId, ToTag, Me
 
 % Stop playback or record (no ToTag)
 parse_splitted(["S", CallId, FromTag, MediaId]) ->
-	#cmd{
-		type=?CMD_S,
-		callid=CallId,
-		mediaid=parse_media_id(MediaId),
-		from=#party{tag=FromTag}
-	};
-
+	parse_splitted(["S", CallId, FromTag, MediaId, null, MediaId]);
 % Stop playback or record
 parse_splitted(["S", CallId, FromTag, MediaId, ToTag, MediaId]) ->
 	#cmd{
@@ -217,9 +181,17 @@ parse_splitted(["S", CallId, FromTag, MediaId, ToTag, MediaId]) ->
 		callid=CallId,
 		mediaid=parse_media_id(MediaId),
 		from=#party{tag=FromTag},
-		to=#party{tag=ToTag}
+		to = ?SAFE_PARTY(ToTag)
 	};
 
+% Record (obsoleted in favor of Copy)
+% No MediaIds and no ToTag
+parse_splitted(["R", CallId, FromTag]) ->
+	parse_splitted(["C", CallId, default, FromTag, "0", null, "0"]);
+% Record (obsoleted in favor of Copy)
+% No MediaIds
+parse_splitted(["R", CallId, FromTag, ToTag]) ->
+	parse_splitted(["C", CallId, default, FromTag, "0", ToTag, "0"]);
 % Copy session (same as record, which is now obsolete)
 parse_splitted(["C", CallId, RecordName, FromTag, MediaId, ToTag, MediaId]) ->
 	#cmd{
@@ -227,7 +199,7 @@ parse_splitted(["C", CallId, RecordName, FromTag, MediaId, ToTag, MediaId]) ->
 		callid=CallId,
 		mediaid=parse_media_id(MediaId),
 		from=#party{tag=FromTag},
-		to=#party{tag=ToTag},
+		to = ?SAFE_PARTY(ToTag),
 		params=[{filename, RecordName}]
 	};
 
@@ -279,7 +251,7 @@ parse_addr(ProbableIp, ProbablePort) ->
 			throw({error_syntax, "Wrong IP"})
 	end.
 
-parse_media_id(ProbableMediaId) ->
+parse_media_id(ProbableMediaId) when is_list(ProbableMediaId) ->
 	try list_to_integer (ProbableMediaId)
 	catch
 		_:_ ->
@@ -460,7 +432,8 @@ parse_cmd_r_1_test() ->
 			callid="0003e348-e21901f6-29cc58a1-379f3ffd@192.168.0.1",
 			mediaid=0,
 			from=#party{tag="0003e348e219767510f1e38f-47c56231"},
-			to=null
+			to=null,
+			params=[{filename, default}]
 		}, parse("393_6 R 0003e348-e21901f6-29cc58a1-379f3ffd@192.168.0.1 0003e348e219767510f1e38f-47c56231", {127,0,0,1}, 1234)).
 
 parse_cmd_r_2_test() ->
@@ -472,7 +445,8 @@ parse_cmd_r_2_test() ->
 			callid="0003e30c-c50c016a-35dc4387-58a65654@192.168.0.100",
 			mediaid=0,
 			from=#party{tag="eb1f1ca7e74cf0fc8a81ea331486452a"},
-			to=#party{tag="0003e30cc50ccbed0342cc8d-0bddf550"}
+			to=#party{tag="0003e30cc50ccbed0342cc8d-0bddf550"},
+			params=[{filename, default}]
 		}, parse("32711_5 R 0003e30c-c50c016a-35dc4387-58a65654@192.168.0.100 eb1f1ca7e74cf0fc8a81ea331486452a 0003e30cc50ccbed0342cc8d-0bddf550", {127,0,0,1}, 1234)).
 
 parse_cmd_p_1_test() ->
