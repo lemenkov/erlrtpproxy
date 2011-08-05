@@ -67,20 +67,6 @@ handle_call(status, _From, #state{calls = Calls} = State) ->
 handle_call(_Message, _From , State) ->
 	{reply, error, State}.
 
-handle_cast(#cmd{type = ?CMD_V, origin = #origin{pid = Pid}} = Cmd, State) ->
-	% Request basic supported rtpproxy protocol version
-	% see available versions here:
-	% http://sippy.git.sourceforge.net/git/gitweb.cgi?p=sippy/rtpproxy;a=blob;f=rtpp_command.c#l58
-	% We, curently, provide only basic functionality
-	gen_server:cast(Pid, {reply, Cmd, {version, "20040107"}}),
-	{noreply, State};
-
-handle_cast(#cmd{type = ?CMD_VF, origin = #origin{pid = Pid}, params=Version} = Cmd, State) ->
-	% Request additional rtpproxy protocol extensions
-	% TODO we should check version capabilities here
-	gen_server:cast(Pid, {reply, Cmd, {supported, Version}}),
-	{noreply, State};
-
 handle_cast(#cmd{type = ?CMD_X, origin = #origin{pid = Pid}} = Cmd, State) ->
 	% stop all active sessions
 	lists:foreach(fun(X) -> gen_server:cast(X#thread.pid, stop) end, State#state.calls),
