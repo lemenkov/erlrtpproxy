@@ -84,11 +84,14 @@ status() ->
 					ok = io:format("~s", [lists:flatten(Ret)]),
 					0;
 				undefined ->
+					ok = io:format("~n"),
 					3
 			catch _:_ ->
+				ok = io:format("~n"),
 				4
 			end;
 		_ ->
+			ok = io:format("~n"),
 			4
 	end,
 	halt(Status).

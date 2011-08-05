@@ -58,7 +58,7 @@
 		fromrtcp,
 		to,
 		tortcp,
-		holdstate=false,
+		hold=false,
 		started=false
 	}
 ).
@@ -120,11 +120,12 @@ init (
 handle_call(?CMD_Q, _From, #state{started = Started} = State) ->
 	% TODO (acquire information about call state)
 %-record(media, {fd=null, ip=null, port=null, rtpstate=rtp, lastseen}).
-%-record(state, {parent, tref, from, fromrtcp, to, tortcp, holdstate=false, started}).
+%-record(state, {parent, tref, from, fromrtcp, to, tortcp, hold=false, started}).
 	% sprintf(buf, "%s %d %lu %lu %lu %lu\n", cookie, spa->ttl, spa->pcount[idx], spa->pcount[NOT(idx)], spa->pcount[2], spa->pcount[3]);
 	Reply = io_lib:format("CallDuration: ~w", [case Started of false -> "<not started yet>"; _ -> trunc(0.5 + timer:now_diff(erlang:now(), Started) / 1000000) end]),
 	{reply, {ok, Reply}, State}.
 
+% FIXME move some logic into frontend - leave here only common part
 handle_cast(
 		#cmd{
 			type = Type,
