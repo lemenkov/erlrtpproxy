@@ -102,6 +102,8 @@ rh_status_q() {
     rh_status >/dev/null 2>&1
 }
 
+# To prevent "File operation error: eacces" issues
+cd /
 
 case "$1" in
     start)
