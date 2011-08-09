@@ -21,8 +21,6 @@
 -author('lemenkov@gmail.com').
 
 -behaviour(gen_server).
--export([start/0]).
--export([start/1]).
 -export([start_link/1]).
 -export([init/1]).
 -export([handle_call/3]).
@@ -36,12 +34,6 @@
 % description of call thread
 -record(thread, {pid=null, id=null}).
 -record(state, {calls=[]}).
-
-start() ->
-	gen_server:start({global, ?MODULE}, ?MODULE, [], []).
-
-start(Args) ->
-	gen_server:start({global, ?MODULE}, ?MODULE, Args, []).
 
 start_link(Args) ->
 	gen_server:start_link({global, ?MODULE}, ?MODULE, Args, []).
