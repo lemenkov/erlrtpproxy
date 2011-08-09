@@ -263,10 +263,27 @@ parse_params(A) ->
 	parse_params(A, []).
 
 parse_params([], Result) ->
-	Result;
+	% Default parameters are - symmetric NAT, non-RFC1918 IPv4 network
+	R1 = case {proplists:get_value(internal, Result), proplists:get_value(external, Result)} of
+		{true, true} ->
+			throw({error_syntax, "Both internal and external modifiers are defined"});
+		{undefined, undefined} ->
+			Result ++ [external];
+		_ ->
+			Result
+	end,
+	R2 = case {proplists:get_value(asymmetric, R1), proplists:get_value(symmetric, R1)} of
+		{true, true} ->
+			throw({error_syntax, "Both symmetric and asymmetric modifiers are defined"});
+		{undefined, undefined} ->
+			R1 ++ [symmetric];
+		_ ->
+			R1
+	end,
+	R2;
 % Asymmetric
 parse_params([$A|Rest], Result) ->
-	parse_params(Rest, Result ++ [asymmetric]);
+	parse_params(Rest, ensure_alone(proplists:delete(symmetric, Result), asymmetric));
 % c0,101,100 - Codecs (a bit tricky)
 parse_params([$C|Rest], Result) ->
 	case string:span(Rest, "0123456789,") of
@@ -280,23 +297,23 @@ parse_params([$C|Rest], Result) ->
 			% http://www.iana.org/assignments/rtp-parameters
 			% http://www.iana.org/assignments/media-types/audio/index.html
 			Codecs = lists:map(fun(X) -> {Y, _} = string:to_integer(X), Y end, string:tokens(string:substr(Rest, 1, Ret), ",")),
-			parse_params(Rest1, Result ++ [{codecs, Codecs}])
+			parse_params(Rest1, ensure_alone(Result, codecs, Codecs))
 	end;
 % IPv6
 parse_params([$6|Rest], Result) ->
-	parse_params(Rest, Result ++ [ipv6]);
+	parse_params(Rest, ensure_alone(Result, ipv6));
 % Internal (RFC1918) network
 parse_params([$I|Rest], Result) ->
-	parse_params(Rest, Result ++ [internal]);
+	parse_params(Rest, ensure_alone(Result, internal));
 % External (non-RFC1918) network
 parse_params([$E|Rest], Result) ->
-	parse_params(Rest, Result ++ [external]);
+	parse_params(Rest, ensure_alone(Result, external));
 % Symmetric
 parse_params([$S|Rest], Result) ->
-	parse_params(Rest, Result ++ [symmetric]);
+	parse_params(Rest, ensure_alone(Result, symmetric));
 % Weak
 parse_params([$W|Rest], Result) ->
-	parse_params(Rest, Result ++ [weak]);
+	parse_params(Rest, ensure_alone(Result, weak));
 % zNN - repacketization, NN in msec, for the most codecs its value should be
 %       in 10ms increments, however for some codecs the increment could differ
 %       (e.g. 30ms for GSM or 20ms for G.723).
@@ -308,15 +325,22 @@ parse_params([$Z|Rest], Result) ->
 		Ret ->
 			Rest1 = string:substr(Rest, Ret + 1),
 			Value = string:to_integer(string:substr(Rest, 1, Ret)),
-			parse_params(Rest1, Result ++ [{repacketize, Value}])
+			parse_params(Rest1, ensure_alone(Result, repacketize, Value))
 	end;
-% Lock
+% l - local address (?)
 parse_params([$L|Rest], Result) ->
-	parse_params(Rest, Result ++ [lock]);
+	parse_params(Rest, ensure_alone(Result, local));
 % r - remote address (?)
+parse_params([$R|Rest], Result) ->
+	parse_params(Rest, ensure_alone(Result, remote));
 parse_params([_|Rest], Result) ->
 	% Unknown parameter - just skip it
 	parse_params(Rest, Result).
+
+ensure_alone(Proplist, Param) ->
+	proplists:delete(Param, Proplist) ++ [Param].
+ensure_alone(Proplist, Param, Value) ->
+	proplists:delete(Param, Proplist) ++ [{Param, Value}].
 
 %%
 %% Tests
@@ -351,7 +375,7 @@ parse_cmd_u_1_test() ->
 			callid="0003e30c-c50c00f7-123e8bd9-542f2edf@192.168.0.100",
 			mediaid=1,
 			from=#party{tag="0003e30cc50cd69210b8c36b-0ecf0120",addr={{192,168,0,100}, 27686}},
-			params=[{codecs,[0,8,18,101]}]
+			params=[{codecs,[0,8,18,101]},external,symmetric]
 		}, parse("24393_4 Uc0,8,18,101 0003e30c-c50c00f7-123e8bd9-542f2edf@192.168.0.100 192.168.0.100 27686 0003e30cc50cd69210b8c36b-0ecf0120;1", {127,0,0,1}, 1234)).
 
 parse_cmd_u_2_test() ->
@@ -363,7 +387,7 @@ parse_cmd_u_2_test() ->
 			callid="e12ea248-94a5e885@192.168.5.3",
 			mediaid=1,
 			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432}},
-			params=[{codecs,[8,0,2,4,18,96,97,98,100,101]}]
+			params=[{codecs,[8,0,2,4,18,96,97,98,100,101]},external,symmetric]
 		}, parse("438_41061 Uc8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
 
 parse_cmd_l_1_test() ->
@@ -376,7 +400,7 @@ parse_cmd_l_1_test() ->
 			mediaid=1,
 			from=#party{tag="8d11d16a3b56fcd588d72b3d359cc4e1",addr={{192,168,100,4}, 17050}},
 			to=#party{tag="e4920d0cb29cf52o0"},
-			params=[{codecs,[0,101,100]}]
+			params=[{codecs,[0,101,100]},external,symmetric]
 		}, parse("413_40797 Lc0,101,100 452ca314-3bbcf0ea@192.168.0.2 192.168.100.4 17050 e4920d0cb29cf52o0;1 8d11d16a3b56fcd588d72b3d359cc4e1;1", {127,0,0,1}, 1234)).
 
 parse_cmd_l_2_test() ->
@@ -389,7 +413,7 @@ parse_cmd_l_2_test() ->
 			mediaid=1,
 			from=#party{tag="60753eabbd87fe6f34068e9d80a9fc1c",addr={{192,168,100,4}, 18756}},
 			to=#party{tag="1372466422"},
-			params=[internal, {codecs,[8,101,100]}]
+			params=[internal, {codecs,[8,101,100]},symmetric]
 		}, parse("418_41111 LIc8,101,100 a68e961-5f6a75e5-356cafd9-3562@192.168.100.6 192.168.100.4 18756 1372466422;1 60753eabbd87fe6f34068e9d80a9fc1c;1", {127,0,0,1}, 1234)).
 
 parse_cmd_d_1_test() ->
