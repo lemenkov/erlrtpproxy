@@ -288,12 +288,12 @@ handle_info(Other, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%
 
 % Define functions for sending RTP/RTCP and updating state
-send_simple (Var1, #media{ip = null, port = null}, Ip, Port, _Msg) ->
+send_simple (Party, #media{ip = null, port = null}, Ip, Port, _Msg) ->
 	% Probably RTP or RTCP, but we CANNOT send yet.
-	Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()};
-send_simple (Var1, Var2, Ip, Port, Msg) ->
-	gen_udp:send(Var1#media.fd, Var2#media.ip, Var2#media.port, Msg),
-	Var1#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()}.
+	Party#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()};
+send_simple (Party, #media{ip = I, port = P}, Ip, Port, Msg) ->
+	gen_udp:send(Party#media.fd, I, P, Msg),
+	Party#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()}.
 
 send_locked (#media{fd = Fd, ip = Ip, port = Port} = Party, #media{ip = I, port = P}, Ip, Port, Msg) when I /= null, port /= null ->
 	gen_udp:send(Fd, I, P, Msg),
