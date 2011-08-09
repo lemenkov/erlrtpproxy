@@ -369,26 +369,26 @@ parse_cmd_u_2_test() ->
 parse_cmd_l_1_test() ->
 	?assertEqual(
 		#cmd{
-			type=?CMD_L,
+			type=?CMD_U,
 			cookie="413_40797",
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="452ca314-3bbcf0ea@192.168.0.2",
 			mediaid=1,
-			from=#party{tag="e4920d0cb29cf52o0"},
-			to=#party{tag="8d11d16a3b56fcd588d72b3d359cc4e1",addr={{192,168,100,4}, 17050}},
+			from=#party{tag="8d11d16a3b56fcd588d72b3d359cc4e1",addr={{192,168,100,4}, 17050}},
+			to=#party{tag="e4920d0cb29cf52o0"},
 			params=[{codecs,[0,101,100]}]
 		}, parse("413_40797 Lc0,101,100 452ca314-3bbcf0ea@192.168.0.2 192.168.100.4 17050 e4920d0cb29cf52o0;1 8d11d16a3b56fcd588d72b3d359cc4e1;1", {127,0,0,1}, 1234)).
 
 parse_cmd_l_2_test() ->
 	?assertEqual(
 		#cmd{
-			type=?CMD_L,
+			type=?CMD_U,
 			cookie="418_41111",
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="a68e961-5f6a75e5-356cafd9-3562@192.168.100.6",
 			mediaid=1,
-			from=#party{tag="1372466422"},
-			to=#party{tag="60753eabbd87fe6f34068e9d80a9fc1c",addr={{192,168,100,4}, 18756}},
+			from=#party{tag="60753eabbd87fe6f34068e9d80a9fc1c",addr={{192,168,100,4}, 18756}},
+			to=#party{tag="1372466422"},
 			params=[internal, {codecs,[8,101,100]}]
 		}, parse("418_41111 LIc8,101,100 a68e961-5f6a75e5-356cafd9-3562@192.168.100.6 192.168.100.4 18756 1372466422;1 60753eabbd87fe6f34068e9d80a9fc1c;1", {127,0,0,1}, 1234)).
 
