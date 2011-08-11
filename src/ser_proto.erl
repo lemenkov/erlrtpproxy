@@ -140,7 +140,7 @@ parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, MediaId]) ->
 		callid=CallId,
 		mediaid=parse_media_id(MediaId),
 		from=#party{tag=FromTag},
-		params=parse_playcount(Args) ++ [{filename, PlayName}, {codecs, Codecs}]
+		params=lists:sort(parse_playcount(Args) ++ [{filename, PlayName}, {codecs, Codecs}])
 	};
 % Playback pre-recorded audio (Music-on-hold and resume)
 parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, MediaId, ToTag, MediaId]) ->
@@ -150,7 +150,7 @@ parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, MediaId, ToTag, Me
 		mediaid=parse_media_id(MediaId),
 		from=#party{tag=FromTag},
 		to=#party{tag=ToTag},
-		params=parse_playcount(Args) ++ [{filename, PlayName}, {codecs, Codecs}]
+		params=lists:sort(parse_playcount(Args) ++ [{filename, PlayName}, {codecs, Codecs}])
 	};
 % Playback pre-recorded audio (Music-on-hold and resume)
 parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, MediaId, ToTag, MediaId, ProbableIp, ProbablePort]) ->
@@ -161,7 +161,7 @@ parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, MediaId, ToTag, Me
 		mediaid=parse_media_id(MediaId),
 		from=#party{tag=FromTag},
 		to=#party{tag=ToTag},
-		params=parse_playcount(Args) ++ [{filename, PlayName}, {codecs, Codecs}, {addr, {GuessIp, GuessPort}}]
+		params=lists:sort(parse_playcount(Args) ++ [{filename, PlayName}, {codecs, Codecs}, {addr, {GuessIp, GuessPort}}])
 	};
 
 % Stop playback or record (no ToTag)
@@ -267,20 +267,20 @@ parse_params([], Result) ->
 	R1 = case {proplists:get_value(internal, Result), proplists:get_value(external, Result)} of
 		{true, true} ->
 			throw({error_syntax, "Both internal and external modifiers are defined"});
-		{undefined, undefined} ->
-			Result ++ [external];
+		{true, _} ->
+			proplists:delete(internal, Result) ++ [{external, false}];
 		_ ->
-			Result
+			proplists:delete(external, Result) ++ [{external, true}]
 	end,
 	R2 = case {proplists:get_value(asymmetric, R1), proplists:get_value(symmetric, R1)} of
 		{true, true} ->
 			throw({error_syntax, "Both symmetric and asymmetric modifiers are defined"});
-		{undefined, undefined} ->
-			R1 ++ [symmetric];
+		{true, _} ->
+			proplists:delete(asymmetric, R1) ++ [{symmetric, false}];
 		_ ->
-			R1
+			proplists:delete(symmetric, R1) ++ [{symmetric, true}]
 	end,
-	R2;
+	lists:sort(R2);
 % Asymmetric
 parse_params([$A|Rest], Result) ->
 	parse_params(Rest, ensure_alone(proplists:delete(symmetric, Result), asymmetric));
@@ -375,7 +375,7 @@ parse_cmd_u_1_test() ->
 			callid="0003e30c-c50c00f7-123e8bd9-542f2edf@192.168.0.100",
 			mediaid=1,
 			from=#party{tag="0003e30cc50cd69210b8c36b-0ecf0120",addr={{192,168,0,100}, 27686}},
-			params=[{codecs,[0,8,18,101]},external,symmetric]
+			params=[{codecs,[0,8,18,101]},{external,true},{symmetric,true}]
 		}, parse("24393_4 Uc0,8,18,101 0003e30c-c50c00f7-123e8bd9-542f2edf@192.168.0.100 192.168.0.100 27686 0003e30cc50cd69210b8c36b-0ecf0120;1", {127,0,0,1}, 1234)).
 
 parse_cmd_u_2_test() ->
@@ -387,7 +387,7 @@ parse_cmd_u_2_test() ->
 			callid="e12ea248-94a5e885@192.168.5.3",
 			mediaid=1,
 			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432}},
-			params=[{codecs,[8,0,2,4,18,96,97,98,100,101]},external,symmetric]
+			params=[{codecs,[8,0,2,4,18,96,97,98,100,101]},{external,true},{symmetric,true}]
 		}, parse("438_41061 Uc8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
 
 parse_cmd_l_1_test() ->
@@ -400,7 +400,7 @@ parse_cmd_l_1_test() ->
 			mediaid=1,
 			from=#party{tag="8d11d16a3b56fcd588d72b3d359cc4e1",addr={{192,168,100,4}, 17050}},
 			to=#party{tag="e4920d0cb29cf52o0"},
-			params=[{codecs,[0,101,100]},external,symmetric]
+			params=[{codecs,[0,101,100]},{external,true},{symmetric,true}]
 		}, parse("413_40797 Lc0,101,100 452ca314-3bbcf0ea@192.168.0.2 192.168.100.4 17050 e4920d0cb29cf52o0;1 8d11d16a3b56fcd588d72b3d359cc4e1;1", {127,0,0,1}, 1234)).
 
 parse_cmd_l_2_test() ->
@@ -413,7 +413,7 @@ parse_cmd_l_2_test() ->
 			mediaid=1,
 			from=#party{tag="60753eabbd87fe6f34068e9d80a9fc1c",addr={{192,168,100,4}, 18756}},
 			to=#party{tag="1372466422"},
-			params=[internal, {codecs,[8,101,100]},symmetric]
+			params=[{codecs,[8,101,100]},{external,false},{symmetric,true}]
 		}, parse("418_41111 LIc8,101,100 a68e961-5f6a75e5-356cafd9-3562@192.168.100.6 192.168.100.4 18756 1372466422;1 60753eabbd87fe6f34068e9d80a9fc1c;1", {127,0,0,1}, 1234)).
 
 parse_cmd_d_1_test() ->
@@ -476,7 +476,7 @@ parse_cmd_p_1_test() ->
 			mediaid=1,
 			from=#party{tag="0003e30cc50ccc9f743d4fa6-38d0bd14"},
 			to=null,
-			params=[{playcount, 20}, {filename,"/var/run/tmp/hello_uac.wav"},{codecs,"session"}]
+			params=[{codecs,"session"},{filename,"/var/run/tmp/hello_uac.wav"},{playcount, 20}]
 		}, parse("2154_5 P20 0003e30c-c50c0171-35b90751-013a3ef6@192.168.0.100 /var/run/tmp/hello_uac.wav session 0003e30cc50ccc9f743d4fa6-38d0bd14;1", {127,0,0,1}, 1234)).
 
 parse_cmd_p_2_test() ->
@@ -489,7 +489,7 @@ parse_cmd_p_2_test() ->
 			mediaid=1,
 			from=#party{tag="0003e30cc50ccc5416857d59-357336dc"},
 			to=#party{tag="28d49e51a95d5a31d09b31ccc63c5f4b"},
-			params=[{playcount, 10}, {filename,"/var/tmp/rtpproxy_test/media/01.wav"},{codecs,"session"}]
+			params=[{codecs,"session"},{filename,"/var/tmp/rtpproxy_test/media/01.wav"},{playcount, 10}]
 		}, parse("1389_5 P10 0003e30c-c50c016d-46bbcf2e-6369eecf@192.168.0.100 /var/tmp/rtpproxy_test/media/01.wav session 0003e30cc50ccc5416857d59-357336dc;1 28d49e51a95d5a31d09b31ccc63c5f4b;1", {127,0,0,1}, 1234)).
 
 parse_cmd_s_1_test() ->
