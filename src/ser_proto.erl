@@ -292,11 +292,14 @@ parse_params([$C|Rest], Result) ->
 			parse_params(Rest, Result);
 		Ret ->
 			Rest1 = string:substr(Rest, Ret + 1),
-			% FIXME use atoms instead of numbers where possible
-			% grep "a=rtpmap:" /var/log/messages | sed -e 's,.*a=rtpmap:,,g' | sort | uniq | sort -n
-			% http://www.iana.org/assignments/rtp-parameters
-			% http://www.iana.org/assignments/media-types/audio/index.html
-			Codecs = lists:map(fun(X) -> {Y, _} = string:to_integer(X), Y end, string:tokens(string:substr(Rest, 1, Ret), ",")),
+			% FIXME should we sort codecs at all or should we try to maintain their original order?
+			Codecs = lists:map(fun guess_codec/1,
+				lists:sort(
+					lists:map(fun guess_codec_n/1,
+						string:tokens(string:substr(Rest, 1, Ret), ",")
+					)
+				)
+			),
 			parse_params(Rest1, ensure_alone(Result, codecs, Codecs))
 	end;
 % IPv6
@@ -342,6 +345,33 @@ ensure_alone(Proplist, Param) ->
 ensure_alone(Proplist, Param, Value) ->
 	proplists:delete(Param, Proplist) ++ [{Param, Value}].
 
+% FIXME use atoms instead of numbers where possible
+% grep "a=rtpmap:" /var/log/messages | sed -e 's,.*a=rtpmap:,,g' | sort | uniq | sort -n
+% http://www.iana.org/assignments/rtp-parameters
+% http://www.iana.org/assignments/media-types/audio/index.html
+guess_codec(0) -> {'PCMU',8000,1};
+guess_codec(3) -> {'GSM',8000,1};
+guess_codec(4) -> {'G723',8000,1};
+guess_codec(5) -> {'DVI4',8000,1};
+guess_codec(6) -> {'DVI4',16000,1};
+guess_codec(7) -> {'LPC',8000,1};
+guess_codec(8) -> {'PCMA',8000,1};
+guess_codec(9) -> {'G722',8000,1};
+guess_codec(10) -> {'L16',8000,2}; % FIXME 44100 according to RFC3551, Stereo
+guess_codec(11) -> {'L16',8000,1}; % FIXME 44100 according to RFC3551, Mono
+guess_codec(12) -> {'QCELP',8000,1};
+guess_codec(13) -> {'CN',8000,1};
+guess_codec(14) -> {'MPA',90000,0}; % FIXME 90000 Hz?
+guess_codec(15) -> {'G728',8000,1};
+guess_codec(16) -> {'DVI4',11025,1};
+guess_codec(17) -> {'DVI4',22050,1};
+guess_codec(18) -> {'G729',8000,1}; % FIXME the same as G.729a?
+guess_codec(C) -> C.
+
+guess_codec_n(Codec) ->
+	{Y, _} = string:to_integer(Codec),
+	Y.
+
 %%
 %% Tests
 %%
@@ -375,7 +405,7 @@ parse_cmd_u_1_test() ->
 			callid="0003e30c-c50c00f7-123e8bd9-542f2edf@192.168.0.100",
 			mediaid=1,
 			from=#party{tag="0003e30cc50cd69210b8c36b-0ecf0120",addr={{192,168,0,100}, 27686}},
-			params=[{codecs,[0,8,18,101]},{external,true},{symmetric,true}]
+			params=[{codecs,[{'PCMU',8000,1},{'PCMA',8000,1},{'G729',8000,1},101]},{external,true},{symmetric,true}]
 		}, parse("24393_4 Uc0,8,18,101 0003e30c-c50c00f7-123e8bd9-542f2edf@192.168.0.100 192.168.0.100 27686 0003e30cc50cd69210b8c36b-0ecf0120;1", {127,0,0,1}, 1234)).
 
 parse_cmd_u_2_test() ->
@@ -387,7 +417,7 @@ parse_cmd_u_2_test() ->
 			callid="e12ea248-94a5e885@192.168.5.3",
 			mediaid=1,
 			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432}},
-			params=[{codecs,[8,0,2,4,18,96,97,98,100,101]},{external,true},{symmetric,true}]
+			params=[{codecs,[{'PCMU',8000,1},2,{'G723',8000,1},{'PCMA',8000,1},{'G729',8000,1},96,97,98,100,101]},{external,true},{symmetric,true}]
 		}, parse("438_41061 Uc8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
 
 parse_cmd_l_1_test() ->
@@ -400,7 +430,7 @@ parse_cmd_l_1_test() ->
 			mediaid=1,
 			from=#party{tag="8d11d16a3b56fcd588d72b3d359cc4e1",addr={{192,168,100,4}, 17050}},
 			to=#party{tag="e4920d0cb29cf52o0"},
-			params=[{codecs,[0,101,100]},{external,true},{symmetric,true}]
+			params=[{codecs,[{'PCMU',8000,1},100,101]},{external,true},{symmetric,true}]
 		}, parse("413_40797 Lc0,101,100 452ca314-3bbcf0ea@192.168.0.2 192.168.100.4 17050 e4920d0cb29cf52o0;1 8d11d16a3b56fcd588d72b3d359cc4e1;1", {127,0,0,1}, 1234)).
 
 parse_cmd_l_2_test() ->
@@ -413,7 +443,7 @@ parse_cmd_l_2_test() ->
 			mediaid=1,
 			from=#party{tag="60753eabbd87fe6f34068e9d80a9fc1c",addr={{192,168,100,4}, 18756}},
 			to=#party{tag="1372466422"},
-			params=[{codecs,[8,101,100]},{external,false},{symmetric,true}]
+			params=[{codecs,[{'PCMA',8000,1},100,101]},{external,false},{symmetric,true}]
 		}, parse("418_41111 LIc8,101,100 a68e961-5f6a75e5-356cafd9-3562@192.168.100.6 192.168.100.4 18756 1372466422;1 60753eabbd87fe6f34068e9d80a9fc1c;1", {127,0,0,1}, 1234)).
 
 parse_cmd_d_1_test() ->
