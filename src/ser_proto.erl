@@ -327,7 +327,7 @@ parse_params([$Z|Rest], Result) ->
 			parse_params(Rest, Result);
 		Ret ->
 			Rest1 = string:substr(Rest, Ret + 1),
-			Value = string:to_integer(string:substr(Rest, 1, Ret)),
+			{Value, _} = string:to_integer(string:substr(Rest, 1, Ret)),
 			parse_params(Rest1, ensure_alone(Result, repacketize, Value))
 	end;
 % l - local address (?)
