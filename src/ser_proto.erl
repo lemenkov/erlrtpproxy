@@ -336,6 +336,18 @@ parse_params([$L|Rest], Result) ->
 % r - remote address (?)
 parse_params([$R|Rest], Result) ->
 	parse_params(Rest, ensure_alone(Result, remote));
+% Transcode - unofficial extension
+parse_params([$T|Rest], Result) ->
+	io:format("Transcoding~n"),
+	case string:span(Rest, "0123456789") of
+		0 ->
+			% Bogus - skip incomplete modifier
+			parse_params(Rest, Result);
+		Ret ->
+			Rest1 = string:substr(Rest, Ret + 1),
+			{Value, _} = string:to_integer(string:substr(Rest, 1, Ret)),
+			parse_params(Rest1, ensure_alone(Result, transcode, guess_codec(Value)))
+	end;
 parse_params([_|Rest], Result) ->
 	% Unknown parameter - just skip it
 	parse_params(Rest, Result).
@@ -419,6 +431,64 @@ parse_cmd_u_2_test() ->
 			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432}},
 			params=[{codecs,[{'PCMU',8000,1},2,{'G723',8000,1},{'PCMA',8000,1},{'G729',8000,1},96,97,98,100,101]},{external,true},{symmetric,true}]
 		}, parse("438_41061 Uc8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
+
+parse_cmd_u_3transcode1_test() ->
+	?assertEqual(
+		#cmd{
+			type=?CMD_U,
+			cookie="438_41061",
+			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
+			callid="e12ea248-94a5e885@192.168.5.3",
+			mediaid=1,
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432}},
+			params=[
+				{codecs,[
+						{'PCMU',8000,1},
+						2,
+						{'G723',8000,1},
+						{'PCMA',8000,1},
+						{'G729',8000,1},
+						96,
+						97,
+						98,
+						100,
+						101
+					]
+				},
+				{external,true},
+				{symmetric,true},
+				{transcode,{'G723',8000,1}}
+			]
+		}, parse("438_41061 Uc8,0,2,4,18,96,97,98,100,101t4 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
+
+parse_cmd_u_3transcode2_test() ->
+	?assertEqual(
+		#cmd{
+			type=?CMD_U,
+			cookie="438_41061",
+			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
+			callid="e12ea248-94a5e885@192.168.5.3",
+			mediaid=1,
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432}},
+			params=[
+				{codecs,[
+						{'PCMU',8000,1},
+						2,
+						{'G723',8000,1},
+						{'PCMA',8000,1},
+						{'G729',8000,1},
+						96,
+						97,
+						98,
+						100,
+						101
+					]
+				},
+				{external,true},
+				{symmetric,true},
+				{transcode,{'G723',8000,1}}
+			]
+		}, parse("438_41061 Ut4c8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
 
 parse_cmd_l_1_test() ->
 	?assertEqual(
