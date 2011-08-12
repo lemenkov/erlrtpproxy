@@ -55,6 +55,8 @@ encode(Cmd, {supported, _Version}) ->
 	Cmd#cmd.cookie ++ ?RTPPROXY_VER_SUPPORTED;
 encode(Cmd, ok) ->
 	Cmd#cmd.cookie ++ ?RTPPROXY_OK;
+encode(Cmd, {error, software}) ->
+	Cmd#cmd.cookie ++ ?RTPPROXY_ERR_SOFTWARE;
 encode(Cmd, {error, notfound}) ->
 	Cmd#cmd.cookie ++ ?RTPPROXY_ERR_NOSESSION;
 encode(Cookie, {error, syntax}) ->
