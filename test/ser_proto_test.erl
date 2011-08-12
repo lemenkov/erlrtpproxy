@@ -247,5 +247,11 @@ encode_ok_test() ->
 encode_ip_test() ->
 	?assertEqual("8411_41413 41212 192.168.100.4\n", ser_proto:encode(#cmd{cookie="8411_41413"}, {{192,168,100,4},41212})).
 
+encode_version_basic_test() ->
+	?assertEqual("32031_1 20040107\n", ser_proto:encode(#cmd{cookie="32031_1"}, {version, "20040107"})).
+
+encode_version_supported_test() ->
+	?assertEqual("32031_3 1\n", ser_proto:encode(#cmd{cookie="32031_3"}, {supported, "20081224"})).
+
 -endif.
 
