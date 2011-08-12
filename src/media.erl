@@ -209,29 +209,17 @@ terminate(Reason, #state{callid = CallId, mediaid = MediaId, tref = TimerRef, tr
 
 	?ERR("terminated due to reason [~p]", [Reason]).
 
-handle_info({udp, Fd, Ip, Port, Msg}, #state{tortcp = #media{fd = Fd}, send_fun = SendFun} = State) ->
+handle_info({udp, Fd, Ip, Port, Msg}, #state{fromrtcp = #media{fd = FdFrom}, tortcp = #media{fd = FdTo}, send_fun = SendFun} = State) when Fd == FdFrom; Fd == FdTo ->
 	inet:setopts(Fd, [{active, once}]),
 	% First, we'll try do decode our RCP packet(s)
 	try
 		{ok, Rtcps} = rtcp:decode(Msg),
 		?INFO("RTCP from ~s: ~s", [State#state.callid, lists:map (fun rtp_utils:pp/1, Rtcps)]),
 		Msg2 = rtcp_process (Rtcps),
-		{noreply, State#state{fromrtcp=SendFun(State#state.fromrtcp, State#state.tortcp, Ip, Port, Msg2)}}
-	catch
-		E:C ->
-			rtp_utils:dump_packet(node(), self(), Msg),
-			?ERR("rtcp:decode(...) error ~p:~p", [E,C]),
-			{noreply, State}
-	end;
-
-handle_info({udp, Fd, Ip, Port, Msg}, #state{fromrtcp = #media{fd = Fd}, send_fun = SendFun} = State) ->
-	inet:setopts(Fd, [{active, once}]),
-	% First, we'll try do decode our RCP packet(s)
-	try
-		{ok, Rtcps} = rtcp:decode(Msg),
-		?INFO("RTCP from ~s: ~s", [State#state.callid, lists:map (fun rtp_utils:pp/1, Rtcps)]),
-		Msg2 = rtcp_process (Rtcps),
-		{noreply, State#state{tortcp=SendFun(State#state.tortcp, State#state.fromrtcp, Ip, Port, Msg2)}}
+		case Fd of
+			FdFrom -> {noreply, State#state{tortcp=SendFun(State#state.tortcp, State#state.fromrtcp, Ip, Port, Msg2)}};
+			FdTo -> {noreply, State#state{fromrtcp=SendFun(State#state.fromrtcp, State#state.tortcp, Ip, Port, Msg2)}}
+		end
 	catch
 		E:C ->
 			rtp_utils:dump_packet(node(), self(), Msg),
