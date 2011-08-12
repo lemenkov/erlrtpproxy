@@ -162,16 +162,21 @@ handle_cast(
 			gen_server:cast(Pid, {reply, Cmd, {error, notfound}}),
 			{noreply, State};
 		_ ->
+			SendFun = case proplists:get_value(weak, Params) of
+				true -> fun send_simple/5;
+				_ -> fun send_locked/5
+			end,
+
 			{ok, {I, P}} = inet:sockname(Fd),
 			gen_server:cast(Pid, {reply, Cmd, {I, P}}),
 			case {rtpproxy_utils:is_rfc1918(GuessIp), Dir} of
 				{true, _} ->
 					% FIXME check for bridging between internal (RFC 1918) and public networks
-					{noreply, State};
+					{noreply, State#state{send_fun = SendFun}};
 				{_, from} ->
-					{noreply, State#state{from = From#media{ip=GuessIp, port=GuessPort}}};
+					{noreply, State#state{from = From#media{ip=GuessIp, port=GuessPort}, send_fun = SendFun}};
 				{_, to} ->
-					{noreply, State#state{to = To#media{ip=GuessIp, port=GuessPort}, tag_t = Tag}}
+					{noreply, State#state{to = To#media{ip=GuessIp, port=GuessPort}, tag_t = Tag, send_fun = SendFun}}
 			end
 	end;
 
