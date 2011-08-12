@@ -214,6 +214,7 @@ terminate(Reason, #state{callid = CallId, mediaid = MediaId, tref = TimerRef, tr
 
 	?ERR("terminated due to reason [~p]", [Reason]).
 
+% RTCP processing
 handle_info({udp, Fd, Ip, Port, Msg}, #state{fromrtcp = #media{fd = FdFrom}, tortcp = #media{fd = FdTo}, send_fun = SendFun} = State) when Fd == FdFrom; Fd == FdTo ->
 	inet:setopts(Fd, [{active, once}]),
 	% First, we'll try do decode our RCP packet(s)
