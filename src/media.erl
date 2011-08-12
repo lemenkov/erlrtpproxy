@@ -164,15 +164,14 @@ handle_cast(
 		_ ->
 			{ok, {I, P}} = inet:sockname(Fd),
 			gen_server:cast(Pid, {reply, Cmd, {I, P}}),
-			case rtpproxy_utils:is_rfc1918(GuessIp) of
-				true ->
+			case {rtpproxy_utils:is_rfc1918(GuessIp), Dir} of
+				{true, _} ->
 					% FIXME check for bridging between internal (RFC 1918) and public networks
 					{noreply, State};
-				_ ->
-					case Dir of
-						from -> {noreply, State#state{from = From#media{ip=GuessIp, port=GuessPort}}};
-						to -> {noreply, State#state{to = To#media{ip=GuessIp, port=GuessPort}, tag_t = Tag}}
-					end
+				{_, from} ->
+					{noreply, State#state{from = From#media{ip=GuessIp, port=GuessPort}}};
+				{_, to} ->
+					{noreply, State#state{to = To#media{ip=GuessIp, port=GuessPort}, tag_t = Tag}}
 			end
 	end;
 
