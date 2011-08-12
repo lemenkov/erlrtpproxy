@@ -26,7 +26,7 @@ run: rel
 	chmod 755 ./rel/ser/bin/ser
 	./rel/ser/bin/ser start
 
-test:
+test: all
 	$(REBAR) eunit $(REBAR_FLAGS)
 
 
