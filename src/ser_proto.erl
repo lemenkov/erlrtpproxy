@@ -357,11 +357,12 @@ ensure_alone(Proplist, Param) ->
 ensure_alone(Proplist, Param, Value) ->
 	proplists:delete(Param, Proplist) ++ [{Param, Value}].
 
-% FIXME use atoms instead of numbers where possible
+% FIXME use more atoms instead of numbers where possible
 % grep "a=rtpmap:" /var/log/messages | sed -e 's,.*a=rtpmap:,,g' | sort | uniq | sort -n
 % http://www.iana.org/assignments/rtp-parameters
 % http://www.iana.org/assignments/media-types/audio/index.html
 guess_codec(0) -> {'PCMU',8000,1};
+% 1 and 2 are reserved
 guess_codec(3) -> {'GSM',8000,1};
 guess_codec(4) -> {'G723',8000,1};
 guess_codec(5) -> {'DVI4',8000,1};
@@ -369,8 +370,8 @@ guess_codec(6) -> {'DVI4',16000,1};
 guess_codec(7) -> {'LPC',8000,1};
 guess_codec(8) -> {'PCMA',8000,1};
 guess_codec(9) -> {'G722',8000,1};
-guess_codec(10) -> {'L16',8000,2}; % FIXME 44100 according to RFC3551, Stereo
-guess_codec(11) -> {'L16',8000,1}; % FIXME 44100 according to RFC3551, Mono
+guess_codec(10) -> {'L16',8000,2}; % FIXME 44100 according to RFC3551
+guess_codec(11) -> {'L16',8000,1}; % FIXME 44100 according to RFC3551
 guess_codec(12) -> {'QCELP',8000,1};
 guess_codec(13) -> {'CN',8000,1};
 guess_codec(14) -> {'MPA',90000,0}; % FIXME 90000 Hz?
