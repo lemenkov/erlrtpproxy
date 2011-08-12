@@ -340,7 +340,6 @@ parse_params([$R|Rest], Result) ->
 	parse_params(Rest, ensure_alone(Result, remote));
 % Transcode - unofficial extension
 parse_params([$T|Rest], Result) ->
-	io:format("Transcoding~n"),
 	case string:span(Rest, "0123456789") of
 		0 ->
 			% Bogus - skip incomplete modifier
