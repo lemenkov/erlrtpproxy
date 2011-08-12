@@ -59,7 +59,7 @@
 		to,
 		tortcp,
 		hold=false,
-		send_fun=send_locked,
+		send_fun,
 		started=false
 	}
 ).
