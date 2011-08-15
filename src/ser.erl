@@ -46,42 +46,46 @@ init (_Unused) ->
 
 	pong = net_adm:ping(RtpproxyNode),
 
+	% Ping every second
+	{ok, TRef} = timer:send_interval(1000, ping),
+
 	case gen_udp:open(Port, [{ip, Ip}, {active, true}, list]) of
 		{ok, Fd} ->
 			?INFO("started at [~s:~w]", [inet_parse:ntoa(Ip), Port]),
-			{ok, Fd};
+			{ok, {Fd, TRef, online}};
 		{error, Reason} ->
 			?ERR("interface not started. Reason [~p]", [Reason]),
 			{stop, Reason}
 	end.
 
-handle_call(_Other, _From, Fd) ->
-	{noreply, Fd}.
+handle_call(_Other, _From, State) ->
+	{noreply, State}.
 
 % Got two addresses (initial Media stream creation)
-handle_cast({reply, #cmd{origin = #origin{type = ser, ip = Ip, port = Port}} = Cmd, Answer, _}, Fd) ->
+handle_cast({reply, #cmd{origin = #origin{type = ser, ip = Ip, port = Port}} = Cmd, Answer, _}, {Fd, _, _} = State) ->
 	Data = ser_proto:encode(Cmd, Answer),
 	gen_udp:send(Fd, Ip, Port, Data),
-	{noreply, Fd};
+	{noreply, State};
 % TODO deprecate this case
-handle_cast({reply, #cmd{origin = #origin{type = ser, ip = Ip, port = Port}} = Cmd, Answer}, Fd) ->
+handle_cast({reply, #cmd{origin = #origin{type = ser, ip = Ip, port = Port}} = Cmd, Answer}, {Fd, _, _} = State) ->
 	Data = ser_proto:encode(Cmd, Answer),
 	gen_udp:send(Fd, Ip, Port, Data),
-	{noreply, Fd};
+	{noreply, State};
 
-handle_cast(_Request, Fd) ->
-	{noreply, Fd}.
+handle_cast(_Request, State) ->
+	{noreply, State}.
 
-code_change(_OldVsn, Fd, _Extra) ->
-	{ok, Fd}.
+code_change(_OldVsn, State, _Extra) ->
+	{ok, State}.
 
-terminate(Reason, Fd) ->
+terminate(Reason, {Fd, TRef}) ->
 	gen_udp:close(Fd),
+	timer:cancel(TRef),
 	?ERR("thread terminated due to reason [~p]", [Reason]).
 
 % Fd from which message arrived must be equal to Fd from our state
 % Brief introduction of protocol is here: http://rtpproxy.org/wiki/RTPproxyProtocol
-handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
+handle_info({udp, Fd, Ip, Port, Msg}, {Fd, _, Online} = State) ->
 	try ser_proto:parse(Msg, Ip, Port) of
 		#cmd{type = ?CMD_V} = Cmd ->
 			% Request basic supported rtpproxy protocol version
@@ -97,9 +101,13 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 			?INFO("SER cmd: ~p", [Cmd]),
 			Data = ser_proto:encode(Cmd, {supported, Version}),
 			gen_udp:send(Fd, Ip, Port, Data);
-		Cmd ->
+		Cmd when Online == online ->
 			?INFO("SER cmd: ~p", [Cmd]),
-			gen_server:cast({global, rtpproxy}, Cmd)
+			gen_server:cast({global, rtpproxy}, Cmd);
+		Cmd when Online == offline ->
+			?INFO("SER cmd: ~p", [Cmd]),
+			Data = ser_proto:encode(Cmd, {error, software}),
+			gen_udp:send(Fd, Ip, Port, Data)
 	catch
 		throw:{error_syntax, Error} ->
 			?ERR("Bad syntax. [~s -> ~s]~n", [Msg, Error]),
@@ -112,8 +120,15 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 			Data = ser_proto:encode(Cookie, {error, syntax}),
 			gen_udp:send(Fd, Ip, Port, Data)
 	end,
-	{noreply, Fd};
+	{noreply, State};
 
-handle_info(Info, Fd) ->
+handle_info(ping, {Fd, TRef, _}) ->
+	{ok, RtpproxyNode} = application:get_env(?MODULE, rtpproxy_node),
+	case net_adm:ping(RtpproxyNode) of
+		pong -> {noreply, {Fd, TRef, online}};
+		pang -> {noreply, {Fd, TRef, offline}}
+	end;
+
+handle_info(Info, State) ->
 	?WARN("Info [~w]", [Info]),
-	{noreply, Fd}.
+	{noreply, State}.
