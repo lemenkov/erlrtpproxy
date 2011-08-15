@@ -111,13 +111,11 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, _, Online} = State) ->
 	catch
 		throw:{error_syntax, Error} ->
 			?ERR("Bad syntax. [~s -> ~s]~n", [Msg, Error]),
-			[Cookie|_Rest] = string:tokens(Msg, " ;"),
-			Data = ser_proto:encode(Cookie, {error, syntax}),
+			Data = ser_proto:encode(Msg, {error, syntax}),
 			gen_udp:send(Fd, Ip, Port, Data);
 		E:C ->
 			?ERR("Exception. [~s -> ~p:~p]~n", [Msg, E, C]),
-			[Cookie|_Rest] = string:tokens(Msg, " ;"),
-			Data = ser_proto:encode(Cookie, {error, syntax}),
+			Data = ser_proto:encode(Msg, {error, syntax}),
 			gen_udp:send(Fd, Ip, Port, Data)
 	end,
 	{noreply, State};

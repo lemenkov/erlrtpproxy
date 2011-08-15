@@ -254,7 +254,7 @@ encode_version_supported_test() ->
 	?assertEqual("32031_3 1\n", ser_proto:encode(#cmd{cookie="32031_3"}, {supported, "20081224"})).
 
 encode_error_syntax_test() ->
-	?assertEqual("32098_3 E1\n", ser_proto:encode("32098_3", {error, syntax})).
+	?assertEqual("32098_3 E1\n", ser_proto:encode("32098_3 hello there - some invalid command string", {error, syntax})).
 
 encode_error_software_test() ->
 	?assertEqual("24393_4 E7\n", ser_proto:encode(#cmd{cookie="24393_4"}, {error, software})).
