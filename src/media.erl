@@ -59,7 +59,8 @@
 		to,
 		tortcp,
 		hold=false,
-		send_fun,
+		send_fun_f,
+		send_fun_t,
 		started=false
 	}
 ).
@@ -120,7 +121,7 @@ init (
 			fromrtcp= #media{fd=Fd1},
 			to	= #media{fd=Fd2},
 			tortcp	= #media{fd=Fd3},
-			send_fun= SendFun
+			send_fun_f= SendFun
 		}
 	}.
 
@@ -170,13 +171,16 @@ handle_cast(
 			{ok, {I, P}} = inet:sockname(Fd),
 			gen_server:cast(Pid, {reply, Cmd, {I, P}}),
 			case {rtpproxy_utils:is_rfc1918(GuessIp), Dir} of
-				{true, _} ->
+				{true, from} ->
 					% FIXME check for bridging between internal (RFC 1918) and public networks
-					{noreply, State#state{send_fun = SendFun}};
+					{noreply, State#state{send_fun_f = SendFun}};
+				{true, to} ->
+					% FIXME check for bridging between internal (RFC 1918) and public networks
+					{noreply, State#state{send_fun_t = SendFun}};
 				{_, from} ->
-					{noreply, State#state{from = From#media{ip=GuessIp, port=GuessPort}, send_fun = SendFun}};
+					{noreply, State#state{from = From#media{ip=GuessIp, port=GuessPort}, send_fun_f = SendFun}};
 				{_, to} ->
-					{noreply, State#state{to = To#media{ip=GuessIp, port=GuessPort}, tag_t = Tag, send_fun = SendFun}}
+					{noreply, State#state{to = To#media{ip=GuessIp, port=GuessPort}, tag_t = Tag, send_fun_t = SendFun}}
 			end
 	end;
 
@@ -215,7 +219,7 @@ terminate(Reason, #state{callid = CallId, mediaid = MediaId, tref = TimerRef, tr
 	?ERR("terminated due to reason [~p]", [Reason]).
 
 % RTCP processing
-handle_info({udp, Fd, Ip, Port, Msg}, #state{fromrtcp = #media{fd = FdFrom}, tortcp = #media{fd = FdTo}, send_fun = SendFun} = State) when Fd == FdFrom; Fd == FdTo ->
+handle_info({udp, Fd, Ip, Port, Msg}, #state{fromrtcp = #media{fd = FdFrom}, tortcp = #media{fd = FdTo}, send_fun_f = SendFunF, send_fun_t = SendFunT} = State) when Fd == FdFrom; Fd == FdTo ->
 	inet:setopts(Fd, [{active, once}]),
 	% First, we'll try do decode our RCP packet(s)
 	try
@@ -223,8 +227,8 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fromrtcp = #media{fd = FdFrom}, tor
 		?INFO("RTCP from ~s: ~s", [State#state.callid, lists:map (fun rtp_utils:pp/1, Rtcps)]),
 		Msg2 = rtcp_process (Rtcps),
 		case Fd of
-			FdFrom -> {noreply, State#state{tortcp=SendFun(State#state.tortcp, State#state.fromrtcp, Ip, Port, Msg2)}};
-			FdTo -> {noreply, State#state{fromrtcp=SendFun(State#state.fromrtcp, State#state.tortcp, Ip, Port, Msg2)}}
+			FdFrom -> {noreply, State#state{tortcp=SendFunT(State#state.tortcp, State#state.fromrtcp, Ip, Port, Msg2)}};
+			FdTo -> {noreply, State#state{fromrtcp=SendFunF(State#state.fromrtcp, State#state.tortcp, Ip, Port, Msg2)}}
 		end
 	catch
 		E:C ->
@@ -241,11 +245,11 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fromrtcp = #media{fd = FdFrom}, tor
 
 % TODO check that message was arrived from valid {Ip, Port}
 % TODO check whether message is valid rtp stream
-handle_info({udp, Fd, Ip, Port, Msg}, #state{from = #media{fd = Fd}, send_fun = SendFun} = State) ->
+handle_info({udp, Fd, Ip, Port, Msg}, #state{from = #media{fd = Fd}, send_fun_f = SendFun} = State) ->
 	inet:setopts(Fd, [{active, once}]),
 	{noreply, State#state{to = SendFun(State#state.to, State#state.from, Ip, Port, Msg), started=start_acc(State)}};
 
-handle_info({udp, Fd, Ip, Port, Msg}, #state{to = #media{fd = Fd}, send_fun = SendFun} = State) ->
+handle_info({udp, Fd, Ip, Port, Msg}, #state{to = #media{fd = Fd}, send_fun_t = SendFun} = State) ->
 	inet:setopts(Fd, [{active, once}]),
 	{noreply, State#state{from = SendFun(State#state.from, State#state.to, Ip, Port, Msg), started=start_acc(State)}};
 
