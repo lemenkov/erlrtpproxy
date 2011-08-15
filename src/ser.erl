@@ -120,11 +120,17 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, _, Online} = State) ->
 	end,
 	{noreply, State};
 
-handle_info(ping, {Fd, TRef, _}) ->
+handle_info(ping, {Fd, TRef, Online}) ->
 	{ok, RtpproxyNode} = application:get_env(?MODULE, rtpproxy_node),
 	case net_adm:ping(RtpproxyNode) of
-		pong -> {noreply, {Fd, TRef, online}};
-		pang -> {noreply, {Fd, TRef, offline}}
+		pong when Online == offline ->
+			?WARN("Connection to erlrtpproxy restored.~n", []),
+			{noreply, {Fd, TRef, online}};
+		pong ->
+			{noreply, {Fd, TRef, online}};
+		pang ->
+			?ERR("Lost connection to erlrtpproxy.~n", []),
+			{noreply, {Fd, TRef, offline}}
 	end;
 
 handle_info(Info, State) ->
