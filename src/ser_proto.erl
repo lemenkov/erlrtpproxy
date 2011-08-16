@@ -34,7 +34,6 @@
 -define(SAFE_PARTY(Val), case Val of null -> null; _ -> #party{tag=Val} end).
 
 parse(Msg,Ip, Port) ->
-	% TODO pass modifiers as atoms (not as string)
 	[Cookie,C|Rest] = string:tokens(Msg, " ;"),
 	Cmd = parse_splitted([string:to_upper(C)|Rest]),
 	Cmd#cmd{
