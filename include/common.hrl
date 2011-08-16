@@ -10,7 +10,7 @@
 	}).
 
 -record(origin, {type, pid, ip, port}).
--record(party, {tag, addr=null, rtcpaddr=null}).
+-record(party, {tag, addr=null, rtcpaddr=null, proto=udp}).
 
 -define(CMD_U, message_u).
 -define(CMD_D, message_d).
