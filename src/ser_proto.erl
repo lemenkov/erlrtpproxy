@@ -34,7 +34,9 @@
 -define(SAFE_PARTY(Val), case Val of null -> null; _ -> #party{tag=Val} end).
 
 parse(Msg,Ip, Port) ->
-	[Cookie,C|Rest] = string:tokens(Msg, " ;"),
+	% Drop accidental zeroes - OpenSIPs inserts them sometimes
+	% FIXME bug in OpenSIPS?
+	[Cookie,C|Rest] = string:tokens([X || X <-  Msg, X /= 0], " ;"),
 	Cmd = parse_splitted([string:to_upper(C)|Rest]),
 	Cmd#cmd{
 		cookie=Cookie,
