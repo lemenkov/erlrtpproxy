@@ -111,13 +111,14 @@ parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId]) 
 % Reinvite, Hold and Resume
 parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, ToTag, MediaId]) ->
 	{GuessIp, GuessPort} = parse_addr(ProbableIp, ProbablePort),
+	Params	= parse_params(Args),
 	#cmd{
 		type = ?CMD_U,
 		callid = CallId,
 		mediaid	= parse_media_id(MediaId),
-		from = #party{tag=FromTag, addr={GuessIp, GuessPort}},
+		from = #party{tag=FromTag, addr={GuessIp, GuessPort}, proto=proplists:get_value(proto, Params, udp)},
 		to = ?SAFE_PARTY(ToTag),
-		params	= parse_params(Args)
+		params= proplists:delete(proto, Params)
 	};
 
 % Lookup existing session
@@ -351,6 +352,17 @@ parse_params([$T|Rest], Result) ->
 			{Value, _} = string:to_integer(string:substr(Rest, 1, Ret)),
 			parse_params(Rest1, ensure_alone(Result, transcode, guess_codec(Value)))
 	end;
+% Protocol - unofficial extension
+parse_params([$P|Rest], Result) ->
+	case string:span(Rest, "0123456789") of
+		0 ->
+			% Bogus - skip incomplete modifier
+			parse_params(Rest, Result);
+		Ret ->
+			Rest1 = string:substr(Rest, Ret + 1),
+			{Value, _} = string:to_integer(string:substr(Rest, 1, Ret)),
+			parse_params(Rest1, ensure_alone(Result, proto, guess_proto(Value)))
+	end;
 parse_params([_|Rest], Result) ->
 	% Unknown parameter - just skip it
 	parse_params(Rest, Result).
@@ -359,6 +371,10 @@ ensure_alone(Proplist, Param) ->
 	proplists:delete(Param, Proplist) ++ [Param].
 ensure_alone(Proplist, Param, Value) ->
 	proplists:delete(Param, Proplist) ++ [{Param, Value}].
+
+guess_proto(0) -> udp;
+guess_proto(1) -> tcp;
+guess_proto(2) -> sctp.
 
 % FIXME use more atoms instead of numbers where possible
 % grep "a=rtpmap:" /var/log/messages | sed -e 's,.*a=rtpmap:,,g' | sort | uniq | sort -n

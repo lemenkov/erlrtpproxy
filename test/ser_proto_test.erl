@@ -148,6 +148,36 @@ parse_cmd_u4_zeroes_test() ->
 			]
 		}, ser_proto:parse("5958_7 UZ30" ++ [0,0,0] ++ "c34,31 ffe0100519df4bc1bbd2f8e18309ca8a 192.168.170.67 19268 186f101b0e04481ea045517edb93b62d;2", {127,0,0,1}, 1234)).
 
+parse_cmd_u_5_proto_test() ->
+	?assertEqual(
+		#cmd{
+			type=?CMD_U,
+			cookie="438_41061",
+			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
+			callid="e12ea248-94a5e885@192.168.5.3",
+			mediaid=1,
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432}, proto=tcp},
+			params=[
+				{codecs,[
+						{'PCMU',8000,1},
+						2,
+						{'G723',8000,1},
+						{'PCMA',8000,1},
+						{'G729',8000,1},
+						96,
+						97,
+						98,
+						100,
+						101
+					]
+				},
+				{external,true},
+				{symmetric,true},
+				{transcode,{'G723',8000,1}}
+			]
+		}, ser_proto:parse("438_41061 Ut4p1c8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
+
+
 parse_cmd_l_1_test() ->
 	?assertEqual(
 		#cmd{
