@@ -138,8 +138,8 @@ parse_cmd_u4_zeroes_test() ->
 			from=#party{tag="186f101b0e04481ea045517edb93b62d",addr={{192,168,170,67}, 19268}},
 			params=[
 				{codecs,[
-						31,
-						34
+						{'H261',90000,0},
+						{'H263',90000,0}
 					]
 				},
 				{external,true},

@@ -382,6 +382,10 @@ guess_codec(15) -> {'G728',8000,1};
 guess_codec(16) -> {'DVI4',11025,1};
 guess_codec(17) -> {'DVI4',22050,1};
 guess_codec(18) -> {'G729',8000,1}; % FIXME the same as G.729a?
+
+guess_codec(31) -> {'H261',90000,0};
+guess_codec(34) -> {'H263',90000,0};
+
 guess_codec(C) -> C.
 
 guess_codec_n(Codec) ->
