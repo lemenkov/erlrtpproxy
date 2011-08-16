@@ -54,7 +54,17 @@ parse_cmd_u_1_test() ->
 			callid="0003e30c-c50c00f7-123e8bd9-542f2edf@192.168.0.100",
 			mediaid=1,
 			from=#party{tag="0003e30cc50cd69210b8c36b-0ecf0120",addr={{192,168,0,100}, 27686}},
-			params=[{codecs,[{'PCMU',8000,1},{'PCMA',8000,1},{'G729',8000,1},101]},{external,true},{symmetric,true}]
+			params=[
+				{codecs,[
+						{'PCMU',8000,1},
+						{'PCMA',8000,1},
+						{'G729',8000,1},
+						101
+					]
+				},
+				{external,true},
+				{symmetric,true}
+			]
 		}, ser_proto:parse("24393_4 Uc0,8,18,101 0003e30c-c50c00f7-123e8bd9-542f2edf@192.168.0.100 192.168.0.100 27686 0003e30cc50cd69210b8c36b-0ecf0120;1", {127,0,0,1}, 1234)).
 
 parse_cmd_u_2_test() ->
@@ -66,7 +76,23 @@ parse_cmd_u_2_test() ->
 			callid="e12ea248-94a5e885@192.168.5.3",
 			mediaid=1,
 			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432}},
-			params=[{codecs,[{'PCMU',8000,1},2,{'G723',8000,1},{'PCMA',8000,1},{'G729',8000,1},96,97,98,100,101]},{external,true},{symmetric,true}]
+			params=[
+				{codecs,[
+						{'PCMU',8000,1},
+						2,
+						{'G723',8000,1},
+						{'PCMA',8000,1},
+						{'G729',8000,1},
+						96,
+						97,
+						98,
+						100,
+						101
+					]
+				},
+				{external,true},
+				{symmetric,true}
+			]
 		}, ser_proto:parse("438_41061 Uc8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
 
 parse_cmd_u_3transcode1_test() ->
@@ -188,7 +214,16 @@ parse_cmd_l_1_test() ->
 			mediaid=1,
 			from=#party{tag="8d11d16a3b56fcd588d72b3d359cc4e1",addr={{192,168,100,4}, 17050}},
 			to=#party{tag="e4920d0cb29cf52o0"},
-			params=[{codecs,[{'PCMU',8000,1},100,101]},{external,true},{symmetric,true}]
+			params=[
+				{codecs,[
+						{'PCMU',8000,1},
+						100,
+						101
+					]
+				},
+				{external,true},
+				{symmetric,true}
+			]
 		}, ser_proto:parse("413_40797 Lc0,101,100 452ca314-3bbcf0ea@192.168.0.2 192.168.100.4 17050 e4920d0cb29cf52o0;1 8d11d16a3b56fcd588d72b3d359cc4e1;1", {127,0,0,1}, 1234)).
 
 parse_cmd_l_2_test() ->
@@ -201,7 +236,16 @@ parse_cmd_l_2_test() ->
 			mediaid=1,
 			from=#party{tag="60753eabbd87fe6f34068e9d80a9fc1c",addr={{192,168,100,4}, 18756}},
 			to=#party{tag="1372466422"},
-			params=[{codecs,[{'PCMA',8000,1},100,101]},{external,false},{symmetric,true}]
+			params=[
+				{codecs,[
+						{'PCMA',8000,1},
+						100,
+						101
+					]
+				},
+				{external,false},
+				{symmetric,true}
+			]
 		}, ser_proto:parse("418_41111 LIc8,101,100 a68e961-5f6a75e5-356cafd9-3562@192.168.100.6 192.168.100.4 18756 1372466422;1 60753eabbd87fe6f34068e9d80a9fc1c;1", {127,0,0,1}, 1234)).
 
 parse_cmd_d_1_test() ->
@@ -238,7 +282,9 @@ parse_cmd_r_1_test() ->
 			mediaid=0,
 			from=#party{tag="0003e348e219767510f1e38f-47c56231"},
 			to=null,
-			params=[{filename, default}]
+			params=[
+				{filename, default}
+			]
 		}, ser_proto:parse("393_6 R 0003e348-e21901f6-29cc58a1-379f3ffd@192.168.0.1 0003e348e219767510f1e38f-47c56231", {127,0,0,1}, 1234)).
 
 parse_cmd_r_2_test() ->
@@ -251,7 +297,9 @@ parse_cmd_r_2_test() ->
 			mediaid=0,
 			from=#party{tag="eb1f1ca7e74cf0fc8a81ea331486452a"},
 			to=#party{tag="0003e30cc50ccbed0342cc8d-0bddf550"},
-			params=[{filename, default}]
+			params=[
+				{filename, default}
+			]
 		}, ser_proto:parse("32711_5 R 0003e30c-c50c016a-35dc4387-58a65654@192.168.0.100 eb1f1ca7e74cf0fc8a81ea331486452a 0003e30cc50ccbed0342cc8d-0bddf550", {127,0,0,1}, 1234)).
 
 parse_cmd_p_1_test() ->
@@ -264,7 +312,11 @@ parse_cmd_p_1_test() ->
 			mediaid=1,
 			from=#party{tag="0003e30cc50ccc9f743d4fa6-38d0bd14"},
 			to=null,
-			params=[{codecs,"session"},{filename,"/var/run/tmp/hello_uac.wav"},{playcount, 20}]
+			params=[
+				{codecs,"session"},
+				{filename,"/var/run/tmp/hello_uac.wav"},
+				{playcount, 20}
+			]
 		}, ser_proto:parse("2154_5 P20 0003e30c-c50c0171-35b90751-013a3ef6@192.168.0.100 /var/run/tmp/hello_uac.wav session 0003e30cc50ccc9f743d4fa6-38d0bd14;1", {127,0,0,1}, 1234)).
 
 parse_cmd_p_2_test() ->
@@ -277,7 +329,11 @@ parse_cmd_p_2_test() ->
 			mediaid=1,
 			from=#party{tag="0003e30cc50ccc5416857d59-357336dc"},
 			to=#party{tag="28d49e51a95d5a31d09b31ccc63c5f4b"},
-			params=[{codecs,"session"},{filename,"/var/tmp/rtpproxy_test/media/01.wav"},{playcount, 10}]
+			params=[
+				{codecs,"session"},
+				{filename,"/var/tmp/rtpproxy_test/media/01.wav"},
+				{playcount, 10}
+			]
 		}, ser_proto:parse("1389_5 P10 0003e30c-c50c016d-46bbcf2e-6369eecf@192.168.0.100 /var/tmp/rtpproxy_test/media/01.wav session 0003e30cc50ccc5416857d59-357336dc;1 28d49e51a95d5a31d09b31ccc63c5f4b;1", {127,0,0,1}, 1234)).
 
 parse_cmd_s_1_test() ->
@@ -288,8 +344,7 @@ parse_cmd_s_1_test() ->
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="0003e30c-c50c0171-35b90751-013a3ef6@192.168.0.100",
 			mediaid=1,
-			from=#party{tag="0003e30cc50ccc9f743d4fa6-38d0bd14"},
-			to=null
+			from=#party{tag="0003e30cc50ccc9f743d4fa6-38d0bd14"}
 		}, ser_proto:parse("2154_6 S 0003e30c-c50c0171-35b90751-013a3ef6@192.168.0.100 0003e30cc50ccc9f743d4fa6-38d0bd14;1", {127,0,0,1}, 1234)).
 
 encode_ok_test() ->
