@@ -31,14 +31,8 @@
 
 -include("../include/common.hrl").
 
-% Milliseconds
--define(RTP_TIME_TO_LIVE, 150000).
-
-% Microseconds
--define(RTCP_TIME_TO_LIVE, 10000000).
-
-% Milliseconds
--define(INTERIM_UPDATE, 30000).
+% Milliseconds - 105 seconds
+-define(RTP_TIME_TO_LIVE, 105000).
 
 %-include("rtcp.hrl").
 
@@ -46,22 +40,18 @@
 % * fd - our fd, where we will receive messages from other side
 % * ip - real client's ip
 % * port - real client's port
--record(media, {fd=null, ip=null, port=null, rtpstate=nortp, lastseen, ssrc=null}).
+-record(media, {pid=null, ip=null, port=null, rtpstate=nortp}).
 -record(state, {
 		callid,
 		mediaid,
 		tag_f,
 		tag_t,
 		tref,
-		tref2,
 		from,
 		fromrtcp,
 		to,
 		tortcp,
-		hold=false,
-		send_fun_f,
-		send_fun_t,
-		started=false
+		started = false
 	}
 ).
 
@@ -81,33 +71,40 @@ init (
 	% TODO just choose the first IP address for now
 	[MainIp | _Rest ]  = rtpproxy_utils:get_ipaddrs(),
 	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE, ping),
-%	{ok, TRef} = timer:send_interval(?CALL_TIME_TO_LIVE*5, timeout),
-	{ok, TRef2} = timer:send_interval(?INTERIM_UPDATE, interim_update),
 
 	{Fd0, Fd1, Fd2, Fd3} = rtpproxy_utils:get_fd_quadruple(MainIp),
 
 	[P0, P1, P2, P3]  = lists:map(fun(X) -> {ok, {_I, P}} = inet:sockname(X), P end, [Fd0, Fd1, Fd2, Fd3]),
-	?INFO("started at ~s, with  F {~p,~p} T {~p,~p}", [inet_parse:ntoa(MainIp), P0, P1, P2, P3]),
+	?INFO("~s started at ~s, with  F {~p,~p} T {~p,~p}", [CallId, inet_parse:ntoa(MainIp), P0, P1, P2, P3]),
+
+	Weak = proplists:get_value(weak, Params),
+	Symmetric = proplists:get_value(symmetric, Params),
+
+	{ok, {I0, P0}} = inet:sockname(Fd0),
+	{ok, {I1, P1}} = inet:sockname(Fd1),
+	{ok, {I2, P2}} = inet:sockname(Fd2),
+	{ok, {I3, P3}} = inet:sockname(Fd3),
+	gen_server:cast(Pid, {reply, Cmd, {I0, P0}, {I2, P2}}),
+
+	% FIXME use start (w/o linking)
+	{ok, Pid0} = gen_rtp_socket:start_link([self(), Fd0, udp, rtp, [{weak, Weak}, {symmetric, Symmetric}]]),
+	{ok, Pid1} = gen_rtp_socket:start_link([self(), Fd1, udp, rtcp, []]),
+	{ok, Pid2} = gen_rtp_socket:start_link([self(), Fd2, udp, rtp, [{weak, Weak}, {symmetric, Symmetric}, {ip, GuessIp}, {port, GuessPort}]]),
+	{ok, Pid3} = gen_rtp_socket:start_link([self(), Fd3, udp, rtcp, []]),
+
+	gen_udp:controlling_process(Fd0, Pid0),
+	gen_udp:controlling_process(Fd1, Pid1),
+	gen_udp:controlling_process(Fd2, Pid2),
+	gen_udp:controlling_process(Fd3, Pid3),
+
+	gen_server:call(Pid0, {neighbour, Pid2}),
+	gen_server:call(Pid2, {neighbour, Pid0}),
+
+	gen_server:call(Pid1, {neighbour, Pid3}),
+	gen_server:call(Pid3, {neighbour, Pid1}),
 
 	% Register at the rtpproxy
 	gen_server:cast({global, rtpproxy}, {created, self(), {CallId, MediaId}}),
-
-	SendFun = case proplists:get_value(weak, Params) of
-		true -> fun send_simple/5;
-		_ -> fun send_locked/5
-	end,
-
-	{ok, {I0, P0}} = inet:sockname(Fd0),
-	{ok, {I2, P2}} = inet:sockname(Fd2),
-	gen_server:cast(Pid, {reply, Cmd, {I0, P0}, {I2, P2}}),
-
-	FromRtp = case rtpproxy_utils:is_rfc1918(GuessIp) of
-		true ->
-			% FIXME check for bridging between internal (RFC 1918) and public networks
-			#media{fd=Fd0};
-		_ ->
-			#media{fd=Fd0, ip=GuessIp, port=GuessPort}
-	end,
 
 	{ok,
 		#state{
@@ -116,19 +113,15 @@ init (
 			tag_f	= TagFrom,
 			tag_t	= null,
 			tref	= TRef,
-			tref2	= TRef2,
-			from	= FromRtp,
-			fromrtcp= #media{fd=Fd1},
-			to	= #media{fd=Fd2},
-			tortcp	= #media{fd=Fd3},
-			send_fun_f= SendFun
+			from	= #media{pid=Pid0, ip=I0, port=P0, rtpstate=nortp},
+			fromrtcp= #media{pid=Pid1, ip=I1, port=P1, rtpstate=nortp},
+			to	= #media{pid=Pid2, ip=I2, port=P2, rtpstate=nortp},
+			tortcp	= #media{pid=Pid3, ip=I3, port=P3, rtpstate=nortp}
 		}
 	}.
 
 handle_call(?CMD_Q, _From, #state{started = Started} = State) ->
 	% TODO (acquire information about call state)
-%-record(media, {fd=null, ip=null, port=null, rtpstate=rtp, lastseen}).
-%-record(state, {parent, tref, from, fromrtcp, to, tortcp, hold=false, started}).
 	% sprintf(buf, "%s %d %lu %lu %lu %lu\n", cookie, spa->ttl, spa->pcount[idx], spa->pcount[NOT(idx)], spa->pcount[2], spa->pcount[3]);
 	Reply = io_lib:format("CallDuration: ~w", [case Started of false -> "<not started yet>"; _ -> trunc(0.5 + timer:now_diff(erlang:now(), Started) / 1000000) end]),
 	{reply, {ok, Reply}, State}.
@@ -146,41 +139,32 @@ handle_cast(
 		#state{
 			callid = CallId,
 			mediaid = MediaId,
-			from = #media{fd=FdF} = From,
-			to = #media{fd=FdT} = To,
+			from = #media{pid = PidF, ip = IpF, port = PortF} = From,
+			to = #media{pid = PidT, ip = IpT, port = PortT} = To,
 			tag_f = TagF,
 			tag_t = TagT} = State
 	) ->
-	{Dir, Fd} = case Tag of
-		TagF -> {from, FdF};
-		TagT -> {to, FdT};
+	{Dir, P, Ip, Port} = case Tag of
+		TagF -> {from, PidT, IpF, PortF};
+		TagT -> {to, PidF, IpT, PortT};
 		% Initial set up of a tag_t
-		_ when TagT == null -> {to, FdT};
-		_ -> {notfound, notfound}
+		_ when TagT == null -> {to, PidF, IpT, PortT};
+		_ -> {notfound, notfound, notfound, notfound}
 	end,
 	case Dir of
 		notfound ->
 			gen_server:cast(Pid, {reply, Cmd, {error, notfound}}),
 			{noreply, State};
 		_ ->
-			SendFun = case proplists:get_value(weak, Params) of
-				true -> fun send_simple/5;
-				_ -> fun send_locked/5
-			end,
+			Weak = proplists:get_value(weak, Params),
+			Symmetric = proplists:get_value(symmetric, Params),
+			gen_server:cast(P, {update, [{weak, Weak}, {symmetric, Symmetric}, {ip, GuessIp}, {port, GuessPort}]}),
 
-			{ok, {I, P}} = inet:sockname(Fd),
-			gen_server:cast(Pid, {reply, Cmd, {I, P}}),
-			case {rtpproxy_utils:is_rfc1918(GuessIp), Dir} of
-				{true, from} ->
-					% FIXME check for bridging between internal (RFC 1918) and public networks
-					{noreply, State#state{send_fun_f = SendFun}};
-				{true, to} ->
-					% FIXME check for bridging between internal (RFC 1918) and public networks
-					{noreply, State#state{send_fun_t = SendFun}};
-				{_, from} ->
-					{noreply, State#state{from = From#media{ip=GuessIp, port=GuessPort}, send_fun_f = SendFun}};
-				{_, to} ->
-					{noreply, State#state{to = To#media{ip=GuessIp, port=GuessPort}, tag_t = Tag, send_fun_t = SendFun}}
+			gen_server:cast(Pid, {reply, Cmd, {Ip, Port}}),
+
+			case Dir of
+				to -> {noreply, State#state{tag_t = Tag}};
+				_ -> {noreply, State}
 			end
 	end;
 
@@ -200,58 +184,83 @@ handle_cast(
 		_ -> {stop, bye, State}
 	end;
 
-handle_cast(Other, State) ->
-	?WARN("Other cast [~p], State [~p]", [Other, State]),
+handle_cast({start, Pid}, #state{
+		callid = CallID,
+		mediaid = MediaID,
+		from = #media{pid = PidF, rtpstate = SF} = From,
+		to = #media{pid = PidT, rtpstate = ST} = To
+	} = State)  when Pid == PidF; Pid == PidT ->
+	{SF1, ST1} = case Pid of
+		PidF -> {rtp, ST};
+		PidT -> {SF, rtp}
+	end,
+	case (SF1 == rtp) and (ST1 == rtp) of
+		true -> gen_server:cast(rtpproxy_radius, {start, CallID, MediaID});
+		_ -> ok
+	end,
+	{noreply, State#state{
+			started = (SF1 == rtp) and (ST1 == rtp),
+			from = From#media{rtpstate=SF1},
+			to = To#media{rtpstate=ST1}
+		}
+	};
+
+handle_cast({interim_update, Pid}, #state{
+		callid = CallID,
+		mediaid = MediaID,
+		from = #media{pid = PidF, rtpstate = SF} = From,
+		to = #media{pid = PidT, rtpstate = ST} = To,
+		started = true
+	} = State) when Pid == PidF; Pid == PidT ->
+	% Both sides are active, so we need to send interim update here
+	gen_server:cast(rtpproxy_radius, {interim_update, CallID, MediaID}),
+	{SF1, ST1} = case Pid of
+		PidF -> {rtp, ST};
+		PidT -> {SF, rtp}
+	end,
+	{noreply, State#state{
+			from = From#media{rtpstate=SF1},
+			to = To#media{rtpstate=ST1}
+		}
+	};
+
+handle_cast({stop, Pid, Reason}, #state{
+		from = #media{pid = PidF, rtpstate = SF} = From,
+		to = #media{pid = PidT, rtpstate = ST} = To
+	} = State) when Pid == PidF; Pid == PidT ->
+	{SF1, ST1} = case Pid of
+		PidF -> {nortp, ST};
+		PidT -> {SF, nortp}
+	end,
+	case (SF1 == nortp) and (ST1 == nortp) of
+		true -> {stop, stop, State};
+		_ -> {noreply, State#state{
+					from = From#media{rtpstate=SF1},
+					to = To#media{rtpstate=ST1}
+				}
+			}
+	end;
+
+handle_cast({rtcp, Rtcps, From, To}, State) ->
+	?INFO("RTCP from ~s: ~s", [State#state.callid, lists:map (fun rtp_utils:pp/1, Rtcps)]),
+	gen_server:cast(To, {rtcp, Rtcps}),
+	{noreply, State};
+
+handle_cast(_Other, State) ->
 	{noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, #state{callid = CallId, mediaid = MediaId, tref = TimerRef, tref2 = TimerRef2, from = From, fromrtcp = FromRtcp, to = To, tortcp = ToRtcp}) ->
+terminate(Reason, #state{callid = CallId, mediaid = MediaId, tref = TimerRef, from = From, fromrtcp = FromRtcp, to = To, tortcp = ToRtcp}) ->
 	timer:cancel(TimerRef),
-	timer:cancel(TimerRef2),
 	% TODO we should send RTCP BYE here
-	lists:map(fun (X) -> gen_udp:close(X#media.fd) end, [From, FromRtcp, To, ToRtcp]),
+	lists:map(fun (X) -> gen_server:cast(X#media.pid, stop) end, [From, FromRtcp, To, ToRtcp]),
 
 	gen_server:cast({global, rtpproxy}, {'EXIT', self(), Reason}),
 	gen_server:cast(rtpproxy_radius, {stop, CallId, MediaId}),
 
 	?ERR("terminated due to reason [~p]", [Reason]).
-
-% RTCP processing
-handle_info({udp, Fd, Ip, Port, Msg}, #state{fromrtcp = #media{fd = FdFrom}, tortcp = #media{fd = FdTo}, send_fun_f = SendFunF, send_fun_t = SendFunT} = State) when Fd == FdFrom; Fd == FdTo ->
-	inet:setopts(Fd, [{active, once}]),
-	% First, we'll try do decode our RCP packet(s)
-	try
-		{ok, Rtcps} = rtcp:decode(Msg),
-		?INFO("RTCP from ~s: ~s", [State#state.callid, lists:map (fun rtp_utils:pp/1, Rtcps)]),
-		Msg2 = rtcp_process (Rtcps),
-		case Fd of
-			FdFrom -> {noreply, State#state{tortcp=SendFunT(State#state.tortcp, State#state.fromrtcp, Ip, Port, Msg2)}};
-			FdTo -> {noreply, State#state{fromrtcp=SendFunF(State#state.fromrtcp, State#state.tortcp, Ip, Port, Msg2)}}
-		end
-	catch
-		E:C ->
-			rtp_utils:dump_packet(node(), self(), Msg),
-			?ERR("rtcp:decode(...) error ~p:~p", [E,C]),
-			{noreply, State}
-	end;
-
-% We received UDP-data on From or To socket, so we must send in from To or From socket respectively
-% (if we not in HOLD state)
-% (symmetric NAT from the client's PoV)
-% We must ignore previous state ('rtp' or 'nortp') and set it to 'rtp'
-% We use Ip and Port as address for future messages to FdTo or FdFrom
-
-% TODO check that message was arrived from valid {Ip, Port}
-% TODO check whether message is valid rtp stream
-handle_info({udp, Fd, Ip, Port, Msg}, #state{from = #media{fd = Fd}, send_fun_f = SendFun} = State) ->
-	inet:setopts(Fd, [{active, once}]),
-	{noreply, State#state{to = SendFun(State#state.to, State#state.from, Ip, Port, Msg), started=start_acc(State)}};
-
-handle_info({udp, Fd, Ip, Port, Msg}, #state{to = #media{fd = Fd}, send_fun_t = SendFun} = State) ->
-	inet:setopts(Fd, [{active, once}]),
-	{noreply, State#state{from = SendFun(State#state.from, State#state.to, Ip, Port, Msg), started=start_acc(State)}};
 
 % Ping message
 handle_info(ping, #state{from = #media{rtpstate = rtp}, to = #media{rtpstate = rtp}} =  State) ->
@@ -269,67 +278,7 @@ handle_info(ping, State) ->
 %	end
 	{stop, nortp, State};
 
-% Interim update
-handle_info(interim_update, #state{callid = CallId, mediaid = MediaId, from = #media{rtpstate = rtp}, to = #media{rtpstate = rtp}} =  State) ->
-	% Both sides are active, so we need to send interim update here
-	gen_server:cast(rtpproxy_radius, {interim_update, CallId, MediaId}),
-	{noreply, State};
-
-
 handle_info(Other, State) ->
 	?WARN("Other Info [~p], State [~p]", [Other, State]),
 	{noreply, State}.
-
-%%%%%%%%%%%%%%%%%%%%%%%%
-%% Internal functions %%
-%%%%%%%%%%%%%%%%%%%%%%%%
-
-% Define functions for sending RTP/RTCP and updating state
-send_simple (Party, #media{ip = null, port = null}, Ip, Port, _Msg) ->
-	% Probably RTP or RTCP, but we CANNOT send yet.
-	Party#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()};
-send_simple (Party, #media{ip = I, port = P}, Ip, Port, Msg) ->
-	gen_udp:send(Party#media.fd, I, P, Msg),
-	Party#media{ip=Ip, port=Port, rtpstate=rtp, lastseen=now()}.
-
-send_locked (#media{fd = Fd, ip = Ip, port = Port} = Party, #media{ip = I, port = P}, Ip, Port, Msg) when I /= null, port /= null ->
-	gen_udp:send(Fd, I, P, Msg),
-	Party#media{rtpstate=rtp, lastseen=now()};
-send_locked (#media{fd = Fd, ip = null, port = null, rtpstate = nortp} = Party, #media{ip = null, port = null, rtpstate = nortp}, Ip, Port, Msg) ->
-	% Probably RTP or RTCP, but we CANNOT send yet.
-	Party#media{ip = Ip, port = Port, rtpstate=rtp, lastseen=now()};
-send_locked (#media{fd = Fd, ip = null, port = null, rtpstate = nortp} = Party, #media{ip = I, port = P}, Ip, Port, Msg) when I /= null, port /= null ->
-	gen_udp:send(Fd, I, P, Msg),
-	Party#media{ip = Ip, port = Port, rtpstate=rtp, lastseen=now()};
-send_locked (Party, _, _, _, _) ->
-	Party.
-
-% Define function for safe determinin of starting media
-start_acc (#state{started = false, callid = CallId, mediaid = MediaId, from = #media{rtpstate = rtp}, to = #media{rtpstate = rtp}}) ->
-	% FIXME perhaps this should be optional
-	gen_server:cast(rtpproxy_radius, {start, CallId, MediaId}),
-	now();
-start_acc (S) ->
-	S#state.started.
-
-rtcp_process (Rtcps) ->
-	rtcp_process (Rtcps, []).
-rtcp_process ([], Rtcps) ->
-	rtcp:encode(Rtcps);
-rtcp_process ([Rtcp | Rest], Processed) ->
-	NewRtcp = case rtp_utils:get_type(Rtcp) of
-		sr -> Rtcp;
-		rr -> Rtcp;
-		sdes -> Rtcp;
-		bye ->
-			?ERR("We SHOULD terminate this stream due to RTCP BYE", []),
-			% Unfortunately, it's not possible due to issues in Asterisk configs
-			% which users are unwilling to fix. So we just warn about it.
-			% Maybe, in the future, we'll reconsider this behaviour.
-			Rtcp;
-		app -> Rtcp;
-		xr -> Rtcp;
-		_ -> Rtcp
-	end,
-	rtcp_process (Rest, Processed ++ [NewRtcp]).
 

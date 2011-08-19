@@ -105,7 +105,8 @@ is_rfc1918({I0,I1,I2,I3} = Ip) when	is_integer(I0), I0 > 0, I0 < 256,
 					is_integer(I3), I3 >= 0, I3 < 256
 				->
 	is_rfc1918_guarded(Ip);
-is_rfc1918(_) ->
+is_rfc1918(Ip) ->
+	?ERR("BAD IPv4 addr ~p", [Ip]),
 	throw({error, "Not a valid IPv4 address"}).
 
 % Loopback (actually, it's not a RFC1918 network)
