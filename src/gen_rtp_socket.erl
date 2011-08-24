@@ -75,34 +75,7 @@ init ([Parent, Transport, Proto, Parameters]) ->
 	% FIXME allow explicitly set address (IP and Port) for both RTP and RTCP sockets
 	SockParams = proplists:get_value(sockparams, Parameters, []),
 	{ok, Fd} = gen_udp:open(0, SockParams),
-	{ok, TRef} = timer:send_interval(?INTERIM_UPDATE, interim_update),
-	Weak = proplists:get_value(weak, Parameters, false),
-	Symmetric = proplists:get_value(symmetric, Parameters, true),
-
-	% Get probable IP and port
-	{Ip, Port} = ensure_addr(
-		proplists:get_value(ip, Parameters, null),
-		proplists:get_value(port, Parameters, null),
-		proplists:get_value(external, Parameters, true)
-	),
-
-	{ok, #state{
-			parent = Parent,
-			fd = Fd,
-			transport = Transport,
-			proto = Proto,
-			ipf = null,
-			portf = null,
-			ipt = Ip,
-			portt = Port,
-			started = false,
-			lastseen = null,
-			alive = false,
-			weak = Weak,
-			symmetric = Symmetric,
-			tref = TRef
-		}
-	};
+	init ([Parent, Fd, Transport, Proto, Parameters]);
 init ([Parent, Fd, Transport, Proto, Parameters]) ->
 	{ok, TRef} = timer:send_interval(?INTERIM_UPDATE, interim_update),
 	Weak = proplists:get_value(weak, Parameters, false),
