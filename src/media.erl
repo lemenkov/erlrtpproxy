@@ -77,9 +77,6 @@ init (
 	[P0, P1, P2, P3]  = lists:map(fun(X) -> {ok, {_I, P}} = inet:sockname(X), P end, [Fd0, Fd1, Fd2, Fd3]),
 	?INFO("~s started at ~s, with  F {~p,~p} T {~p,~p}", [CallId, inet_parse:ntoa(MainIp), P0, P1, P2, P3]),
 
-	Weak = proplists:get_value(weak, Params),
-	Symmetric = proplists:get_value(symmetric, Params),
-
 	{ok, {I0, P0}} = inet:sockname(Fd0),
 	{ok, {I1, P1}} = inet:sockname(Fd1),
 	{ok, {I2, P2}} = inet:sockname(Fd2),
@@ -87,9 +84,9 @@ init (
 	gen_server:cast(Pid, {reply, Cmd, {I0, P0}, {I2, P2}}),
 
 	% FIXME use start (w/o linking)
-	{ok, Pid0} = gen_rtp_socket:start_link([self(), Fd0, udp, rtp, [{weak, Weak}, {symmetric, Symmetric}]]),
+	{ok, Pid0} = gen_rtp_socket:start_link([self(), Fd0, udp, rtp, Params]),
 	{ok, Pid1} = gen_rtp_socket:start_link([self(), Fd1, udp, rtcp, []]),
-	{ok, Pid2} = gen_rtp_socket:start_link([self(), Fd2, udp, rtp, [{weak, Weak}, {symmetric, Symmetric}, {ip, GuessIp}, {port, GuessPort}]]),
+	{ok, Pid2} = gen_rtp_socket:start_link([self(), Fd2, udp, rtp, Params ++ [{ip, GuessIp}, {port, GuessPort}]]),
 	{ok, Pid3} = gen_rtp_socket:start_link([self(), Fd3, udp, rtcp, []]),
 
 	gen_udp:controlling_process(Fd0, Pid0),
@@ -156,9 +153,7 @@ handle_cast(
 			gen_server:cast(Pid, {reply, Cmd, {error, notfound}}),
 			{noreply, State};
 		_ ->
-			Weak = proplists:get_value(weak, Params),
-			Symmetric = proplists:get_value(symmetric, Params),
-			gen_server:cast(P, {update, [{weak, Weak}, {symmetric, Symmetric}, {ip, GuessIp}, {port, GuessPort}]}),
+			gen_server:cast(P, {update, Params ++ [{ip, GuessIp}, {port, GuessPort}]}),
 
 			gen_server:cast(Pid, {reply, Cmd, {Ip, Port}}),
 
