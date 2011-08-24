@@ -142,7 +142,6 @@ handle_cast({Proto, Pkts}, #state{fd = Fd, proto = Proto, ipt = Ip, portt = Port
 	{noreply, State};
 handle_cast({Proto, Pkts}, #state{fd = Fd, proto = Proto, ipt = Ip, portt = Port, transcode = Transcode, codecs = Codecs} = State) ->
 	{Proto, Pkts2} = transcode({Proto, Pkts}, Transcode, Codecs),
-	rtp_utils:dump_packet(node(), self(), Pkts2),
 	Msg = Proto:encode(Pkts2),
 	% FIXME use Transport
 	gen_udp:send(Fd, Ip, Port, Msg),
