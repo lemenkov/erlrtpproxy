@@ -41,6 +41,7 @@
 -export([terminate/2]).
 
 -include("../include/common.hrl").
+-include_lib("rtplib/include/rtp.hrl").
 
 % Milliseconds
 -define(RTP_TIME_TO_LIVE, 150000).
@@ -61,6 +62,8 @@
 		alive,
 		weak,
 		symmetric,
+		transcode,
+		codecs = null,
 		tref,
 		neighbour = null
 	}
@@ -78,8 +81,27 @@ init ([Parent, Transport, Proto, Parameters]) ->
 	init ([Parent, Fd, Transport, Proto, Parameters]);
 init ([Parent, Fd, Transport, Proto, Parameters]) ->
 	{ok, TRef} = timer:send_interval(?INTERIM_UPDATE, interim_update),
+
 	Weak = proplists:get_value(weak, Parameters, false),
 	Symmetric = proplists:get_value(symmetric, Parameters, true),
+	TryTranscode = proplists:get_value(transcode, Parameters, null),
+	CodecsVals = proplists:get_value(codecs, Parameters, null),
+
+	{Codecs, Transcode} = case TryTranscode of
+		null -> {[], null};
+		_ ->
+			C1 = run_codecs(CodecsVals),
+			T1 = case TryTranscode of
+				{'PCMU',8000,1} -> {?RTP_PAYLOAD_PCMU, proplists:get_value(?RTP_PAYLOAD_PCMU,C1)};
+				{'GSM',8000,1} -> {?RTP_PAYLOAD_GSM, proplists:get_value(?RTP_PAYLOAD_GSM,C1)};
+				{'PCMA',8000,1} -> {?RTP_PAYLOAD_PCMA, proplists:get_value(?RTP_PAYLOAD_PCMA,C1)};
+				_ -> undefined
+			end,
+			case T1 of
+				undefined -> {[], null};
+				_ -> {C1, T1}
+			end
+	end,
 
 	% Get probable IP and port
 	{Ip, Port} = ensure_addr(
@@ -102,22 +124,26 @@ init ([Parent, Fd, Transport, Proto, Parameters]) ->
 			alive = false,
 			weak = Weak,
 			symmetric = Symmetric,
+			transcode = Transcode,
+			codecs = Codecs,
 			tref = TRef
 		}
 	}.
-
-handle_call({addr, Ip, Port}, {Pid, _}, #state{symmetric = true, neighbour = Pid} = State) ->
-	{reply, ok, State#state{ipt = Ip, portt = Port}};
-handle_call({addr, Ip, Port}, {Pid, _}, #state{symmetric = false, neighbour = Pid} = State) ->
-	{reply, ok, State};
 
 handle_call({neighbour, Pid}, _From, State) when is_pid(Pid) ->
 	{reply, ok, State#state{neighbour = Pid}}.
 
 handle_cast({Proto, _Pkts}, #state{proto = Proto, ipt = null, portt = null} = State) ->
 	{noreply, State};
-handle_cast({Proto, Pkts}, #state{fd = Fd, proto = Proto, ipt = Ip, portt = Port} = State) ->
+handle_cast({Proto, Pkts}, #state{fd = Fd, proto = Proto, ipt = Ip, portt = Port, transcode = null} = State) ->
 	Msg = Proto:encode(Pkts),
+	% FIXME use Transport
+	gen_udp:send(Fd, Ip, Port, Msg),
+	{noreply, State};
+handle_cast({Proto, Pkts}, #state{fd = Fd, proto = Proto, ipt = Ip, portt = Port, transcode = Transcode, codecs = Codecs} = State) ->
+	{Proto, Pkts2} = transcode({Proto, Pkts}, Transcode, Codecs),
+	rtp_utils:dump_packet(node(), self(), Pkts2),
+	Msg = Proto:encode(Pkts2),
 	% FIXME use Transport
 	gen_udp:send(Fd, Ip, Port, Msg),
 	{noreply, State};
@@ -125,6 +151,7 @@ handle_cast({Proto, Pkts}, #state{fd = Fd, proto = Proto, ipt = Ip, portt = Port
 handle_cast({update, Parameters}, State) ->
 	Weak = proplists:get_value(weak, Parameters, false),
 	Symmetric = proplists:get_value(symmetric, Parameters, true),
+	Transcode = proplists:get_value(transcode, Parameters, null),
 
 	% Get probable IP and port
 	{Ip, Port} = ensure_addr(
@@ -161,7 +188,7 @@ handle_cast(stop, #state{tref = TRef} = State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, #state{parent = Parent, fd = Fd, transport = Transport, tref = TRef}) ->
+terminate(Reason, #state{parent = Parent, fd = Fd, transport = Transport, tref = TRef, codecs = Codecs}) ->
 	timer:cancel(TRef),
 	Type = case Transport of
 		udp -> gen_udp;
@@ -169,6 +196,10 @@ terminate(Reason, #state{parent = Parent, fd = Fd, transport = Transport, tref =
 		sctp -> gen_sctp
 	end,
 	Type:close(Fd),
+	lists:foreach(fun
+			({_, passthrough}) -> ok;
+			({_, Codec}) -> codec:close(Codec)
+		end, Codecs),
 	gen_server:cast(Parent, {stop, self(), Reason}),
 	ok.
 
@@ -203,7 +234,6 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{parent = Parent, proto = Proto, sta
 	try
 		{ok, Pkts} = Proto:decode(Msg),
 		gen_server:cast(Parent, {start, self()}),
-		gen_server:call(Neighbour, {addr, Ip, Port}),
 		process_data(Proto, Pkts, Parent, Neighbour),
 
 		{noreply, State#state{started = true, ipf = Ip, portf = Port, lastseen = now(), alive = true}}
@@ -246,3 +276,32 @@ process_data(rtp, Pkts, Parent, Neighbour) ->
 	gen_server:cast(Neighbour, {rtp, Pkts});
 process_data(rtcp, Pkts, Parent, Neighbour) ->
 	gen_server:cast(Parent, {rtcp, Pkts, self(), Neighbour}).
+
+transcode({rtp, #rtp{payload_type = OldPayloadType, payload = Payload} = Rtp}, {PayloadType, Encoder}, Codecs) ->
+	Decoder = proplists:get_value(OldPayloadType, Codecs),
+	case Decoder of
+		passthrough -> {ok, Rtp};
+		undefined -> {ok, Rtp};
+		_ ->
+			{ok, RawData} = codec:decode(Decoder, Payload),
+			{ok, NewPayload} = codec:encode(Encoder, RawData),
+			{rtp, Rtp#rtp{payload_type = PayloadType, payload = NewPayload}}
+	end;
+transcode({Proto, Pkts}, _, _) ->
+	{Proto, Pkts}.
+
+run_codecs(CodecsVals) ->
+	run_codecs(CodecsVals, []).
+run_codecs([], Ret) ->
+	Ret;
+run_codecs([{'PCMU',8000,1} | Rest], Ret) ->
+	{ok, Codec} = codec:start_link([?RTP_PAYLOAD_PCMU, self()]),
+	run_codecs(Rest, Ret ++ [{?RTP_PAYLOAD_PCMU, Codec}]);
+run_codecs([{'PCMA',8000,1} | Rest], Ret) ->
+	{ok, Codec} = codec:start_link([?RTP_PAYLOAD_PCMA, self()]),
+	run_codecs(Rest, Ret ++ [{?RTP_PAYLOAD_PCMA, Codec}]);
+run_codecs([{'GSM',8000,1} | Rest], Ret) ->
+	{ok, Codec} = codec:start_link([?RTP_PAYLOAD_GSM, self()]),
+	run_codecs(Rest, Ret ++ [{?RTP_PAYLOAD_GSM, Codec}]);
+run_codecs([CodecVal | Rest], Ret) ->
+	run_codecs(Rest, Ret ++ [{CodecVal, passthrough}]).
