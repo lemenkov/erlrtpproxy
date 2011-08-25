@@ -346,16 +346,12 @@ parse_params([$Z|Rest], Result) ->
 %% Extensions
 
 % Protocol - unofficial extension
-parse_params([$P|Rest], Result) ->
-	case string:span(Rest, "0123456789") of
-		0 ->
-			% Bogus - skip incomplete modifier
-			parse_params(Rest, Result);
-		Ret ->
-			Rest1 = string:substr(Rest, Ret + 1),
-			{Value, _} = string:to_integer(string:substr(Rest, 1, Ret)),
-			parse_params(Rest1, ensure_alone(Result, proto, guess_proto(Value)))
-	end;
+parse_params([$P, $0 |Rest], Result) ->
+	parse_params(Rest, ensure_alone(Result, proto, udp));
+parse_params([$P, $1 |Rest], Result) ->
+	parse_params(Rest, ensure_alone(Result, proto, tcp));
+parse_params([$P, $2 |Rest], Result) ->
+	parse_params(Rest, ensure_alone(Result, proto, sctp));
 % Transcode - unofficial extension
 parse_params([$T|Rest], Result) ->
 	case string:span(Rest, "0123456789") of
@@ -376,10 +372,6 @@ ensure_alone(Proplist, Param) ->
 	proplists:delete(Param, Proplist) ++ [Param].
 ensure_alone(Proplist, Param, Value) ->
 	proplists:delete(Param, Proplist) ++ [{Param, Value}].
-
-guess_proto(0) -> udp;
-guess_proto(1) -> tcp;
-guess_proto(2) -> sctp.
 
 % FIXME use more atoms instead of numbers where possible
 % grep "a=rtpmap:" /var/log/messages | sed -e 's,.*a=rtpmap:,,g' | sort | uniq | sort -n
