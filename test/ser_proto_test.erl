@@ -318,6 +318,16 @@ parse_cmd_u_10_acc_interim_update_test() ->
 			]
 		}, ser_proto:parse("438_41061 Ut4p1c8,0,2,4,18,96,97,98,100,101v0v1v2 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
 
+parse_cmd_u_11_wrong_ipv4_test() ->
+	?assertThrow(
+		{error_syntax,"Wrong IP"},
+		ser_proto:parse("24393_4 Uc0,8,18,101 0003e30c-c50c00f7-123e8bd9-542f2edf@192.168.0.100 892.168.0.100 27686 0003e30cc50cd69210b8c36b-0ecf0120;1", {127,0,0,1}, 1234)).
+
+parse_cmd_u_12_wrong_port_test() ->
+	?assertThrow(
+		{error_syntax,"Wrong port"},
+		ser_proto:parse("24393_4 Uc0,8,18,101 0003e30c-c50c00f7-123e8bd9-542f2edf@192.168.0.100 192.168.0.100 627686 0003e30cc50cd69210b8c36b-0ecf0120;1", {127,0,0,1}, 1234)).
+
 parse_cmd_l_1_test() ->
 	?assertEqual(
 		#cmd{
