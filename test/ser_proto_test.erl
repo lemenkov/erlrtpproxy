@@ -450,6 +450,11 @@ parse_cmd_p_2_test() ->
 			]
 		}, ser_proto:parse("1389_5 P10 0003e30c-c50c016d-46bbcf2e-6369eecf@192.168.0.100 /var/tmp/rtpproxy_test/media/01.wav session 0003e30cc50ccc5416857d59-357336dc;1 28d49e51a95d5a31d09b31ccc63c5f4b;1", {127,0,0,1}, 1234)).
 
+parse_cmd_p_3_wrong_playcount_test() ->
+	?assertThrow(
+		{error_syntax,"Wrong PlayCount"},
+		ser_proto:parse("1389_5 Phello 0003e30c-c50c016d-46bbcf2e-6369eecf@192.168.0.100 /var/tmp/rtpproxy_test/media/01.wav session 0003e30cc50ccc5416857d59-357336dc;1 28d49e51a95d5a31d09b31ccc63c5f4b;1", {127,0,0,1}, 1234)).
+
 parse_cmd_s_1_test() ->
 	?assertEqual(
 		#cmd{
