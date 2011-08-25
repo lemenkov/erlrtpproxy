@@ -377,6 +377,13 @@ parse_params([$T|Rest], Result) ->
 			{Value, _} = string:to_integer(string:substr(Rest, 1, Ret)),
 			parse_params(Rest1, ensure_alone(Result, transcode, guess_codec(Value)))
 	end;
+% Accounting - unofficial extension
+parse_params([$V, $0 |Rest], Result) ->
+	parse_params(Rest, ensure_alone(Result, acc, start));
+parse_params([$V, $1 |Rest], Result) ->
+	parse_params(Rest, ensure_alone(Result, acc, interim_update));
+parse_params([$V, $2 |Rest], Result) ->
+	parse_params(Rest, ensure_alone(Result, acc, stop));
 
 parse_params([_|Rest], Result) ->
 	% Unknown parameter - just skip it

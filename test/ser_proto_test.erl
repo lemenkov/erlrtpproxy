@@ -223,6 +223,96 @@ parse_cmd_u_7_both_symmetric_and_asymmetric_test() ->
 		{error_syntax,"Both symmetric and asymmetric modifiers are defined"},
 		ser_proto:parse("438_41061 Ut4p1asc8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
 
+parse_cmd_u_8_acc_start_test() ->
+	?assertEqual(
+		#cmd{
+			type=?CMD_U,
+			cookie="438_41061",
+			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
+			callid="e12ea248-94a5e885@192.168.5.3",
+			mediaid=1,
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432}, proto=tcp},
+			params=[
+				{acc, start},
+				{codecs,[
+						{'PCMU',8000,1},
+						2,
+						{'G723',8000,1},
+						{'PCMA',8000,1},
+						{'G729',8000,1},
+						96,
+						97,
+						98,
+						100,
+						101
+					]
+				},
+				{external,true},
+				{symmetric,true},
+				{transcode,{'G723',8000,1}}
+			]
+		}, ser_proto:parse("438_41061 Ut4p1c8,0,2,4,18,96,97,98,100,101v0 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
+
+parse_cmd_u_9_acc_interim_update_test() ->
+	?assertEqual(
+		#cmd{
+			type=?CMD_U,
+			cookie="438_41061",
+			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
+			callid="e12ea248-94a5e885@192.168.5.3",
+			mediaid=1,
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432}, proto=tcp},
+			params=[
+				{acc, interim_update},
+				{codecs,[
+						{'PCMU',8000,1},
+						2,
+						{'G723',8000,1},
+						{'PCMA',8000,1},
+						{'G729',8000,1},
+						96,
+						97,
+						98,
+						100,
+						101
+					]
+				},
+				{external,true},
+				{symmetric,true},
+				{transcode,{'G723',8000,1}}
+			]
+		}, ser_proto:parse("438_41061 Ut4p1c8,0,2,4,18,96,97,98,100,101v0v1 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
+
+parse_cmd_u_10_acc_interim_update_test() ->
+	?assertEqual(
+		#cmd{
+			type=?CMD_U,
+			cookie="438_41061",
+			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
+			callid="e12ea248-94a5e885@192.168.5.3",
+			mediaid=1,
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432}, proto=tcp},
+			params=[
+				{acc, stop},
+				{codecs,[
+						{'PCMU',8000,1},
+						2,
+						{'G723',8000,1},
+						{'PCMA',8000,1},
+						{'G729',8000,1},
+						96,
+						97,
+						98,
+						100,
+						101
+					]
+				},
+				{external,true},
+				{symmetric,true},
+				{transcode,{'G723',8000,1}}
+			]
+		}, ser_proto:parse("438_41061 Ut4p1c8,0,2,4,18,96,97,98,100,101v0v1v2 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
+
 parse_cmd_l_1_test() ->
 	?assertEqual(
 		#cmd{
