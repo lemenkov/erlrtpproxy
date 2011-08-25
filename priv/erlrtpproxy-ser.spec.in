@@ -69,6 +69,10 @@ fi
 rm -rf $RPM_BUILD_ROOT
 
 
+%check
+make test
+
+
 %files
 %defattr(-,root,root,-)
 %{_initrddir}/%{realname}
