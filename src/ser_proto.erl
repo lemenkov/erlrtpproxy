@@ -286,6 +286,9 @@ parse_params([], Result) ->
 			proplists:delete(symmetric, R1) ++ [{symmetric, true}]
 	end,
 	lists:sort(R2);
+% IPv6
+parse_params([$6|Rest], Result) ->
+	parse_params(Rest, ensure_alone(Result, ipv6));
 % Asymmetric
 parse_params([$A|Rest], Result) ->
 	parse_params(Rest, ensure_alone(proplists:delete(symmetric, Result), asymmetric));
@@ -307,15 +310,18 @@ parse_params([$C|Rest], Result) ->
 			),
 			parse_params(Rest1, ensure_alone(Result, codecs, Codecs))
 	end;
-% IPv6
-parse_params([$6|Rest], Result) ->
-	parse_params(Rest, ensure_alone(Result, ipv6));
-% Internal (RFC1918) network
-parse_params([$I|Rest], Result) ->
-	parse_params(Rest, ensure_alone(Result, internal));
 % External (non-RFC1918) network
 parse_params([$E|Rest], Result) ->
 	parse_params(Rest, ensure_alone(Result, external));
+% Internal (RFC1918) network
+parse_params([$I|Rest], Result) ->
+	parse_params(Rest, ensure_alone(Result, internal));
+% l - local address (?)
+parse_params([$L|Rest], Result) ->
+	parse_params(Rest, ensure_alone(Result, local));
+% r - remote address (?)
+parse_params([$R|Rest], Result) ->
+	parse_params(Rest, ensure_alone(Result, remote));
 % Symmetric
 parse_params([$S|Rest], Result) ->
 	parse_params(Rest, ensure_alone(Result, symmetric));
@@ -335,23 +341,9 @@ parse_params([$Z|Rest], Result) ->
 			{Value, _} = string:to_integer(string:substr(Rest, 1, Ret)),
 			parse_params(Rest1, ensure_alone(Result, repacketize, Value))
 	end;
-% l - local address (?)
-parse_params([$L|Rest], Result) ->
-	parse_params(Rest, ensure_alone(Result, local));
-% r - remote address (?)
-parse_params([$R|Rest], Result) ->
-	parse_params(Rest, ensure_alone(Result, remote));
-% Transcode - unofficial extension
-parse_params([$T|Rest], Result) ->
-	case string:span(Rest, "0123456789") of
-		0 ->
-			% Bogus - skip incomplete modifier
-			parse_params(Rest, Result);
-		Ret ->
-			Rest1 = string:substr(Rest, Ret + 1),
-			{Value, _} = string:to_integer(string:substr(Rest, 1, Ret)),
-			parse_params(Rest1, ensure_alone(Result, transcode, guess_codec(Value)))
-	end;
+
+%% Extensions
+
 % Protocol - unofficial extension
 parse_params([$P|Rest], Result) ->
 	case string:span(Rest, "0123456789") of
@@ -363,6 +355,18 @@ parse_params([$P|Rest], Result) ->
 			{Value, _} = string:to_integer(string:substr(Rest, 1, Ret)),
 			parse_params(Rest1, ensure_alone(Result, proto, guess_proto(Value)))
 	end;
+% Transcode - unofficial extension
+parse_params([$T|Rest], Result) ->
+	case string:span(Rest, "0123456789") of
+		0 ->
+			% Bogus - skip incomplete modifier
+			parse_params(Rest, Result);
+		Ret ->
+			Rest1 = string:substr(Rest, Ret + 1),
+			{Value, _} = string:to_integer(string:substr(Rest, 1, Ret)),
+			parse_params(Rest1, ensure_alone(Result, transcode, guess_codec(Value)))
+	end;
+
 parse_params([_|Rest], Result) ->
 	% Unknown parameter - just skip it
 	parse_params(Rest, Result).
