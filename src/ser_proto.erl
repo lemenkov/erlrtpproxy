@@ -285,8 +285,22 @@ parse_params([], Result) ->
 		_ ->
 			proplists:delete(symmetric, R1) ++ [{symmetric, true}]
 	end,
-	% FIXME ensure that transcode and codecs are consistent (allow transcoding to one of the codecs)
-	lists:sort(R2);
+	R3 = case {proplists:get_value(transcode, R2), proplists:get_value(codecs, R2)} of
+		{undefined, _} ->
+			R2;
+		{_, undefined} ->
+			% FIXME is it ok?
+			% We just don't care of what client will do with transcoded data at all
+			throw({error_syntax, "Requested transcoding but no codecs are available"});
+		{Codec, Codecs} ->
+			case lists:member(Codec, Codecs) of
+				true ->
+					R2;
+				_ ->
+					throw({error_syntax, "Requested transcoding to incompatible codec"})
+			end
+	end,
+	lists:sort(R3);
 % IPv6
 parse_params([$6|Rest], Result) ->
 	parse_params(Rest, ensure_alone(Result, ipv6));
