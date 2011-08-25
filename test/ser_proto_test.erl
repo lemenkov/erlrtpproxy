@@ -218,6 +218,10 @@ parse_cmd_u_6_both_internal_and_external_test() ->
 		{error_syntax,"Both internal and external modifiers are defined"},
 		ser_proto:parse("438_41061 Ut4p1iec8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
 
+parse_cmd_u_7_both_symmetric_and_asymmetric_test() ->
+	?assertThrow(
+		{error_syntax,"Both symmetric and asymmetric modifiers are defined"},
+		ser_proto:parse("438_41061 Ut4p1asc8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
 
 parse_cmd_l_1_test() ->
 	?assertEqual(
