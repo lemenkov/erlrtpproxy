@@ -285,6 +285,7 @@ parse_params([], Result) ->
 		_ ->
 			proplists:delete(symmetric, R1) ++ [{symmetric, true}]
 	end,
+	% FIXME ensure that transcode and codecs are consistent (allow transcoding to one of the codecs)
 	lists:sort(R2);
 % IPv6
 parse_params([$6|Rest], Result) ->
