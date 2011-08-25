@@ -456,6 +456,11 @@ parse_cmd_s_1_test() ->
 			from=#party{tag="0003e30cc50ccc9f743d4fa6-38d0bd14"}
 		}, ser_proto:parse("2154_6 S 0003e30c-c50c0171-35b90751-013a3ef6@192.168.0.100 0003e30cc50ccc9f743d4fa6-38d0bd14;1", {127,0,0,1}, 1234)).
 
+parse_cmd_unknown_test() ->
+	?assertThrow(
+		{error_syntax,"Unknown command"},
+		ser_proto:parse("2154_6 Z 0003e30c-c50c0171-35b90751-013a3ef6@192.168.0.100 0003e30cc50ccc9f743d4fa6-38d0bd14;1", {127,0,0,1}, 1234)).
+
 encode_ok_test() ->
 	?assertEqual("438_41067 0\n", ser_proto:encode(#cmd{cookie="438_41067"}, ok)).
 
