@@ -328,6 +328,11 @@ parse_cmd_u_12_wrong_port_test() ->
 		{error_syntax,"Wrong port"},
 		ser_proto:parse("24393_4 Uc0,8,18,101 0003e30c-c50c00f7-123e8bd9-542f2edf@192.168.0.100 192.168.0.100 627686 0003e30cc50cd69210b8c36b-0ecf0120;1", {127,0,0,1}, 1234)).
 
+parse_cmd_u_13_wrong_mediain_test() ->
+	?assertThrow(
+		{error_syntax,"Wrong MediaID"},
+		ser_proto:parse("24393_4 Uc0,8,18,101 0003e30c-c50c00f7-123e8bd9-542f2edf@192.168.0.100 192.168.0.100 27686 0003e30cc50cd69210b8c36b-0ecf0120;foo", {127,0,0,1}, 1234)).
+
 parse_cmd_l_1_test() ->
 	?assertEqual(
 		#cmd{
