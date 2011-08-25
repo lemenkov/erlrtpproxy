@@ -104,6 +104,8 @@ parse_splitted(["VF", "20081224"]) ->
 parse_splitted(["VF", "20090810"]) ->
 	% Support for automatic bridging
 	#cmd{type=?CMD_VF, params="20090810"};
+parse_splitted(["VF", Unknown]) ->
+	throw({error_syntax, "Unknown version: " ++ Unknown});
 
 % Create session (no ToTag)
 parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId]) ->

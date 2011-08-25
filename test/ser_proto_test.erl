@@ -45,6 +45,11 @@ parse_cmd_vf_test() ->
 			params="20050322"
 		}, ser_proto:parse("24393_1 VF 20050322", {127,0,0,1}, 1234)).
 
+parse_cmd_vf_unknown_version_test() ->
+	?assertThrow(
+		{error_syntax,"Unknown version: 20070101"},
+		ser_proto:parse("24393_1 VF 20070101", {127,0,0,1}, 1234)).
+
 parse_cmd_u_1_test() ->
 	?assertEqual(
 		#cmd{
