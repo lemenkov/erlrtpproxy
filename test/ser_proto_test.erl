@@ -58,7 +58,7 @@ parse_cmd_u_1_test() ->
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="0003e30c-c50c00f7-123e8bd9-542f2edf@192.168.0.100",
 			mediaid=1,
-			from=#party{tag="0003e30cc50cd69210b8c36b-0ecf0120",addr={{192,0,43,10}, 27686}},
+			from=#party{tag="0003e30cc50cd69210b8c36b-0ecf0120",addr={{192,0,43,10}, 27686}, rtcpaddr={{192,0,43,10}, 27687}},
 			params=[
 				{codecs,[
 						{'PCMU',8000,1},
@@ -80,7 +80,7 @@ parse_cmd_u_2_test() ->
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="e12ea248-94a5e885@192.168.5.3",
 			mediaid=1,
-			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,9}, 16432}},
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,9}, 16432},rtcpaddr={{192,0,43,9}, 16433}},
 			params=[
 				{codecs,[
 						{'PCMU',8000,1},
@@ -108,7 +108,7 @@ parse_cmd_u_3_1_transcode_test() ->
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="e12ea248-94a5e885@192.168.5.3",
 			mediaid=1,
-			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,3}, 16432}},
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,3}, 16432},rtcpaddr={{192,0,43,3}, 16433}},
 			params=[
 				{codecs,[
 						{'PCMU',8000,1},
@@ -137,7 +137,7 @@ parse_cmd_u_3_2_transcode_test() ->
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="e12ea248-94a5e885@192.168.5.3",
 			mediaid=1,
-			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,5}, 16432}},
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,5}, 16432},rtcpaddr={{192,0,43,5}, 16433}},
 			params=[
 				{codecs,[
 						{'PCMU',8000,1},
@@ -176,7 +176,7 @@ parse_cmd_u_4_zeroes_test() ->
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="ffe0100519df4bc1bbd2f8e18309ca8a",
 			mediaid=2,
-			from=#party{tag="186f101b0e04481ea045517edb93b62d",addr={{192,0,43,7}, 19268}},
+			from=#party{tag="186f101b0e04481ea045517edb93b62d",addr={{192,0,43,7}, 19268},rtcpaddr={{192,0,43,7}, 19269}},
 			params=[
 				{codecs,[
 						{'H261',90000,0},
@@ -197,7 +197,7 @@ parse_cmd_u_5_proto_test() ->
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="e12ea248-94a5e885@192.168.5.3",
 			mediaid=1,
-			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,4}, 16432}, proto=tcp},
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,4}, 16432},rtcpaddr={{192,0,43,4}, 16433}, proto=tcp},
 			params=[
 				{codecs,[
 						{'PCMU',8000,1},
@@ -226,7 +226,7 @@ parse_cmd_u_6_0_internal_to_internal_test() ->
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="e12ea248-94a5e885@192.168.5.3",
 			mediaid=1,
-			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432}, proto=tcp},
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432},rtcpaddr={{192,168,5,3}, 16433}, proto=tcp},
 			params=[
 				{codecs,[
 						{'PCMU',8000,1},
@@ -255,7 +255,7 @@ parse_cmd_u_6_1_internal_to_external_test() ->
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="e12ea248-94a5e885@192.168.5.3",
 			mediaid=1,
-			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432}, proto=tcp},
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432},rtcpaddr={{192,168,5,3}, 16433}, proto=tcp},
 			params=[
 				{codecs,[
 						{'PCMU',8000,1},
@@ -284,7 +284,7 @@ parse_cmd_u_6_2_external_to_internal_test() ->
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="e12ea248-94a5e885@192.168.5.3",
 			mediaid=1,
-			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,3}, 16432}, proto=tcp},
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,3}, 16432},rtcpaddr={{192,0,43,3}, 16433}, proto=tcp},
 			params=[
 				{codecs,[
 						{'PCMU',8000,1},
@@ -313,7 +313,7 @@ parse_cmd_u_6_3_external_to_external_test() ->
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="e12ea248-94a5e885@192.168.5.3",
 			mediaid=1,
-			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,3}, 16432}, proto=tcp},
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,3}, 16432},rtcpaddr={{192,0,43,3}, 16433}, proto=tcp},
 			params=[
 				{codecs,[
 						{'PCMU',8000,1},
@@ -342,7 +342,7 @@ parse_cmd_u_6_4_internal_to_internal_single_test() ->
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="e12ea248-94a5e885@192.168.5.3",
 			mediaid=1,
-			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432}, proto=tcp},
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432},rtcpaddr={{192,168,5,3}, 16433}, proto=tcp},
 			params=[
 				{codecs,[
 						{'PCMU',8000,1},
@@ -371,7 +371,7 @@ parse_cmd_u_6_5_external_to_external_single_test() ->
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="e12ea248-94a5e885@192.168.5.3",
 			mediaid=1,
-			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,3}, 16432}, proto=tcp},
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,3}, 16432},rtcpaddr={{192,0,43,3}, 16433}, proto=tcp},
 			params=[
 				{codecs,[
 						{'PCMU',8000,1},
@@ -405,7 +405,7 @@ parse_cmd_u_8_acc_start_test() ->
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="e12ea248-94a5e885@192.168.5.3",
 			mediaid=1,
-			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,3}, 16432}, proto=tcp},
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,3}, 16432},rtcpaddr={{192,0,43,3}, 16433}, proto=tcp},
 			params=[
 				{acc, start},
 				{codecs,[
@@ -435,7 +435,7 @@ parse_cmd_u_9_acc_interim_update_test() ->
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="e12ea248-94a5e885@192.168.5.3",
 			mediaid=1,
-			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,3}, 16432}, proto=tcp},
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,3}, 16432},rtcpaddr={{192,0,43,3}, 16433}, proto=tcp},
 			params=[
 				{acc, interim_update},
 				{codecs,[
@@ -465,7 +465,7 @@ parse_cmd_u_10_acc_stop_test() ->
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="e12ea248-94a5e885@192.168.5.3",
 			mediaid=1,
-			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,3}, 16432}, proto=tcp},
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,3}, 16432},rtcpaddr={{192,0,43,3}, 16433}, proto=tcp},
 			params=[
 				{acc, stop},
 				{codecs,[
@@ -510,7 +510,7 @@ parse_cmd_u_14_discard_rfc1918_test() ->
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="e12ea248-94a5e885@192.168.5.3",
 			mediaid=1,
-			from=#party{tag="6b0a8f6cfc543db1o1",addr=null, proto=tcp},
+			from=#party{tag="6b0a8f6cfc543db1o1",proto=tcp},
 			params=[
 				{acc, stop},
 				{codecs,[
@@ -540,7 +540,7 @@ parse_cmd_u_15_discard_non_rfc1918_test() ->
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="e12ea248-94a5e885@192.168.5.3",
 			mediaid=1,
-			from=#party{tag="6b0a8f6cfc543db1o1",addr=null, proto=tcp},
+			from=#party{tag="6b0a8f6cfc543db1o1", proto=tcp},
 			params=[
 				{acc, stop},
 				{codecs,[
@@ -571,7 +571,7 @@ parse_cmd_l_1_test() ->
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="452ca314-3bbcf0ea@192.168.0.2",
 			mediaid=1,
-			from=#party{tag="8d11d16a3b56fcd588d72b3d359cc4e1",addr={{192,0,43,4}, 17050}},
+			from=#party{tag="8d11d16a3b56fcd588d72b3d359cc4e1",addr={{192,0,43,4}, 17050},rtcpaddr={{192,0,43,4}, 17051}},
 			to=#party{tag="e4920d0cb29cf52o0"},
 			params=[
 				{codecs,[
@@ -593,7 +593,7 @@ parse_cmd_l_2_test() ->
 			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
 			callid="a68e961-5f6a75e5-356cafd9-3562@192.168.100.6",
 			mediaid=1,
-			from=#party{tag="60753eabbd87fe6f34068e9d80a9fc1c",addr={{192,168,100,4}, 18756}},
+			from=#party{tag="60753eabbd87fe6f34068e9d80a9fc1c",addr={{192,168,100,4}, 18756},rtcpaddr={{192,168,100,4}, 18757}},
 			to=#party{tag="1372466422"},
 			params=[
 				{codecs,[
