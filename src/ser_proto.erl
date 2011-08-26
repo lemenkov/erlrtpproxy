@@ -22,6 +22,7 @@
 
 -export([parse/3]).
 -export([encode/2]).
+% To make eunit happy
 -export([is_rfc1918/1]).
 
 -include("common.hrl").
@@ -115,6 +116,8 @@ parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId]) 
 parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, ToTag, MediaId]) ->
 	{GuessIp, GuessPort} = parse_addr(ProbableIp, ProbablePort),
 	Params	= parse_params(Args),
+
+	% Discart address if it's not consistent with direction - FIXME IPv4 only
 	Addr = case {proplists:get_value(direction, Params), is_rfc1918(GuessIp)} of
 		{{external, _}, true} -> null;
 		{{internal, _}, true} -> {GuessIp, GuessPort};
@@ -122,6 +125,7 @@ parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, T
 		{{external, _}, false} -> {GuessIp, GuessPort}
 	end,
 
+	% Try to guess RTCP address
 	RtcpAddr = case Addr of
 		null -> null;
 		{GuessIp, GuessPort} -> {GuessIp, GuessPort + 1}
