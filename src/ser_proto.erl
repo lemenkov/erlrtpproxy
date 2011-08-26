@@ -115,11 +115,18 @@ parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId]) 
 parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, ToTag, MediaId]) ->
 	{GuessIp, GuessPort} = parse_addr(ProbableIp, ProbablePort),
 	Params	= parse_params(Args),
+	Addr = case {proplists:get_value(direction, Params), is_rfc1918(GuessIp)} of
+		{{external, _}, true} -> null;
+		{{internal, _}, true} -> {GuessIp, GuessPort};
+		{{internal, _}, false} -> null;
+		{{external, _}, false} -> {GuessIp, GuessPort}
+	end,
+
 	#cmd{
 		type = ?CMD_U,
 		callid = CallId,
 		mediaid	= parse_media_id(MediaId),
-		from = #party{tag=FromTag, addr={GuessIp, GuessPort}, proto=proplists:get_value(proto, Params, udp)},
+		from = #party{tag=FromTag, addr=Addr, proto=proplists:get_value(proto, Params, udp)},
 		to = ?SAFE_PARTY(ToTag),
 		params= proplists:delete(proto, Params)
 	};
