@@ -62,10 +62,11 @@ start(Cmd) ->
 init (
 	#cmd{
 		type = ?CMD_U,
-		origin = #origin{pid = Pid},
+		origin = #origin{type = ser, pid = Pid},
 		callid = CallId,
 		mediaid = MediaId,
-		from = #party{tag = TagFrom, addr = {GuessIp, GuessPort}},
+		from = #party{tag = TagFrom, addr = FAddr, rtcpaddr = FRtcpAddr, proto = TProto},
+		to = null,
 		params = Params} = Cmd
 	) ->
 	% TODO just choose the first IP address for now
@@ -77,17 +78,31 @@ init (
 	[P0, P1, P2, P3]  = lists:map(fun(X) -> {ok, {_I, P}} = inet:sockname(X), P end, [Fd0, Fd1, Fd2, Fd3]),
 	?INFO("~s started at ~s, with  F {~p,~p} T {~p,~p}", [CallId, inet_parse:ntoa(MainIp), P0, P1, P2, P3]),
 
+	% RTP addresses
 	{ok, {I0, P0}} = inet:sockname(Fd0),
-	{ok, {I1, P1}} = inet:sockname(Fd1),
 	{ok, {I2, P2}} = inet:sockname(Fd2),
+
+	% RTCP addresses
+	{ok, {I1, P1}} = inet:sockname(Fd1),
 	{ok, {I3, P3}} = inet:sockname(Fd3),
+
 	gen_server:cast(Pid, {reply, Cmd, {I0, P0}, {I2, P2}}),
 
+	RtpParams = case FAddr of
+		null -> Params;
+		{GuessIp0, GuessPort0} -> Params ++ [{ip, GuessIp0}, {port, GuessPort0}]
+	end,
+
+	RtcpParams = case FRtcpAddr of
+		null -> proplists:delete(transcode, Params);
+		{GuessIp1, GuessPort1} -> proplists:delete(transcode, Params) ++ [{ip, GuessIp1}, {port, GuessPort1}]
+	end,
+
 	% FIXME use start (w/o linking)
-	{ok, Pid0} = gen_rtp_socket:start_link([self(), Fd0, udp, rtp, Params]),
+	{ok, Pid0} = gen_rtp_socket:start_link([self(), Fd0, udp, rtp, []]),
 	{ok, Pid1} = gen_rtp_socket:start_link([self(), Fd1, udp, rtcp, []]),
-	{ok, Pid2} = gen_rtp_socket:start_link([self(), Fd2, udp, rtp, Params ++ [{ip, GuessIp}, {port, GuessPort}]]),
-	{ok, Pid3} = gen_rtp_socket:start_link([self(), Fd3, udp, rtcp, []]),
+	{ok, Pid2} = gen_rtp_socket:start_link([self(), Fd2, TProto, rtp, RtpParams]),
+	{ok, Pid3} = gen_rtp_socket:start_link([self(), Fd3, TProto, rtcp, RtcpParams]),
 
 	gen_udp:controlling_process(Fd0, Pid0),
 	gen_udp:controlling_process(Fd1, Pid1),
@@ -130,30 +145,42 @@ handle_cast(
 			origin = #origin{pid = Pid},
 			callid = CallId,
 			mediaid = MediaId,
-			from = #party{tag = Tag, addr = {GuessIp, GuessPort}},
-			to = CmdTo,
+			from = #party{tag = Tag, addr = FAddr, rtcpaddr = FRtcpAddr},
 			params = Params} = Cmd,
 		#state{
 			callid = CallId,
 			mediaid = MediaId,
-			from = #media{pid = PidF, ip = IpF, port = PortF} = From,
-			to = #media{pid = PidT, ip = IpT, port = PortT} = To,
+			from = #media{pid = PidF, ip = IpF, port = PortF},
+			fromrtcp = #media{pid = PidFRtcp},
+			to = #media{pid = PidT, ip = IpT, port = PortT},
+			tortcp = #media{pid = PidTRtcp},
 			tag_f = TagF,
 			tag_t = TagT} = State
 	) ->
-	{Dir, P, Ip, Port} = case Tag of
-		TagF -> {from, PidT, IpF, PortF};
-		TagT -> {to, PidF, IpT, PortT};
+	{Dir, P, PRtcp, Ip, Port} = case Tag of
+		TagF -> {from, PidT, PidTRtcp, IpF, PortF};
+		TagT -> {to, PidF, PidFRtcp, IpT, PortT};
 		% Initial set up of a tag_t
-		_ when TagT == null -> {to, PidF, IpT, PortT};
-		_ -> {notfound, notfound, notfound, notfound}
+		_ when TagT == null -> {to, PidF, PidFRtcp, IpT, PortT};
+		_ -> {notfound, null, null, null, null}
 	end,
 	case Dir of
 		notfound ->
 			gen_server:cast(Pid, {reply, Cmd, {error, notfound}}),
 			{noreply, State};
 		_ ->
-			gen_server:cast(P, {update, Params ++ [{ip, GuessIp}, {port, GuessPort}]}),
+			RtpParams = case FAddr of
+				null -> Params;
+				{GuessIp0, GuessPort0} -> Params ++ [{ip, GuessIp0}, {port, GuessPort0}]
+			end,
+
+			RtcpParams = case FRtcpAddr of
+				null -> proplists:delete(transcode, Params);
+				{GuessIp1, GuessPort1} -> proplists:delete(transcode, Params) ++ [{ip, GuessIp1}, {port, GuessPort1}]
+			end,
+
+			gen_server:cast(P, {update, RtpParams}),
+			gen_server:cast(PRtcp, {update, RtcpParams}),
 
 			gen_server:cast(Pid, {reply, Cmd, {Ip, Port}}),
 
