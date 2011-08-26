@@ -85,11 +85,11 @@ init ([Parent, Fd, Transport, Proto, Parameters]) ->
 	Weak = proplists:get_value(weak, Parameters, false),
 	Symmetric = proplists:get_value(symmetric, Parameters, true),
 	TryTranscode = proplists:get_value(transcode, Parameters, null),
-	CodecsVals = proplists:get_value(codecs, Parameters, null),
 
 	{Codecs, Transcode} = case TryTranscode of
 		null -> {[], null};
 		_ ->
+			CodecsVals = proplists:get_value(codecs, Parameters, null),
 			C1 = run_codecs(CodecsVals),
 			T1 = case TryTranscode of
 				{'PCMU',8000,1} -> {?RTP_PAYLOAD_PCMU, proplists:get_value(?RTP_PAYLOAD_PCMU,C1)};
@@ -98,8 +98,14 @@ init ([Parent, Fd, Transport, Proto, Parameters]) ->
 				_ -> undefined
 			end,
 			case T1 of
-				undefined -> {[], null};
-				_ -> {C1, T1}
+				undefined ->
+					lists:foreach(fun
+							({_, passthrough}) -> ok;
+							({_, Codec}) -> codec:close(Codec)
+						end, C1),
+					{[], null};
+				_ ->
+					{C1, T1}
 			end
 	end,
 
