@@ -22,6 +22,7 @@
 
 -export([parse/3]).
 -export([encode/2]).
+-export([is_rfc1918/1]).
 
 -include("common.hrl").
 
@@ -440,3 +441,28 @@ guess_codec(C) -> C.
 guess_codec_n(Codec) ->
 	{Y, _} = string:to_integer(Codec),
 	Y.
+
+% TODO only IPv4 for now
+is_rfc1918({I0,I1,I2,I3} = Ip) when	is_integer(I0), I0 > 0, I0 < 256,
+					is_integer(I1), I1 >= 0, I1 < 256,
+					is_integer(I2), I2 >= 0, I2 < 256,
+					is_integer(I3), I3 >= 0, I3 < 256
+				->
+	is_rfc1918_guarded(Ip);
+is_rfc1918(_) ->
+	throw({error, "Not a valid IPv4 address"}).
+
+% Loopback (actually, it's not a RFC1918 network)
+is_rfc1918_guarded({127,_,_,_}) ->
+	true;
+% RFC 1918, 10.0.0.0 - 10.255.255.255
+is_rfc1918_guarded({10,_,_,_}) ->
+	true;
+% RFC 1918, 172.16.0.0 - 172.31.255.255
+is_rfc1918_guarded({172,I1,_,_}) when I1 > 15, I1 < 32 ->
+	true;
+% RFC 1918, 192.168.0.0 - 192.168.255.255
+is_rfc1918_guarded({192,168,_,_}) ->
+	true;
+is_rfc1918_guarded(_) ->
+	false.
