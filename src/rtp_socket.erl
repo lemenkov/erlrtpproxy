@@ -27,7 +27,7 @@
 %%%
 %%%----------------------------------------------------------------------
 
--module(gen_rtp_socket).
+-module(rtp_socket).
 -author('lemenkov@gmail.com').
 
 -behaviour(gen_server).
@@ -110,11 +110,8 @@ init ([Parent, Fd, Transport, Proto, Parameters]) ->
 	end,
 
 	% Get probable IP and port
-	{Ip, Port} = ensure_addr(
-		proplists:get_value(ip, Parameters, null),
-		proplists:get_value(port, Parameters, null),
-		proplists:get_value(external, Parameters, true)
-	),
+	Ip = proplists:get_value(ip, Parameters, null),
+	Port = proplists:get_value(port, Parameters, null),
 
 	{ok, #state{
 			parent = Parent,
@@ -159,11 +156,8 @@ handle_cast({update, Parameters}, State) ->
 	Transcode = proplists:get_value(transcode, Parameters, null),
 
 	% Get probable IP and port
-	{Ip, Port} = ensure_addr(
-		proplists:get_value(ip, Parameters, null),
-		proplists:get_value(port, Parameters, null),
-		proplists:get_value(external, Parameters, true)
-	),
+	Ip = proplists:get_value(ip, Parameters, null),
+	Port = proplists:get_value(port, Parameters, null),
 
 	case State#state.started of
 		true ->
@@ -266,16 +260,6 @@ handle_info(interim_update, #state{alive = false} = State) ->
 %%
 %% Private functions
 %%
-
-ensure_addr (null, _, _) ->
-	{null, null};
-ensure_addr (GuessIp, GuessPort, IsInternal) ->
-	% Get probable IP and port
-	% FIXME consider IsInternal param
-	{Ip, Port} = case rtpproxy_utils:is_rfc1918(GuessIp) of
-		true -> {null, null};
-		_ -> {GuessIp, GuessPort}
-	end.
 
 process_data(rtp, Pkts, Parent, Neighbour) ->
 	gen_server:cast(Neighbour, {rtp, Pkts});

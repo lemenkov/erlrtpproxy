@@ -22,16 +22,13 @@
 
 -include("../include/common.hrl").
 
--export([get_fd_quadruple/1]).
--export([get_ipaddrs/0]).
--export([get_ipaddrs/1]).
+-export([get_fd_pair/1]).
+-export([get_ipaddrs/2]).
 -export([is_rfc1918/1]).
 
 %% Determine the list of suitable IP addresses
-get_ipaddrs() ->
-	get_ipaddrs([external, ipv4]).
-get_ipaddrs(Options) ->
-	% TODO IPv4 only
+get_ipaddrs({_DirFrom, _DirTo}, _IsIpv6) ->
+	% TODO IPv4 only and external
 	{ok, IPv4List} = inet:getif(),
 	FilterIP = fun (F) ->
 			fun
@@ -53,7 +50,8 @@ get_ipaddrs(Options) ->
 					F({Rest, X ++ [IPv4]})
 			end
 	end,
-	(y:y(FilterIP))({IPv4List, []}).
+	[MainIp | _Rest ] = (y:y(FilterIP))({IPv4List, []}),
+	{MainIp, MainIp}.
 
 %% Open a pair of UDP ports - N and N+1 (for RTP and RTCP consequently)
 get_fd_pair(Ip) ->
@@ -81,21 +79,6 @@ get_fd_pair(Ip, NTry) ->
 			end;
 		{error, _} ->
 			get_fd_pair(Ip, NTry - 1)
-	end.
-
-%% Get a two pairs of UDP ports
-get_fd_quadruple(Ip) ->
-	case get_fd_pair(Ip) of
-		{Fd0, Fd1} ->
-			case get_fd_pair(Ip) of
-				{Fd2, Fd3} ->
-					{Fd0, Fd1, Fd2, Fd3};
-				error ->
-					gen_udp:close(Fd0),
-					gen_udp:close(Fd1),
-					error
-			end;
-		error -> error
 	end.
 
 % TODO only IPv4 for now

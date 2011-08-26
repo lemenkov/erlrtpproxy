@@ -70,23 +70,20 @@ init (
 		params = Params} = Cmd
 	) ->
 	% TODO just choose the first IP address for now
-	[MainIp | _Rest ]  = rtpproxy_utils:get_ipaddrs(),
+
+	Direction = proplists:get_value(direction, Params),
+	IsIpv6 = proplists:get_value(ipv6, Params, false),
+
+	{IpF, IpT}  = rtpproxy_utils:get_ipaddrs(Direction, IsIpv6),
 	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE, ping),
 
-	{Fd0, Fd1, Fd2, Fd3} = rtpproxy_utils:get_fd_quadruple(MainIp),
+	{Fd0, Fd1} = rtpproxy_utils:get_fd_pair(IpF),
+	{Fd2, Fd3} = rtpproxy_utils:get_fd_pair(IpT),
 
 	[P0, P1, P2, P3]  = lists:map(fun(X) -> {ok, {_I, P}} = inet:sockname(X), P end, [Fd0, Fd1, Fd2, Fd3]),
-	?INFO("~s started at ~s, with  F {~p,~p} T {~p,~p}", [CallId, inet_parse:ntoa(MainIp), P0, P1, P2, P3]),
+	?INFO("~s started F:~s, {~p,~p} T:~s {~p,~p}", [CallId, inet_parse:ntoa(IpF), P0, P1, inet_parse:ntoa(IpT), P2, P3]),
 
-	% RTP addresses
-	{ok, {I0, P0}} = inet:sockname(Fd0),
-	{ok, {I2, P2}} = inet:sockname(Fd2),
-
-	% RTCP addresses
-	{ok, {I1, P1}} = inet:sockname(Fd1),
-	{ok, {I3, P3}} = inet:sockname(Fd3),
-
-	gen_server:cast(Pid, {reply, Cmd, {I0, P0}, {I2, P2}}),
+	gen_server:cast(Pid, {reply, Cmd, {IpF, P0}, {IpT, P2}}),
 
 	RtpParams = case FAddr of
 		null -> Params;
@@ -99,10 +96,10 @@ init (
 	end,
 
 	% FIXME use start (w/o linking)
-	{ok, Pid0} = gen_rtp_socket:start_link([self(), Fd0, udp, rtp, []]),
-	{ok, Pid1} = gen_rtp_socket:start_link([self(), Fd1, udp, rtcp, []]),
-	{ok, Pid2} = gen_rtp_socket:start_link([self(), Fd2, TProto, rtp, RtpParams]),
-	{ok, Pid3} = gen_rtp_socket:start_link([self(), Fd3, TProto, rtcp, RtcpParams]),
+	{ok, Pid0} = rtp_socket:start_link([self(), Fd0, udp, rtp, []]),
+	{ok, Pid1} = rtp_socket:start_link([self(), Fd1, udp, rtcp, []]),
+	{ok, Pid2} = rtp_socket:start_link([self(), Fd2, TProto, rtp, RtpParams]),
+	{ok, Pid3} = rtp_socket:start_link([self(), Fd3, TProto, rtcp, RtcpParams]),
 
 	gen_udp:controlling_process(Fd0, Pid0),
 	gen_udp:controlling_process(Fd1, Pid1),
@@ -125,10 +122,10 @@ init (
 			tag_f	= TagFrom,
 			tag_t	= null,
 			tref	= TRef,
-			from	= #media{pid=Pid0, ip=I0, port=P0, rtpstate=nortp},
-			fromrtcp= #media{pid=Pid1, ip=I1, port=P1, rtpstate=nortp},
-			to	= #media{pid=Pid2, ip=I2, port=P2, rtpstate=nortp},
-			tortcp	= #media{pid=Pid3, ip=I3, port=P3, rtpstate=nortp}
+			from	= #media{pid=Pid0, ip=IpF, port=P0, rtpstate=nortp},
+			fromrtcp= #media{pid=Pid1, ip=IpF, port=P1, rtpstate=nortp},
+			to	= #media{pid=Pid2, ip=IpT, port=P2, rtpstate=nortp},
+			tortcp	= #media{pid=Pid3, ip=IpT, port=P3, rtpstate=nortp}
 		}
 	}.
 
