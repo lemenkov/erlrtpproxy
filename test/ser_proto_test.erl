@@ -67,7 +67,7 @@ parse_cmd_u_1_test() ->
 						101
 					]
 				},
-				{external,true},
+				{direction, {external, external}},
 				{symmetric,true}
 			]
 		}, ser_proto:parse("24393_4 Uc0,8,18,101 0003e30c-c50c00f7-123e8bd9-542f2edf@192.168.0.100 192.168.0.100 27686 0003e30cc50cd69210b8c36b-0ecf0120;1", {127,0,0,1}, 1234)).
@@ -95,7 +95,7 @@ parse_cmd_u_2_test() ->
 						101
 					]
 				},
-				{external,true},
+				{direction, {external, external}},
 				{symmetric,true}
 			]
 		}, ser_proto:parse("438_41061 Uc8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
@@ -123,7 +123,7 @@ parse_cmd_u_3transcode1_test() ->
 						101
 					]
 				},
-				{external,true},
+				{direction, {external, external}},
 				{symmetric,true},
 				{transcode,{'G723',8000,1}}
 			]
@@ -152,7 +152,7 @@ parse_cmd_u_3transcode2_test() ->
 						101
 					]
 				},
-				{external,true},
+				{direction, {external, external}},
 				{symmetric,true},
 				{transcode,{'G723',8000,1}}
 			]
@@ -183,7 +183,7 @@ parse_cmd_u4_zeroes_test() ->
 						{'H263',90000,0}
 					]
 				},
-				{external,true},
+				{direction, {external, external}},
 				{repacketize,30},
 				{symmetric,true}
 			]
@@ -212,16 +212,185 @@ parse_cmd_u_5_proto_test() ->
 						101
 					]
 				},
-				{external,true},
+				{direction, {external, external}},
 				{symmetric,true},
 				{transcode,{'G723',8000,1}}
 			]
 		}, ser_proto:parse("438_41061 Ut4p1c8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
 
-parse_cmd_u_6_both_internal_and_external_test() ->
-	?assertThrow(
-		{error_syntax,"Both internal and external modifiers are defined"},
-		ser_proto:parse("438_41061 Ut4p1iec8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
+parse_cmd_u_6_0_internal_to_internal_test() ->
+	?assertEqual(
+		#cmd{
+			type=?CMD_U,
+			cookie="438_41061",
+			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
+			callid="e12ea248-94a5e885@192.168.5.3",
+			mediaid=1,
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432}, proto=tcp},
+			params=[
+				{codecs,[
+						{'PCMU',8000,1},
+						2,
+						{'G723',8000,1},
+						{'PCMA',8000,1},
+						{'G729',8000,1},
+						96,
+						97,
+						98,
+						100,
+						101
+					]
+				},
+				{direction, {internal, internal}},
+				{symmetric,true},
+				{transcode,{'G723',8000,1}}
+			]
+		}, ser_proto:parse("438_41061 Ut4p1iic8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
+
+parse_cmd_u_6_1_internal_to_external_test() ->
+	?assertEqual(
+		#cmd{
+			type=?CMD_U,
+			cookie="438_41061",
+			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
+			callid="e12ea248-94a5e885@192.168.5.3",
+			mediaid=1,
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432}, proto=tcp},
+			params=[
+				{codecs,[
+						{'PCMU',8000,1},
+						2,
+						{'G723',8000,1},
+						{'PCMA',8000,1},
+						{'G729',8000,1},
+						96,
+						97,
+						98,
+						100,
+						101
+					]
+				},
+				{direction, {internal, external}},
+				{symmetric,true},
+				{transcode,{'G723',8000,1}}
+			]
+		}, ser_proto:parse("438_41061 Ut4p1iec8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
+
+parse_cmd_u_6_2_external_to_internal_single_test() ->
+	?assertEqual(
+		#cmd{
+			type=?CMD_U,
+			cookie="438_41061",
+			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
+			callid="e12ea248-94a5e885@192.168.5.3",
+			mediaid=1,
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432}, proto=tcp},
+			params=[
+				{codecs,[
+						{'PCMU',8000,1},
+						2,
+						{'G723',8000,1},
+						{'PCMA',8000,1},
+						{'G729',8000,1},
+						96,
+						97,
+						98,
+						100,
+						101
+					]
+				},
+				{direction, {external, internal}},
+				{symmetric,true},
+				{transcode,{'G723',8000,1}}
+			]
+		}, ser_proto:parse("438_41061 Ut4p1eic8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
+
+parse_cmd_u_6_3_internal_to_internal_single_test() ->
+	?assertEqual(
+		#cmd{
+			type=?CMD_U,
+			cookie="438_41061",
+			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
+			callid="e12ea248-94a5e885@192.168.5.3",
+			mediaid=1,
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432}, proto=tcp},
+			params=[
+				{codecs,[
+						{'PCMU',8000,1},
+						2,
+						{'G723',8000,1},
+						{'PCMA',8000,1},
+						{'G729',8000,1},
+						96,
+						97,
+						98,
+						100,
+						101
+					]
+				},
+				{direction, {internal, internal}},
+				{symmetric,true},
+				{transcode,{'G723',8000,1}}
+			]
+		}, ser_proto:parse("438_41061 Ut4p1ic8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
+
+parse_cmd_u_6_4_external_to_external_test() ->
+	?assertEqual(
+		#cmd{
+			type=?CMD_U,
+			cookie="438_41061",
+			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
+			callid="e12ea248-94a5e885@192.168.5.3",
+			mediaid=1,
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432}, proto=tcp},
+			params=[
+				{codecs,[
+						{'PCMU',8000,1},
+						2,
+						{'G723',8000,1},
+						{'PCMA',8000,1},
+						{'G729',8000,1},
+						96,
+						97,
+						98,
+						100,
+						101
+					]
+				},
+				{direction, {external, external}},
+				{symmetric,true},
+				{transcode,{'G723',8000,1}}
+			]
+		}, ser_proto:parse("438_41061 Ut4p1eec8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
+
+parse_cmd_u_6_5_external_to_external_single_test() ->
+	?assertEqual(
+		#cmd{
+			type=?CMD_U,
+			cookie="438_41061",
+			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
+			callid="e12ea248-94a5e885@192.168.5.3",
+			mediaid=1,
+			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432}, proto=tcp},
+			params=[
+				{codecs,[
+						{'PCMU',8000,1},
+						2,
+						{'G723',8000,1},
+						{'PCMA',8000,1},
+						{'G729',8000,1},
+						96,
+						97,
+						98,
+						100,
+						101
+					]
+				},
+				{direction, {external, external}},
+				{symmetric,true},
+				{transcode,{'G723',8000,1}}
+			]
+		}, ser_proto:parse("438_41061 Ut4p1ec8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
 
 parse_cmd_u_7_both_symmetric_and_asymmetric_test() ->
 	?assertThrow(
@@ -252,7 +421,7 @@ parse_cmd_u_8_acc_start_test() ->
 						101
 					]
 				},
-				{external,true},
+				{direction, {external, external}},
 				{symmetric,true},
 				{transcode,{'G723',8000,1}}
 			]
@@ -312,7 +481,7 @@ parse_cmd_u_10_acc_stop_test() ->
 						101
 					]
 				},
-				{external,true},
+				{direction, {external, external}},
 				{symmetric,true},
 				{transcode,{'G723',8000,1}}
 			]
@@ -350,7 +519,7 @@ parse_cmd_l_1_test() ->
 						101
 					]
 				},
-				{external,true},
+				{direction, {external, external}},
 				{symmetric,true}
 			]
 		}, ser_proto:parse("413_40797 Lc0,101,100 452ca314-3bbcf0ea@192.168.0.2 192.168.100.4 17050 e4920d0cb29cf52o0;1 8d11d16a3b56fcd588d72b3d359cc4e1;1", {127,0,0,1}, 1234)).
@@ -372,7 +541,7 @@ parse_cmd_l_2_test() ->
 						101
 					]
 				},
-				{external,false},
+				{direction, {internal, internal}},
 				{symmetric,true}
 			]
 		}, ser_proto:parse("418_41111 LIc8,101,100 a68e961-5f6a75e5-356cafd9-3562@192.168.100.6 192.168.100.4 18756 1372466422;1 60753eabbd87fe6f34068e9d80a9fc1c;1", {127,0,0,1}, 1234)).

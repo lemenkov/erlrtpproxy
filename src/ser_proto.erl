@@ -271,13 +271,11 @@ parse_params(A) ->
 
 parse_params([], Result) ->
 	% Default parameters are - symmetric NAT, non-RFC1918 IPv4 network
-	R1 = case {proplists:get_value(internal, Result), proplists:get_value(external, Result)} of
-		{true, true} ->
-			throw({error_syntax, "Both internal and external modifiers are defined"});
-		{true, _} ->
-			proplists:delete(internal, Result) ++ [{external, false}];
+	R1 = case proplists:get_value(direction, Result) of
+		undefined ->
+			Result ++ [{direction, {external, external}}];
 		_ ->
-			proplists:delete(external, Result) ++ [{external, true}]
+			Result
 	end,
 	R2 = case {proplists:get_value(asymmetric, R1), proplists:get_value(symmetric, R1)} of
 		{true, true} ->
@@ -327,12 +325,27 @@ parse_params([$C|Rest], Result) ->
 			),
 			parse_params(Rest1, ensure_alone(Result, codecs, Codecs))
 	end;
+% Direction:
 % External (non-RFC1918) network
-parse_params([$E|Rest], Result) ->
-	parse_params(Rest, ensure_alone(Result, external));
 % Internal (RFC1918) network
+% External to External
+parse_params([$E, $E|Rest], Result) ->
+	parse_params(Rest, ensure_alone(Result, direction, {external, external}));
+% External to Internal
+parse_params([$E, $I|Rest], Result) ->
+	parse_params(Rest, ensure_alone(Result, direction, {external, internal}));
+% External to External (single E)
+parse_params([$E|Rest], Result) ->
+	parse_params(Rest, ensure_alone(Result, direction, {external, external}));
+% Internal to External
+parse_params([$I, $E|Rest], Result) ->
+	parse_params(Rest, ensure_alone(Result, direction, {internal, external}));
+% Internal to Internal
+parse_params([$I, $I|Rest], Result) ->
+	parse_params(Rest, ensure_alone(Result, direction, {internal, internal}));
+% Internal to Internal (single I)
 parse_params([$I|Rest], Result) ->
-	parse_params(Rest, ensure_alone(Result, internal));
+	parse_params(Rest, ensure_alone(Result, direction, {internal, internal}));
 % l - local address (?)
 parse_params([$L|Rest], Result) ->
 	parse_params(Rest, ensure_alone(Result, local));
