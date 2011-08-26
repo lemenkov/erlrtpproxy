@@ -282,13 +282,13 @@ parse_cmd_u_9_acc_interim_update_test() ->
 						101
 					]
 				},
-				{external,true},
+				{direction, {external, external}},
 				{symmetric,true},
 				{transcode,{'G723',8000,1}}
 			]
 		}, ser_proto:parse("438_41061 Ut4p1c8,0,2,4,18,96,97,98,100,101v0v1 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
 
-parse_cmd_u_10_acc_interim_update_test() ->
+parse_cmd_u_10_acc_stop_test() ->
 	?assertEqual(
 		#cmd{
 			type=?CMD_U,
