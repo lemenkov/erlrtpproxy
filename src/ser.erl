@@ -33,7 +33,7 @@
 -include("common.hrl").
 -include_lib("erlsyslog/include/erlsyslog.hrl").
 
--record(state, {listen, timer, mode}).
+-record(state, {listen, timer, mode, node}).
 
 start(Args) ->
 	gen_server:start(?MODULE, Args, []).
@@ -44,7 +44,10 @@ start_link(Args) ->
 init (_Unused) ->
 	% Load parameters
 	{ok, {Ip, Port}} = application:get_env(?MODULE, listen_address),
-	{ok, RtpproxyNode} = application:get_env(?MODULE, rtpproxy_node),
+	RtpproxyNode = case application:get_env(?MODULE, rtpproxy_node) of
+		undefined -> undefined;
+		{ok, RtpproxyNode0} -> RtpproxyNode0
+	end,
 
 
 	% Ping every second
@@ -53,7 +56,7 @@ init (_Unused) ->
 	case gen_udp:open(Port, [{ip, Ip}, {active, true}, list]) of
 		{ok, Fd} ->
 			?INFO("started at [~s:~w]", [inet_parse:ntoa(Ip), Port]),
-			{ok, #state{listen = Fd, timer = TRef, mode = offline}};
+			{ok, #state{listen = Fd, timer = TRef, mode = offline, node = RtpproxyNode}};
 		{error, Reason} ->
 			?ERR("interface not started. Reason [~p]", [Reason]),
 			{stop, Reason}
@@ -121,8 +124,9 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{listen = Fd, mode = Online} = State
 	end,
 	{noreply, State};
 
-handle_info(ping, #state{mode = Online} = State) ->
-	{ok, RtpproxyNode} = application:get_env(?MODULE, rtpproxy_node),
+handle_info(ping, #state{node = undefined} = State) ->
+	{noreply, State#state{mode = offline}};
+handle_info(ping, #state{mode = Online, node = RtpproxyNode} = State) ->
 	case net_adm:ping(RtpproxyNode) of
 		pong when Online == offline ->
 			?WARN("Connection to erlrtpproxy restored.~n", []),
