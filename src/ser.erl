@@ -33,6 +33,8 @@
 -include("common.hrl").
 -include_lib("erlsyslog/include/erlsyslog.hrl").
 
+-record(state, {listen, timer, mode}).
+
 start(Args) ->
 	gen_server:start(?MODULE, Args, []).
 
@@ -52,7 +54,7 @@ init (_Unused) ->
 	case gen_udp:open(Port, [{ip, Ip}, {active, true}, list]) of
 		{ok, Fd} ->
 			?INFO("started at [~s:~w]", [inet_parse:ntoa(Ip), Port]),
-			{ok, {Fd, TRef, online}};
+			{ok, #state{listen = Fd, timer = TRef, mode = online}};
 		{error, Reason} ->
 			?ERR("interface not started. Reason [~p]", [Reason]),
 			{stop, Reason}
@@ -62,12 +64,12 @@ handle_call(_Other, _From, State) ->
 	{noreply, State}.
 
 % Got two addresses (initial Media stream creation)
-handle_cast({reply, #cmd{origin = #origin{type = ser, ip = Ip, port = Port}} = Cmd, Answer, _}, {Fd, _, _} = State) ->
+handle_cast({reply, #cmd{origin = #origin{type = ser, ip = Ip, port = Port}} = Cmd, Answer, _}, #state{listen = Fd} = State) ->
 	Data = ser_proto:encode(Cmd, Answer),
 	gen_udp:send(Fd, Ip, Port, Data),
 	{noreply, State};
 % TODO deprecate this case
-handle_cast({reply, #cmd{origin = #origin{type = ser, ip = Ip, port = Port}} = Cmd, Answer}, {Fd, _, _} = State) ->
+handle_cast({reply, #cmd{origin = #origin{type = ser, ip = Ip, port = Port}} = Cmd, Answer}, #state{listen = Fd} = State) ->
 	Data = ser_proto:encode(Cmd, Answer),
 	gen_udp:send(Fd, Ip, Port, Data),
 	{noreply, State};
@@ -78,14 +80,14 @@ handle_cast(_Request, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, {Fd, TRef}) ->
+terminate(Reason, #state{listen = Fd, timer = TRef}) ->
 	gen_udp:close(Fd),
 	timer:cancel(TRef),
 	?ERR("thread terminated due to reason [~p]", [Reason]).
 
 % Fd from which message arrived must be equal to Fd from our state
 % Brief introduction of protocol is here: http://rtpproxy.org/wiki/RTPproxyProtocol
-handle_info({udp, Fd, Ip, Port, Msg}, {Fd, _, Online} = State) ->
+handle_info({udp, Fd, Ip, Port, Msg}, #state{listen = Fd, mode = Online} = State) ->
 	try ser_proto:parse(Msg, Ip, Port) of
 		#cmd{type = ?CMD_V} = Cmd ->
 			% Request basic supported rtpproxy protocol version
@@ -120,17 +122,17 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Fd, _, Online} = State) ->
 	end,
 	{noreply, State};
 
-handle_info(ping, {Fd, TRef, Online}) ->
+handle_info(ping, #state{mode = Online} = State) ->
 	{ok, RtpproxyNode} = application:get_env(?MODULE, rtpproxy_node),
 	case net_adm:ping(RtpproxyNode) of
 		pong when Online == offline ->
 			?WARN("Connection to erlrtpproxy restored.~n", []),
-			{noreply, {Fd, TRef, online}};
+			{noreply, State#state{mode = online}};
 		pong ->
-			{noreply, {Fd, TRef, online}};
+			{noreply, State#state{mode = online}};
 		pang ->
 			?ERR("Lost connection to erlrtpproxy.~n", []),
-			{noreply, {Fd, TRef, offline}}
+			{noreply, State#state{mode = offline}}
 	end;
 
 handle_info(Info, State) ->
