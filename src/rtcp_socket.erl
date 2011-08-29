@@ -53,8 +53,7 @@
 		portt,
 		started,
 		weak,
-		symmetric,
-		neighbour = null
+		symmetric
 	}
 ).
 
@@ -68,8 +67,7 @@ init ([Parent, Fd, Transport, Parameters]) ->
 	Symmetric = proplists:get_value(symmetric, Parameters, true),
 
 	% Get probable IP and port
-	Ip = proplists:get_value(ip, Parameters, null),
-	Port = proplists:get_value(port, Parameters, null),
+	{Ip, Port} = proplists:get_value(rtp, Parameters, {null, null}),
 
 	{ok, #state{
 			parent = Parent,
@@ -85,8 +83,8 @@ init ([Parent, Fd, Transport, Parameters]) ->
 		}
 	}.
 
-handle_call({neighbour, Pid}, _From, State) when is_pid(Pid) ->
-	{reply, ok, State#state{neighbour = Pid}}.
+handle_call(_Call, _From, State) ->
+	{stop, bad_call, State}.
 
 handle_cast({rtcp, _Pkts}, #state{ipt = null, portt = null} = State) ->
 	{noreply, State};
@@ -138,22 +136,22 @@ terminate(Reason, #state{parent = Parent, fd = Fd, transport = Transport}) ->
 	Type:close(Fd),
 	ok.
 
-handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, parent = Parent, started = true, weak = true, symmetric = Symmetric, neighbour = Neighbour} = State) ->
+handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, parent = Parent, started = true, weak = true, symmetric = Symmetric} = State) ->
 	inet:setopts(Fd, [{active, once}]),
 	try
 		{ok, Pkts} = rtcp:decode(Msg),
-		gen_server:cast(Parent, {rtcp, Pkts, self(), Neighbour}),
+		gen_server:cast(Parent, {rtcp, Pkts, self()}),
 		{noreply, State#state{ipt = Ip, portt = Port}}
 	catch
 		_:_ -> rtp_utils:dump_packet(node(), self(), Msg),
 		{noreply, State}
 	end;
 
-handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, parent = Parent, started = true, weak = false, ipf = Ip, portf = Port, neighbour = Neighbour} = State) ->
+handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, parent = Parent, started = true, weak = false, ipf = Ip, portf = Port} = State) ->
 	inet:setopts(Fd, [{active, once}]),
 	try
 		{ok, Pkts} = rtcp:decode(Msg),
-		gen_server:cast(Parent, {rtcp, Pkts, self(), Neighbour}),
+		gen_server:cast(Parent, {rtcp, Pkts, self()}),
 		{noreply, State}
 	catch
 		_:_ -> rtp_utils:dump_packet(node(), self(), Msg),
@@ -164,11 +162,11 @@ handle_info({udp, Fd, _Ip, _Port, _Msg}, #state{fd = Fd, started = true, weak = 
 	?ERR("Disallow data from strange source", []),
 	{noreply, State};
 
-handle_info({udp, Fd, Ip, Port, Msg}, #state{parent = Parent, started = false, neighbour = Neighbour} = State) ->
+handle_info({udp, Fd, Ip, Port, Msg}, #state{parent = Parent, started = false} = State) ->
 	inet:setopts(Fd, [{active, once}]),
 	try
 		{ok, Pkts} = rtcp:decode(Msg),
-		gen_server:cast(Parent, {rtcp, Pkts, self(), Neighbour}),
+		gen_server:cast(Parent, {rtcp, Pkts, self()}),
 		{noreply, State#state{started = true, ipf = Ip, portf = Port}}
 	catch
 		_:_ -> rtp_utils:dump_packet(node(), self(), Msg),

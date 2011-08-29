@@ -48,9 +48,8 @@
 		tag_t,
 		tref,
 		from,
-		fromrtcp,
 		to,
-		tortcp,
+		origcmd,
 		started = false
 	}
 ).
@@ -62,58 +61,28 @@ start(Cmd) ->
 init (
 	#cmd{
 		type = ?CMD_U,
-		origin = #origin{type = ser, pid = Pid},
 		callid = CallId,
 		mediaid = MediaId,
 		from = #party{tag = TagFrom, addr = FAddr, rtcpaddr = FRtcpAddr, proto = TProto},
-		to = null,
 		params = Params} = Cmd
 	) ->
-	% TODO just choose the first IP address for now
-
-	Direction = proplists:get_value(direction, Params),
-	IsIpv6 = proplists:get_value(ipv6, Params, false),
-
-	{IpF, IpT}  = rtpproxy_utils:get_ipaddrs(Direction, IsIpv6),
 	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE, ping),
 
-	{Fd0, Fd1} = rtpproxy_utils:get_fd_pair(IpF),
-	{Fd2, Fd3} = rtpproxy_utils:get_fd_pair(IpT),
+	{FromDir, ToDir} = proplists:get_value(direction, Params),
 
-	[P0, P1, P2, P3]  = lists:map(fun(X) -> {ok, {_I, P}} = inet:sockname(X), P end, [Fd0, Fd1, Fd2, Fd3]),
-	?INFO("~s started F:~s, {~p,~p} T:~s {~p,~p}", [CallId, inet_parse:ntoa(IpF), P0, P1, inet_parse:ntoa(IpT), P2, P3]),
-
-	gen_server:cast(Pid, {reply, Cmd, {IpF, P0}, {IpT, P2}}),
-
-	RtpParams = case FAddr of
-		null -> Params;
-		{GuessIp0, GuessPort0} -> Params ++ [{ip, GuessIp0}, {port, GuessPort0}]
+	FRtpParamsAddon = case FAddr of
+		null -> [];
+		{GuessIp0, GuessPort0} -> [{rtp, {GuessIp0, GuessPort0}}]
 	end,
 
-	RtcpParams = case FRtcpAddr of
-		null -> proplists:delete(transcode, Params);
-		{GuessIp1, GuessPort1} -> proplists:delete(transcode, Params) ++ [{ip, GuessIp1}, {port, GuessPort1}]
+	FRtcpParamsAddon = case FRtcpAddr of
+		null -> [];
+		{GuessIp1, GuessPort1} -> [{rtcp, {GuessIp1, GuessPort1}}]
 	end,
 
 	% FIXME use start (w/o linking)
-	{ok, Pid0} = rtp_socket:start_link([self(), Fd0, udp, rtp, []]),
-	{ok, Pid1} = rtp_socket:start_link([self(), Fd1, udp, rtcp, []]),
-	{ok, Pid2} = rtp_socket:start_link([self(), Fd2, TProto, rtp, RtpParams]),
-	{ok, Pid3} = rtp_socket:start_link([self(), Fd3, TProto, rtcp, RtcpParams]),
-
-	gen_udp:controlling_process(Fd0, Pid0),
-	gen_udp:controlling_process(Fd1, Pid1),
-	gen_udp:controlling_process(Fd2, Pid2),
-	gen_udp:controlling_process(Fd3, Pid3),
-
-	gen_server:call(Pid0, {neighbour, Pid2}),
-	gen_server:call(Pid2, {neighbour, Pid0}),
-
-	gen_server:call(Pid1, {neighbour, Pid3}),
-	gen_server:call(Pid3, {neighbour, Pid1}),
-
-	% Register at the rtpproxy
-	gen_server:cast({global, rtpproxy}, {created, self(), {CallId, MediaId}}),
+	{ok, PidF} = rtp_socket:start_link([self(), udp, [{direction, ToDir}]]),
+	{ok, PidT} = rtp_socket:start_link([self(), TProto, proplists:delete(direction, Params) ++ [{direction, FromDir}] ++ FRtpParamsAddon ++ FRtcpParamsAddon]),
 
 	{ok,
 		#state{
@@ -122,10 +91,9 @@ init (
 			tag_f	= TagFrom,
 			tag_t	= null,
 			tref	= TRef,
-			from	= #media{pid=Pid0, ip=IpF, port=P0, rtpstate=nortp},
-			fromrtcp= #media{pid=Pid1, ip=IpF, port=P1, rtpstate=nortp},
-			to	= #media{pid=Pid2, ip=IpT, port=P2, rtpstate=nortp},
-			tortcp	= #media{pid=Pid3, ip=IpT, port=P3, rtpstate=nortp}
+			from	= #media{pid=PidF, rtpstate=nortp},
+			to	= #media{pid=PidT, rtpstate=nortp},
+			origcmd = Cmd
 		}
 	}.
 
@@ -148,36 +116,33 @@ handle_cast(
 			callid = CallId,
 			mediaid = MediaId,
 			from = #media{pid = PidF, ip = IpF, port = PortF},
-			fromrtcp = #media{pid = PidFRtcp},
 			to = #media{pid = PidT, ip = IpT, port = PortT},
-			tortcp = #media{pid = PidTRtcp},
 			tag_f = TagF,
 			tag_t = TagT} = State
 	) ->
-	{Dir, P, PRtcp, Ip, Port} = case Tag of
-		TagF -> {from, PidT, PidTRtcp, IpF, PortF};
-		TagT -> {to, PidF, PidFRtcp, IpT, PortT};
+	{Dir, P, Ip, Port} = case Tag of
+		TagF -> {from, PidT, IpF, PortF};
+		TagT -> {to, PidF, IpT, PortT};
 		% Initial set up of a tag_t
-		_ when TagT == null -> {to, PidF, PidFRtcp, IpT, PortT};
-		_ -> {notfound, null, null, null, null}
+		_ when TagT == null -> {to, PidF, IpT, PortT};
+		_ -> {notfound, null, null, null}
 	end,
 	case Dir of
 		notfound ->
 			gen_server:cast(Pid, {reply, Cmd, {error, notfound}}),
 			{noreply, State};
 		_ ->
-			RtpParams = case FAddr of
-				null -> Params;
-				{GuessIp0, GuessPort0} -> Params ++ [{ip, GuessIp0}, {port, GuessPort0}]
+			RtpParamsAddon = case FAddr of
+				null -> [];
+				{GuessIp0, GuessPort0} -> [{rtp, {GuessIp0, GuessPort0}}]
 			end,
 
-			RtcpParams = case FRtcpAddr of
-				null -> proplists:delete(transcode, Params);
-				{GuessIp1, GuessPort1} -> proplists:delete(transcode, Params) ++ [{ip, GuessIp1}, {port, GuessPort1}]
+			RtcpParamsAddon = case FRtcpAddr of
+				null -> [];
+				{GuessIp1, GuessPort1} -> [{rtcp, {GuessIp1, GuessPort1}}]
 			end,
 
-			gen_server:cast(P, {update, RtpParams}),
-			gen_server:cast(PRtcp, {update, RtcpParams}),
+			gen_server:cast(P, {update, Params ++ RtpParamsAddon ++ RtcpParamsAddon}),
 
 			gen_server:cast(Pid, {reply, Cmd, {Ip, Port}}),
 
@@ -190,7 +155,6 @@ handle_cast(
 handle_cast(
 		#cmd{
 			type = ?CMD_D,
-			origin = #origin{pid = Pid},
 			callid = CallId,
 			mediaid = 0,
 			from = #party{tag = TagFrom},
@@ -260,10 +224,22 @@ handle_cast({stop, Pid, Reason}, #state{
 			}
 	end;
 
-handle_cast({rtcp, Rtcps, From, To}, State) ->
+handle_cast({rtcp, Rtcps, PidF}, #state{from = #media{pid=PidF, rtpstate=nortp}, to = #media{pid=PidT, rtpstate=nortp}} = State) ->
 	?INFO("RTCP from ~s: ~s", [State#state.callid, lists:map (fun rtp_utils:pp/1, Rtcps)]),
-	gen_server:cast(To, {rtcp, Rtcps}),
+	gen_server:cast(PidT, {rtcp, Rtcps, self()}),
 	{noreply, State};
+handle_cast({rtcp, Rtcps, PidT}, #state{from = #media{pid=PidF, rtpstate=nortp}, to = #media{pid=PidT, rtpstate=nortp}} = State) ->
+	?INFO("RTCP from ~s: ~s", [State#state.callid, lists:map (fun rtp_utils:pp/1, Rtcps)]),
+	gen_server:cast(PidF, {rtcp, Rtcps, self()}),
+	{noreply, State};
+
+handle_cast({started, Pid, {I0, P0}, {I1, P1}}, #state{from = #media{pid = Pid} = From, to = To, origcmd = Cmd} = State) ->
+	try_notify_parent(Cmd, From#media{ip = I0, port = P0}, To),
+	{noreply, State#state{from = From#media{ip = I0, port = P0}}};
+
+handle_cast({started, Pid, {I0, P0}, {I1, P1}}, #state{from = From, to = #media{pid = Pid} = To, origcmd = Cmd} = State) ->
+	try_notify_parent(Cmd, From, To#media{ip = I0, port = P0}),
+	{noreply, State#state{to = To#media{ip = I0, port = P0}}};
 
 handle_cast(_Other, State) ->
 	{noreply, State}.
@@ -271,10 +247,10 @@ handle_cast(_Other, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, #state{callid = CallId, mediaid = MediaId, tref = TimerRef, from = From, fromrtcp = FromRtcp, to = To, tortcp = ToRtcp}) ->
+terminate(Reason, #state{callid = CallId, mediaid = MediaId, tref = TimerRef, from = From, to = To}) ->
 	timer:cancel(TimerRef),
-	% TODO we should send RTCP BYE here
-	lists:map(fun (X) -> gen_server:cast(X#media.pid, stop) end, [From, FromRtcp, To, ToRtcp]),
+	gen_server:cast(From#media.pid, stop),
+	gen_server:cast(To#media.pid, stop),
 
 	gen_server:cast({global, rtpproxy}, {'EXIT', self(), Reason}),
 	gen_server:cast(rtpproxy_radius, {stop, CallId, MediaId}),
@@ -301,3 +277,17 @@ handle_info(Other, State) ->
 	?WARN("Other Info [~p], State [~p]", [Other, State]),
 	{noreply, State}.
 
+%%
+%% Private functions
+%%
+
+try_notify_parent(Cmd, #media{ip = null, port = null}, _) ->
+	ok;
+try_notify_parent(Cmd, _, #media{ip = null, port = null}) ->
+	ok;
+try_notify_parent(#cmd{origin = #origin{type = ser, pid = Pid}, callid = CallId, mediaid = MediaId} = Cmd, #media{pid = Pid0, ip = I0, port = P0}, #media{pid = Pid1, ip = I1, port = P1}) ->
+	gen_server:cast(Pid0, {neighbour, Pid1}),
+	gen_server:cast(Pid1, {neighbour, Pid0}),
+	gen_server:cast(Pid, {reply, Cmd, {I0, P0}, {I1, P1}}),
+	gen_server:cast({global, rtpproxy}, {created, self(), {CallId, MediaId}}),
+	ok.

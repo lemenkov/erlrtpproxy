@@ -27,7 +27,7 @@
 -export([is_rfc1918/1]).
 
 %% Determine the list of suitable IP addresses
-get_ipaddrs({_DirFrom, _DirTo}, _IsIpv6) ->
+get_ipaddrs(_IsRfc1918, _IsIpv6) ->
 	% TODO IPv4 only and external
 	{ok, IPv4List} = inet:getif(),
 	FilterIP = fun (F) ->
@@ -51,10 +51,11 @@ get_ipaddrs({_DirFrom, _DirTo}, _IsIpv6) ->
 			end
 	end,
 	[MainIp | _Rest ] = (y:y(FilterIP))({IPv4List, []}),
-	{MainIp, MainIp}.
+	MainIp.
 
 %% Open a pair of UDP ports - N and N+1 (for RTP and RTCP consequently)
-get_fd_pair(Ip) ->
+get_fd_pair({Direction, IsIpv6}) ->
+	Ip  = rtpproxy_utils:get_ipaddrs(Direction, IsIpv6),
 	get_fd_pair(Ip, 10).
 get_fd_pair(Ip, 0) ->
 	?ERR("Create new socket at ~p FAILED", [Ip]),

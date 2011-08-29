@@ -51,6 +51,7 @@
 -record(state, {
 		parent,
 		fd,
+		rtcp,
 		transport,
 		proto,
 		ipf,
@@ -74,22 +75,24 @@ start(Args) ->
 start_link(Args) ->
 	gen_server:start_link(?MODULE, Args, []).
 
-init ([Parent, Transport, Proto, Parameters]) ->
+init ([Parent, Transport, Params] = InVals) ->
 	% FIXME allow explicitly set address (IP and Port) for both RTP and RTCP sockets
-	SockParams = proplists:get_value(sockparams, Parameters, []),
-	{ok, Fd} = gen_udp:open(0, SockParams),
-	init ([Parent, Fd, Transport, Proto, Parameters]);
-init ([Parent, Fd, Transport, Proto, Parameters]) ->
+	SockParams = proplists:get_value(sockparams, Params, []),
+	% FIXME open socket according Transport - don't hardcode UDP
+	Direction = proplists:get_value(direction, Params),
+	IsIpv6 = proplists:get_value(ipv6, Params, false),
+	{Fd0, Fd1} = rtpproxy_utils:get_fd_pair({Direction, IsIpv6}),
+
 	{ok, TRef} = timer:send_interval(?INTERIM_UPDATE, interim_update),
 
-	Weak = proplists:get_value(weak, Parameters, false),
-	Symmetric = proplists:get_value(symmetric, Parameters, true),
-	TryTranscode = proplists:get_value(transcode, Parameters, null),
+	Weak = proplists:get_value(weak, Params, false),
+	Symmetric = proplists:get_value(symmetric, Params, true),
+	TryTranscode = proplists:get_value(transcode, Params, null),
 
 	{Codecs, Transcode} = case TryTranscode of
 		null -> {[], null};
 		_ ->
-			CodecsVals = proplists:get_value(codecs, Parameters, null),
+			CodecsVals = proplists:get_value(codecs, Params, null),
 			C1 = run_codecs(CodecsVals),
 			T1 = case TryTranscode of
 				{'PCMU',8000,1} -> {?RTP_PAYLOAD_PCMU, proplists:get_value(?RTP_PAYLOAD_PCMU,C1)};
@@ -101,7 +104,8 @@ init ([Parent, Fd, Transport, Proto, Parameters]) ->
 				undefined ->
 					lists:foreach(fun
 							({_, passthrough}) -> ok;
-							({_, Codec}) -> codec:close(Codec)
+							({_, Codec}) -> codec:close(Codec);
+							(_) -> ok
 						end, C1),
 					{[], null};
 				_ ->
@@ -110,14 +114,22 @@ init ([Parent, Fd, Transport, Proto, Parameters]) ->
 	end,
 
 	% Get probable IP and port
-	Ip = proplists:get_value(ip, Parameters, null),
-	Port = proplists:get_value(port, Parameters, null),
+	{Ip, Port} = proplists:get_value(rtp, Params, {null, null}),
+
+	?ERR("INIT: ~p", [InVals]),
+	{ok, RtcpPid} = rtcp_socket:start_link([self(), Fd1, udp, Params]),
+	gen_udp:controlling_process(Fd1, RtcpPid),
+
+	{ok, {I0, P0}} = inet:sockname(Fd0),
+	{ok, {I1, P1}} = inet:sockname(Fd1),
+
+	gen_server:cast(Parent, {started, self(), {I0, P0}, {I1, P1}}),
 
 	{ok, #state{
 			parent = Parent,
-			fd = Fd,
+			fd = Fd0,
+			rtcp = RtcpPid,
 			transport = Transport,
-			proto = Proto,
 			ipf = null,
 			portf = null,
 			ipt = Ip,
@@ -133,31 +145,41 @@ init ([Parent, Fd, Transport, Proto, Parameters]) ->
 		}
 	}.
 
-handle_call({neighbour, Pid}, _From, State) when is_pid(Pid) ->
-	{reply, ok, State#state{neighbour = Pid}}.
+handle_call(_Call, _From, State) ->
+	{stop, bad_call, State}.
 
-handle_cast({Proto, _Pkts}, #state{proto = Proto, ipt = null, portt = null} = State) ->
+handle_cast({rtp, _Pkts}, #state{ipt = null, portt = null} = State) ->
 	{noreply, State};
-handle_cast({Proto, Pkts}, #state{fd = Fd, proto = Proto, ipt = Ip, portt = Port, transcode = null} = State) ->
-	Msg = Proto:encode(Pkts),
+handle_cast({rtp, Pkts}, #state{fd = Fd, ipt = Ip, portt = Port, transcode = null} = State) ->
+	Msg = rtp:encode(Pkts),
 	% FIXME use Transport
 	gen_udp:send(Fd, Ip, Port, Msg),
 	{noreply, State};
-handle_cast({Proto, Pkts}, #state{fd = Fd, proto = Proto, ipt = Ip, portt = Port, transcode = Transcode, codecs = Codecs} = State) ->
-	{Proto, Pkts2} = transcode({Proto, Pkts}, Transcode, Codecs),
-	Msg = Proto:encode(Pkts2),
+handle_cast({rtp, Pkts}, #state{fd = Fd, ipt = Ip, portt = Port, transcode = Transcode, codecs = Codecs} = State) ->
+	{rtp, Pkts2} = transcode(Pkts, Transcode, Codecs),
+	Msg = rtp:encode(Pkts2),
 	% FIXME use Transport
 	gen_udp:send(Fd, Ip, Port, Msg),
 	{noreply, State};
 
-handle_cast({update, Parameters}, State) ->
-	Weak = proplists:get_value(weak, Parameters, false),
-	Symmetric = proplists:get_value(symmetric, Parameters, true),
-	Transcode = proplists:get_value(transcode, Parameters, null),
+handle_cast({rtcp, Pkts, RtcpPid}, #state{parent = Parent, rtcp = RtcpPid} = State) ->
+	% FIXME Do something with RTCP before sending it further
+	gen_server:cast(Parent, {rtcp, Pkts, self()}),
+	{noreply, State};
+
+handle_cast({rtcp, Pkts, Parent}, #state{parent = Parent, rtcp = RtcpPid} = State) ->
+	% FIXME Do something with RTCP before sending it further
+	gen_server:cast(RtcpPid, {rtcp, Pkts}),
+	{noreply, State};
+
+handle_cast({update, Params}, State) ->
+	Weak = proplists:get_value(weak, Params, false),
+	Symmetric = proplists:get_value(symmetric, Params, true),
+	Transcode = proplists:get_value(transcode, Params, null),
 
 	% Get probable IP and port
-	Ip = proplists:get_value(ip, Parameters, null),
-	Port = proplists:get_value(port, Parameters, null),
+	Ip = proplists:get_value(ip, Params, null),
+	Port = proplists:get_value(port, Params, null),
 
 	case State#state.started of
 		true ->
@@ -175,6 +197,9 @@ handle_cast({update, Parameters}, State) ->
 				}
 			}
 	end;
+
+handle_cast({neighbour, Pid}, State) when is_pid(Pid) ->
+	{noreply, State#state{neighbour = Pid}};
 
 handle_cast(stop, #state{tref = TRef} = State) ->
 	% Run 30-second Timer instead
@@ -202,22 +227,22 @@ terminate(Reason, #state{parent = Parent, fd = Fd, transport = Transport, tref =
 	gen_server:cast(Parent, {stop, self(), Reason}),
 	ok.
 
-handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, parent = Parent, proto = Proto, started = true, weak = true, symmetric = Symmetric, neighbour = Neighbour} = State) ->
+handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, parent = Parent, started = true, weak = true, symmetric = Symmetric, neighbour = Neighbour} = State) ->
 	inet:setopts(Fd, [{active, once}]),
 	try
-		{ok, Pkts} = Proto:decode(Msg),
-		process_data(Proto, Pkts, Parent, Neighbour),
+		{ok, Pkts} = rtp:decode(Msg),
+		process_data(rtp, Pkts, Parent, Neighbour),
 		{noreply, State#state{ipt = Ip, portt = Port, lastseen = now(), alive = true}}
 	catch
 		_:_ -> rtp_utils:dump_packet(node(), self(), Msg),
 		{noreply, State}
 	end;
 
-handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, parent = Parent, proto = Proto, started = true, weak = false, ipf = Ip, portf = Port, neighbour = Neighbour} = State) ->
+handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, parent = Parent, started = true, weak = false, ipf = Ip, portf = Port, neighbour = Neighbour} = State) ->
 	inet:setopts(Fd, [{active, once}]),
 	try
-		{ok, Pkts} = Proto:decode(Msg),
-		process_data(Proto, Pkts, Parent, Neighbour),
+		{ok, Pkts} = rtp:decode(Msg),
+		process_data(rtp, Pkts, Parent, Neighbour),
 		{noreply, State#state{lastseen = now(), alive = true}}
 	catch
 		_:_ -> rtp_utils:dump_packet(node(), self(), Msg),
@@ -228,12 +253,12 @@ handle_info({udp, Fd, _Ip, _Port, _Msg}, #state{fd = Fd, started = true, weak = 
 	?ERR("Disallow data from strange source", []),
 	{noreply, State};
 
-handle_info({udp, Fd, Ip, Port, Msg}, #state{parent = Parent, proto = Proto, started = false, neighbour = Neighbour} = State) ->
+handle_info({udp, Fd, Ip, Port, Msg}, #state{parent = Parent, started = false, neighbour = Neighbour} = State) ->
 	inet:setopts(Fd, [{active, once}]),
 	try
-		{ok, Pkts} = Proto:decode(Msg),
+		{ok, Pkts} = rtp:decode(Msg),
 		gen_server:cast(Parent, {start, self()}),
-		process_data(Proto, Pkts, Parent, Neighbour),
+		process_data(rtp, Pkts, Parent, Neighbour),
 
 		{noreply, State#state{started = true, ipf = Ip, portf = Port, lastseen = now(), alive = true}}
 	catch
@@ -266,18 +291,18 @@ process_data(rtp, Pkts, Parent, Neighbour) ->
 process_data(rtcp, Pkts, Parent, Neighbour) ->
 	gen_server:cast(Parent, {rtcp, Pkts, self(), Neighbour}).
 
-transcode({rtp, #rtp{payload_type = OldPayloadType, payload = Payload} = Rtp}, {PayloadType, Encoder}, Codecs) ->
+transcode(#rtp{payload_type = OldPayloadType, payload = Payload} = Rtp, {PayloadType, Encoder}, Codecs) ->
 	Decoder = proplists:get_value(OldPayloadType, Codecs),
 	case Decoder of
-		passthrough -> {ok, Rtp};
-		undefined -> {ok, Rtp};
+		passthrough -> {rtp, Rtp};
+		undefined -> {rtp, Rtp};
 		_ ->
 			{ok, RawData} = codec:decode(Decoder, Payload),
 			{ok, NewPayload} = codec:encode(Encoder, RawData),
 			{rtp, Rtp#rtp{payload_type = PayloadType, payload = NewPayload}}
 	end;
-transcode({Proto, Pkts}, _, _) ->
-	{Proto, Pkts}.
+transcode(Pkts, _, _) ->
+	{rtp, Pkts}.
 
 run_codecs(CodecsVals) ->
 	run_codecs(CodecsVals, []).
