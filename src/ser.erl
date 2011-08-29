@@ -46,7 +46,6 @@ init (_Unused) ->
 	{ok, {Ip, Port}} = application:get_env(?MODULE, listen_address),
 	{ok, RtpproxyNode} = application:get_env(?MODULE, rtpproxy_node),
 
-	pong = net_adm:ping(RtpproxyNode),
 
 	% Ping every second
 	{ok, TRef} = timer:send_interval(1000, ping),
@@ -54,7 +53,7 @@ init (_Unused) ->
 	case gen_udp:open(Port, [{ip, Ip}, {active, true}, list]) of
 		{ok, Fd} ->
 			?INFO("started at [~s:~w]", [inet_parse:ntoa(Ip), Port]),
-			{ok, #state{listen = Fd, timer = TRef, mode = online}};
+			{ok, #state{listen = Fd, timer = TRef, mode = offline}};
 		{error, Reason} ->
 			?ERR("interface not started. Reason [~p]", [Reason]),
 			{stop, Reason}
