@@ -82,7 +82,7 @@ init ([Parent, Transport, Params] = InVals) ->
 	% FIXME open socket according Transport - don't hardcode UDP
 	Direction = proplists:get_value(direction, Params),
 	IsIpv6 = proplists:get_value(ipv6, Params, false),
-	{Fd0, Fd1} = rtpproxy_utils:get_fd_pair({Direction, IsIpv6}),
+	{Fd0, Fd1} = rtpproxy_utils:get_fd_pair({Direction, IsIpv6, SockParams}),
 
 	{ok, TRef} = timer:send_interval(?INTERIM_UPDATE, interim_update),
 

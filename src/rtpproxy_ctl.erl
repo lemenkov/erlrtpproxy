@@ -44,6 +44,9 @@ start() ->
 %	mnesia:start(),
 %	mnesia:wait_for_tables(mnesia:system_info(local_tables), infinity),
 
+	% Load necessary config files
+	rpc:multicall(Nodes, application, load, [rtpproxy]),
+
 	% Load main module
 	pool:pspawn(application, start, [rtpproxy]).
 
