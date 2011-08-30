@@ -117,7 +117,6 @@ init ([Parent, Transport, Params] = InVals) ->
 	% Get probable IP and port
 	{Ip, Port} = proplists:get_value(rtp, Params, {null, null}),
 
-	?ERR("INIT: ~p", [InVals]),
 	{ok, RtcpPid} = rtcp_socket:start_link([self(), Fd1, udp, Params]),
 	gen_udp:controlling_process(Fd1, RtcpPid),
 
