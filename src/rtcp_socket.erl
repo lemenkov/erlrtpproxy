@@ -63,6 +63,8 @@ start_link(Args) ->
 	gen_server:start_link(?MODULE, Args, []).
 
 init ([Parent, Fd, Transport, Parameters]) ->
+	process_flag(trap_exit, true),
+
 	Weak = proplists:get_value(weak, Parameters, false),
 	Symmetric = proplists:get_value(symmetric, Parameters, true),
 

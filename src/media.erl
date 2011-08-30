@@ -66,6 +66,8 @@ init (
 		from = #party{tag = TagFrom, addr = FAddr, rtcpaddr = FRtcpAddr, proto = TProto},
 		params = Params} = Cmd
 	) ->
+	process_flag(trap_exit, true),
+
 	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE, ping),
 
 	{FromDir, ToDir} = proplists:get_value(direction, Params),
@@ -249,8 +251,6 @@ code_change(_OldVsn, State, _Extra) ->
 
 terminate(Reason, #state{callid = CallId, mediaid = MediaId, tref = TimerRef, from = From, to = To}) ->
 	timer:cancel(TimerRef),
-	gen_server:cast(From#media.pid, stop),
-	gen_server:cast(To#media.pid, stop),
 
 	gen_server:cast({global, rtpproxy}, {'EXIT', self(), Reason}),
 	gen_server:cast(rtpproxy_radius, {stop, CallId, MediaId}),
@@ -272,6 +272,14 @@ handle_info(ping, State) ->
 %			{noreply, State}
 %	end
 	{stop, nortp, State};
+
+handle_info({'EXIT', Pid, Reason}, #state{from = #media{pid = Pid}} = State) ->
+	?ERR("RTP From socket died: ~p", [Reason]),
+	{stop, Reason, State};
+
+handle_info({'EXIT', Pid, Reason}, #state{to = #media{pid = Pid}} = State) ->
+	?ERR("RTP To socket died: ~p", [Reason]),
+	{stop, Reason, State};
 
 handle_info(Other, State) ->
 	?WARN("Other Info [~p], State [~p]", [Other, State]),

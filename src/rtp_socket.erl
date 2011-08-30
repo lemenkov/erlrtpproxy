@@ -76,6 +76,7 @@ start_link(Args) ->
 	gen_server:start_link(?MODULE, Args, []).
 
 init ([Parent, Transport, Params] = InVals) ->
+	process_flag(trap_exit, true),
 	% FIXME allow explicitly set address (IP and Port) for both RTP and RTCP sockets
 	SockParams = proplists:get_value(sockparams, Params, []),
 	% FIXME open socket according Transport - don't hardcode UDP
@@ -224,7 +225,6 @@ terminate(Reason, #state{parent = Parent, fd = Fd, transport = Transport, tref =
 			({_, passthrough}) -> ok;
 			({_, Codec}) -> codec:close(Codec)
 		end, Codecs),
-	gen_server:cast(Parent, {stop, self(), Reason}),
 	ok.
 
 handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, parent = Parent, started = true, weak = true, symmetric = Symmetric, neighbour = Neighbour} = State) ->
@@ -280,7 +280,11 @@ handle_info(interim_update, #state{parent = Parent, alive = true} = State) ->
 	gen_server:cast(Parent, {interim_update, self()}),
 	{noreply, State#state{alive = false}};
 handle_info(interim_update, #state{alive = false} = State) ->
-	{stop, timeout, State}.
+	{stop, timeout, State};
+
+handle_info({'EXIT', Pid, Reason}, #state{rtcp = Pid} = State) ->
+	?ERR("RTCP socket died: ~p", [Reason]),
+	{noreply, State}.
 
 %%
 %% Private functions
