@@ -43,7 +43,11 @@ start_link(Args) ->
 
 init (_Unused) ->
 	% Load parameters
-	{ok, {Ip, Port}} = application:get_env(?MODULE, listen_address),
+	{Proto, Ip, Port} = case application:get_env(?MODULE, listen_address) of
+		{ok, {Ip0, Port0}} -> {udp, Ip0, Port0};
+		{ok, {Proto1, Ip1, Port1}} -> {Proto1, Ip1, Port1}
+	end,
+
 	RtpproxyNode = case application:get_env(?MODULE, rtpproxy_node) of
 		undefined -> undefined;
 		{ok, RtpproxyNode0} -> RtpproxyNode0
