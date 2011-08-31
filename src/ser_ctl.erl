@@ -32,12 +32,7 @@ start() ->
 	% Replace logger with erlsyslog
 	error_logger:add_report_handler(erlsyslog, {0, SyslogHost, SyslogPort}),
 
-	application:start(ser),
-
-	% Load listener
-	{ok, {Proto, IpStr, Port}} = application:get_env(ser, listen),
-	{ok, Ip} = inet_parse:address(IpStr),
-	listener_sup:start_link(Proto, Ip, Port).
+	application:start(ser).
 
 stop() ->
 	Status = case init:get_plain_arguments() of

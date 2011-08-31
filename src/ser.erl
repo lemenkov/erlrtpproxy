@@ -47,6 +47,11 @@ init (_Unused) ->
 	% Ping every second
 	{ok, TRef} = timer:send_interval(1000, ping),
 
+	% Load listener
+	{ok, {Proto, IpStr, Port}} = application:get_env(ser, listen),
+	{ok, Ip} = inet_parse:address(IpStr),
+	listener_sup:start_link(Proto, Ip, Port),
+
 	error_logger:info_msg("SER nathelper interface started at ~p~n", [node()]),
 	{ok, #state{timer = TRef, mode = offline, node = RtpproxyNode}}.
 
