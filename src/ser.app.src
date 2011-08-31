@@ -6,11 +6,6 @@
 		{modules, []},
 		{registered, [ser, ser_sup]},
 		{applications, [kernel, stdlib, erlsyslog]},
-		{env,
-			[
-				{listen_address, {{127,0,0,1}, 22222}},
-				{rtpproxy_node, 'rtpproxy@example.com'}
-			]},
 		{mod, {ser_app, []}}
 	    ]
 }.
