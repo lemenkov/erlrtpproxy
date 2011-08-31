@@ -44,7 +44,8 @@ init (_Unused) ->
 	process_flag(trap_exit, true),
 
 	% Load parameters
-	{ok, {Proto, Ip, Port}} = application:get_env(?MODULE, listen),
+	{ok, {Proto, IpStr, Port}} = application:get_env(?MODULE, listen),
+	{ok, Ip} = inet_parse:address(IpStr),
 
 	RtpproxyNode = case application:get_env(?MODULE, rtpproxy_node) of
 		undefined -> undefined;
