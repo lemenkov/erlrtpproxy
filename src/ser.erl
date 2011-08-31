@@ -89,9 +89,9 @@ handle_cast(#cmd{type = ?CMD_VF, params=Version} = Cmd, #state{listen = Listener
 	error_logger:info_msg("SER cmd VF: ~s~n", [Version]),
 	gen_server:cast(Listener, {Cmd, {supported, Version}}),
 	{noreply, State};
-handle_cast(Cmd, #state{mode = online} = State) ->
+handle_cast(#cmd{origin = Origin} = Cmd, #state{mode = online} = State) ->
 	error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
-	gen_server:cast({global, rtpproxy}, Cmd),
+	gen_server:cast({global, rtpproxy}, Cmd#cmd{origin = Origin#origin{pid = self()}}),
 	{noreply, State};
 handle_cast(Cmd, #state{listen = Listener, mode = offline} = State) ->
 	error_logger:info_msg("SER cmd (OFFLINE): ~p~n", [Cmd]),
