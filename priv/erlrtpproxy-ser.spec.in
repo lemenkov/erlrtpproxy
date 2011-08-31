@@ -80,6 +80,7 @@ make test
 %config(noreplace) %{_sysconfdir}/sysconfig/%{realname}
 %dir %{_libdir}/erlang/lib/%{realname}-%{version}
 %dir %{_libdir}/erlang/lib/%{realname}-%{version}/ebin
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/listener_sup.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}.app
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_app.beam
