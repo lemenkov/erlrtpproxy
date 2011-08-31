@@ -34,7 +34,7 @@
 start_link(Args) ->
 	gen_server:start_link({local, listener}, ?MODULE, Args, []).
 
-init ([Parent, {I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
+init ([{I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
 	is_integer(I0), I0 >= 0, I0 < 65535,
 	is_integer(I1), I1 >= 0, I1 < 65535,
 	is_integer(I2), I2 >= 0, I2 < 65535,
@@ -46,8 +46,8 @@ init ([Parent, {I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
 	process_flag(trap_exit, true),
 	{ok, Fd} = gen_udp:open(Port, [{ip, IPv6}, {active, true}, list, inet6]),
 	error_logger:info_msg("UDP listener started at [~s:~w]~n", [inet_parse:ntoa(IPv6), Port]),
-	{ok, {Parent, Fd}};
-init ([Parent, {I0, I1, I2, I3} = IPv4, Port]) when
+	{ok, Fd};
+init ([{I0, I1, I2, I3} = IPv4, Port]) when
 	is_integer(I0), I0 >= 0, I0 < 256,
 	is_integer(I1), I1 >= 0, I1 < 256,
 	is_integer(I2), I2 >= 0, I2 < 256,
@@ -55,24 +55,24 @@ init ([Parent, {I0, I1, I2, I3} = IPv4, Port]) when
 	process_flag(trap_exit, true),
 	{ok, Fd} = gen_udp:open(Port, [{ip, IPv4}, {active, true}, list]),
 	error_logger:info_msg("UDP listener started at [~s:~w]~n", [inet_parse:ntoa(IPv4), Port]),
-	{ok, {Parent, Fd}}.
+	{ok, Fd}.
 
 handle_call(_Other, _From, State) ->
 	{noreply, State}.
 
-handle_cast({#cmd{origin = #origin{type = ser, ip = Ip, port = Port}} = Cmd, Answer}, {_, Fd} = State) ->
+handle_cast({#cmd{origin = #origin{type = ser, ip = Ip, port = Port}} = Cmd, Answer}, Fd) ->
 	Data = ser_proto:encode(Cmd, Answer),
 	gen_udp:send(Fd, Ip, Port, Data),
-	{noreply, State};
+	{noreply, Fd};
 
 handle_cast(_Request, State) ->
 	{noreply, State}.
 
 % Fd from which message arrived must be equal to Fd from our state
-handle_info({udp, Fd, Ip, Port, Msg}, {Parent, Fd} = State) ->
+handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 	try ser_proto:parse(Msg, Ip, Port) of
 		Cmd ->
-			gen_server:cast(Parent, Cmd)
+			gen_server:cast(ser, Cmd)
 	catch
 		throw:{error_syntax, Error} ->
 			error_logger:error_msg("Bad syntax. [~s -> ~s]~n", [Msg, Error]),
@@ -83,7 +83,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Parent, Fd} = State) ->
 			Data = ser_proto:encode(Msg, {error, syntax}),
 			gen_udp:send(Fd, Ip, Port, Data)
 	end,
-	{noreply, State};
+	{noreply, Fd};
 
 handle_info(Info, State) ->
 	error_logger:warning_msg("Info [~p]~n", [Info]),
@@ -92,7 +92,7 @@ handle_info(Info, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, {_, Fd}) ->
+terminate(Reason, Fd) ->
 	gen_udp:close(Fd),
 	error_logger:error_msg("UDP lisener closed: ~p~n", [Reason]),
 	ok.

@@ -33,7 +33,6 @@
 -export([code_change/3]).
 
 -record(state, {
-	parent,
 	listener,
 	acceptor,
 	clients = []
@@ -44,7 +43,7 @@
 start_link(Args) ->
 	gen_server:start_link({local, listener}, ?MODULE, Args, []).
 
-init ([Parent, {I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
+init ([{I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
 	is_integer(I0), I0 >= 0, I0 < 65535,
 	is_integer(I1), I1 >= 0, I1 < 65535,
 	is_integer(I2), I2 >= 0, I2 < 65535,
@@ -58,9 +57,9 @@ init ([Parent, {I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
 	{ok, Socket} = gen_tcp:listen(Port, Opts),
 	{ok, Ref} = prim_inet:async_accept(Socket, -1),
 	error_logger:info_msg("TCP listener started at [~s:~w]~n", [inet_parse:ntoa(IPv6), Port]),
-	{ok, #state{parent = Parent, listener = Socket, acceptor = Ref}};
+	{ok, #state{listener = Socket, acceptor = Ref}};
 
-init ([Parent, {I0, I1, I2, I3} = IPv4, Port]) when
+init ([{I0, I1, I2, I3} = IPv4, Port]) when
 	is_integer(I0), I0 >= 0, I0 < 256,
 	is_integer(I1), I1 >= 0, I1 < 256,
 	is_integer(I2), I2 >= 0, I2 < 256,
@@ -70,7 +69,7 @@ init ([Parent, {I0, I1, I2, I3} = IPv4, Port]) when
 	{ok, Socket} = gen_tcp:listen(Port, Opts),
 	{ok, Ref} = prim_inet:async_accept(Socket, -1),
 	error_logger:info_msg("TCP listener started at [~s:~w]~n", [inet_parse:ntoa(IPv4), Port]),
-	{ok, #state{parent = Parent, listener = Socket, acceptor = Ref}}.
+	{ok, #state{listener = Socket, acceptor = Ref}}.
 
 handle_call(Request, _From, State) ->
 	{stop, {unknown_call, Request}, State}.
@@ -87,12 +86,12 @@ handle_cast({#cmd{origin = #origin{type = ser, ip = Ip, port = Port}} = Cmd, Ans
 handle_cast(_Msg, State) ->
 	{noreply, State}.
 
-handle_info({tcp, Client, Msg}, State = #state{parent = Parent}) ->
+handle_info({tcp, Client, Msg}, State) ->
 	inet:setopts(Client, [{active, once}, {packet, raw}, list]),
 	{ok, {Ip, Port}} = inet:peername(Client),
 	try ser_proto:parse(Msg, Ip, Port) of
 		Cmd ->
-			gen_server:cast(Parent, Cmd)
+			gen_server:cast(ser, Cmd)
 	catch
 		throw:{error_syntax, Error} ->
 			error_logger:error_msg("Bad syntax. [~s -> ~s]~n", [Msg, Error]),
