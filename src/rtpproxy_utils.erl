@@ -27,10 +27,10 @@
 %% Open a pair of UDP ports - N and N+1 (for RTP and RTCP consequently)
 get_fd_pair({_, true, SockParams}) ->
 	{ok, Ip} = application:get_env(rtpproxy, ipv6),
-	get_fd_pair(Ip, SockParams, 10);
+	get_fd_pair(Ip, SockParams ++ [inet6], 10);
 get_fd_pair({internal, false, SockParams}) ->
 	{ok, Ip} = application:get_env(rtpproxy, internal),
-	get_fd_pair(Ip, SockParams ++ [inet6], 10);
+	get_fd_pair(Ip, SockParams, 10);
 get_fd_pair({external, false, SockParams}) ->
 	{ok, Ip} = application:get_env(rtpproxy, external),
 	get_fd_pair(Ip, SockParams, 10).
