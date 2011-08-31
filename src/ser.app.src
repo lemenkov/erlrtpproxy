@@ -4,7 +4,7 @@
 		{description, "Application for tearing down calls"},
 		{vsn, "%VSN%"},
 		{modules, []},
-		{registered, [ser, ser_sup]},
+		{registered, [ser, ser_sup, listener, listener_sup]},
 		{applications, [kernel, stdlib]},
 		{mod, {ser_app, []}}
 	    ]
