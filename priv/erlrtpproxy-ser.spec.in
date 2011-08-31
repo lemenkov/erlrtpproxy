@@ -86,6 +86,7 @@ make test
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_ctl.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_proto.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_sup.beam
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/udp_listener.beam
 
 %dir %attr(0755,%{realname},%{realname}) %{_localstatedir}/lib/%{realname}
 
