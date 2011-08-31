@@ -60,6 +60,10 @@ init (_Unused) ->
 			{ok, Listener} = udp_listener:start_link([self(), Ip, Port]),
 			error_logger:info_msg("SER nathelper interface started at ~p~n", [node()]),
 			{ok, #state{listen = Listener, timer = TRef, mode = offline, node = RtpproxyNode}};
+		tcp ->
+			{ok, Listener} = tcp_listener:start_link([self(), Ip, Port]),
+			error_logger:info_msg("SER nathelper interface started at ~p~n", [node()]),
+			{ok, #state{listen = Listener, timer = TRef, mode = offline, node = RtpproxyNode}};
 		_ ->
 			error_logger:error_msg("Proto ~p not supported yet.~n", [Proto]),
 			{stop, failure}
