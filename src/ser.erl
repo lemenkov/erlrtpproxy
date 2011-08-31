@@ -106,7 +106,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 terminate(Reason, #state{timer = TRef}) ->
 	timer:cancel(TRef),
-	error_logger:error_msg("thread terminated due to reason [~p]~n", [Reason]).
+	error_logger:info_msg("SER nathelper interface terminated due to reason ~p~n", [Reason]).
 
 handle_info(ping, #state{node = undefined} = State) ->
 	{noreply, State#state{mode = offline}};
