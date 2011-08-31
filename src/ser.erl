@@ -55,19 +55,14 @@ init (_Unused) ->
 	% Ping every second
 	{ok, TRef} = timer:send_interval(1000, ping),
 
-	case Proto of
-		udp ->
-			{ok, Listener} = udp_listener:start_link([self(), Ip, Port]),
-			error_logger:info_msg("SER nathelper interface started at ~p~n", [node()]),
-			{ok, #state{listen = Listener, timer = TRef, mode = offline, node = RtpproxyNode}};
-		tcp ->
-			{ok, Listener} = tcp_listener:start_link([self(), Ip, Port]),
-			error_logger:info_msg("SER nathelper interface started at ~p~n", [node()]),
-			{ok, #state{listen = Listener, timer = TRef, mode = offline, node = RtpproxyNode}};
-		_ ->
-			error_logger:error_msg("Proto ~p not supported yet.~n", [Proto]),
-			{stop, failure}
-	end.
+	ListenerType = case Proto of
+		udp -> udp_listener;
+		tcp -> tcp_listener
+	end,
+	{ok, Listener} = ListenerType:start_link([self(), Ip, Port]),
+
+	error_logger:info_msg("SER nathelper interface started at ~p~n", [node()]),
+	{ok, #state{listen = Listener, timer = TRef, mode = offline, node = RtpproxyNode}}.
 
 handle_call(_Other, _From, State) ->
 	{noreply, State}.
