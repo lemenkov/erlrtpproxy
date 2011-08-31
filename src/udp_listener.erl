@@ -32,7 +32,7 @@
 -include("common.hrl").
 
 start_link(Args) ->
-	gen_server:start_link(?MODULE, Args, []).
+	gen_server:start_link({local, listener}, ?MODULE, Args, []).
 
 init ([Parent, {I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
 	is_integer(I0), I0 >= 0, I0 < 65535,
@@ -92,6 +92,8 @@ handle_info(Info, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(_, {_, Fd}) ->
-	gen_udp:close(Fd).
+terminate(Reason, {_, Fd}) ->
+	gen_udp:close(Fd),
+	error_logger:error_msg("UDP lisener closed: ~p~n", [Reason]),
+	ok.
 

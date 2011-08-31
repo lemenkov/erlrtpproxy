@@ -42,7 +42,7 @@
 -include("common.hrl").
 
 start_link(Args) ->
-	gen_server:start_link(?MODULE, Args, []).
+	gen_server:start_link({local, listener}, ?MODULE, Args, []).
 
 init ([Parent, {I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
 	is_integer(I0), I0 >= 0, I0 < 65535,
@@ -126,15 +126,16 @@ handle_info({inet_async, ListSock, Ref, {ok, CliSocket}}, #state{listener=ListSo
 	{noreply, State#state{acceptor=NewRef, clients = Clients ++ [CliSocket]}};
 
 handle_info({inet_async, ListSock, Ref, Error}, #state{listener=ListSock, acceptor=Ref} = State) ->
-	error_logger:error_msg("Error in socket acceptor: ~p.\n", [Error]),
+	error_logger:error_msg("Error in socket acceptor: ~p.~n", [Error]),
 	{stop, Error, State};
 
 handle_info(_Info, State) ->
 	{noreply, State}.
 
-terminate(_Reason, #state{listener = Listener, clients = Clients}) ->
+terminate(Reason, #state{listener = Listener, clients = Clients}) ->
 	gen_tcp:close(Listener),
 	lists:map(fun gen_tcp:close/1, Clients),
+	error_logger:error_msg("TCP lisener closed: ~p~n", [Reason]),
 	ok.
 
 code_change(_OldVsn, State, _Extra) ->

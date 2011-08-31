@@ -32,7 +32,7 @@
 
 -include("common.hrl").
 
--record(state, {listen, timer, mode, node}).
+-record(state, {timer, mode, node}).
 
 start(Args) ->
 	gen_server:start(?MODULE, Args, []).
@@ -55,47 +55,43 @@ init (_Unused) ->
 	% Ping every second
 	{ok, TRef} = timer:send_interval(1000, ping),
 
-	ListenerType = case Proto of
-		udp -> udp_listener;
-		tcp -> tcp_listener
-	end,
-	{ok, Listener} = ListenerType:start_link([self(), Ip, Port]),
+	listener_sup:start_link(Proto, self(), Ip, Port),
 
 	error_logger:info_msg("SER nathelper interface started at ~p~n", [node()]),
-	{ok, #state{listen = Listener, timer = TRef, mode = offline, node = RtpproxyNode}}.
+	{ok, #state{timer = TRef, mode = offline, node = RtpproxyNode}}.
 
 handle_call(_Other, _From, State) ->
 	{noreply, State}.
 
 % Got two addresses (initial Media stream creation)
-handle_cast({reply, Cmd, Answer, _}, #state{listen = Listener} = State) ->
-	gen_server:cast(Listener, Cmd, Answer),
+handle_cast({reply, Cmd, Answer, _}, State) ->
+	gen_server:cast(listener, Cmd, Answer),
 	{noreply, State};
 % TODO deprecate this case
-handle_cast({reply, Cmd, Answer}, #state{listen = Listener} = State) ->
-	gen_server:cast(Listener, Cmd, Answer),
+handle_cast({reply, Cmd, Answer}, State) ->
+	gen_server:cast(listener, Cmd, Answer),
 	{noreply, State};
 
-handle_cast(#cmd{type = ?CMD_V} = Cmd, #state{listen = Listener} = State) ->
+handle_cast(#cmd{type = ?CMD_V} = Cmd, State) ->
 	% Request basic supported rtpproxy protocol version
 	% see available versions here:
 	% http://sippy.git.sourceforge.net/git/gitweb.cgi?p=sippy/rtpproxy;a=blob;f=rtpp_command.c#l58
 	% We provide only basic functionality, currently.
 	error_logger:info_msg("SER cmd V~n"),
-	gen_server:cast(Listener, {Cmd, {version, "20040107"}}),
+	gen_server:cast(listener, {Cmd, {version, "20040107"}}),
 	{noreply, State};
-handle_cast(#cmd{type = ?CMD_VF, params=Version} = Cmd, #state{listen = Listener} = State) ->
+handle_cast(#cmd{type = ?CMD_VF, params=Version} = Cmd, State) ->
 	% Request additional rtpproxy protocol extensions
 	error_logger:info_msg("SER cmd VF: ~s~n", [Version]),
-	gen_server:cast(Listener, {Cmd, {supported, Version}}),
+	gen_server:cast(listener, {Cmd, {supported, Version}}),
 	{noreply, State};
 handle_cast(#cmd{origin = Origin} = Cmd, #state{mode = online} = State) ->
 	error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
 	gen_server:cast({global, rtpproxy}, Cmd#cmd{origin = Origin#origin{pid = self()}}),
 	{noreply, State};
-handle_cast(Cmd, #state{listen = Listener, mode = offline} = State) ->
+handle_cast(Cmd, #state{mode = offline} = State) ->
 	error_logger:info_msg("SER cmd (OFFLINE): ~p~n", [Cmd]),
-	gen_server:cast(Listener, {Cmd, {error, software}}),
+	gen_server:cast(listener, {Cmd, {error, software}}),
 	{noreply, State};
 
 handle_cast(_Request, State) ->
