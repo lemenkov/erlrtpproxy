@@ -42,6 +42,8 @@ start_link(Args) ->
 	gen_server:start_link(?MODULE, Args, []).
 
 init (_Unused) ->
+	process_flag(trap_exit, true),
+
 	% Load parameters
 	{Proto, Ip, Port} = case application:get_env(?MODULE, listen_address) of
 		{ok, {Ip0, Port0}} -> {udp, Ip0, Port0};
@@ -53,31 +55,51 @@ init (_Unused) ->
 		{ok, RtpproxyNode0} -> RtpproxyNode0
 	end,
 
-
 	% Ping every second
 	{ok, TRef} = timer:send_interval(1000, ping),
 
-	case gen_udp:open(Port, [{ip, Ip}, {active, true}, list]) of
-		{ok, Fd} ->
+	case Proto of
+		udp ->
 			?INFO("started at [~s:~w]", [inet_parse:ntoa(Ip), Port]),
-			{ok, #state{listen = Fd, timer = TRef, mode = offline, node = RtpproxyNode}};
-		{error, Reason} ->
-			?ERR("interface not started. Reason [~p]", [Reason]),
-			{stop, Reason}
+			{ok, Listener} = udp_listener:start_link([self(), Ip, Port]),
+			{ok, #state{listen = Listener, timer = TRef, mode = offline, node = RtpproxyNode}};
+		_ ->
+			?ERR("Proto ~p not supported yet", [Proto]),
+			{stop, failure}
 	end.
 
 handle_call(_Other, _From, State) ->
 	{noreply, State}.
 
 % Got two addresses (initial Media stream creation)
-handle_cast({reply, #cmd{origin = #origin{type = ser, ip = Ip, port = Port}} = Cmd, Answer, _}, #state{listen = Fd} = State) ->
-	Data = ser_proto:encode(Cmd, Answer),
-	gen_udp:send(Fd, Ip, Port, Data),
+handle_cast({reply, Cmd, Answer, _}, #state{listen = Listener} = State) ->
+	gen_server:cast(Listener, Cmd, Answer),
 	{noreply, State};
 % TODO deprecate this case
-handle_cast({reply, #cmd{origin = #origin{type = ser, ip = Ip, port = Port}} = Cmd, Answer}, #state{listen = Fd} = State) ->
-	Data = ser_proto:encode(Cmd, Answer),
-	gen_udp:send(Fd, Ip, Port, Data),
+handle_cast({reply, Cmd, Answer}, #state{listen = Listener} = State) ->
+	gen_server:cast(Listener, Cmd, Answer),
+	{noreply, State};
+
+handle_cast(#cmd{type = ?CMD_V} = Cmd, #state{listen = Listener} = State) ->
+	% Request basic supported rtpproxy protocol version
+	% see available versions here:
+	% http://sippy.git.sourceforge.net/git/gitweb.cgi?p=sippy/rtpproxy;a=blob;f=rtpp_command.c#l58
+	% We provide only basic functionality, currently.
+	error_logger:info_msg("SER cmd V~n"),
+	gen_server:cast(Listener, {Cmd, {version, "20040107"}}),
+	{noreply, State};
+handle_cast(#cmd{type = ?CMD_VF, params=Version} = Cmd, #state{listen = Listener} = State) ->
+	% Request additional rtpproxy protocol extensions
+	error_logger:info_msg("SER cmd VF: ~s~n", [Version]),
+	gen_server:cast(Listener, {Cmd, {supported, Version}}),
+	{noreply, State};
+handle_cast(Cmd, #state{mode = online} = State) ->
+	error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
+	gen_server:cast({global, rtpproxy}, Cmd),
+	{noreply, State};
+handle_cast(Cmd, #state{listen = Listener, mode = offline} = State) ->
+	error_logger:info_msg("SER cmd (OFFLINE): ~p~n", [Cmd]),
+	gen_server:cast(Listener, {Cmd, {error, software}}),
 	{noreply, State};
 
 handle_cast(_Request, State) ->
@@ -86,47 +108,9 @@ handle_cast(_Request, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, #state{listen = Fd, timer = TRef}) ->
-	gen_udp:close(Fd),
+terminate(Reason, #state{timer = TRef}) ->
 	timer:cancel(TRef),
 	?ERR("thread terminated due to reason [~p]", [Reason]).
-
-% Fd from which message arrived must be equal to Fd from our state
-% Brief introduction of protocol is here: http://rtpproxy.org/wiki/RTPproxyProtocol
-handle_info({udp, Fd, Ip, Port, Msg}, #state{listen = Fd, mode = Online} = State) ->
-	try ser_proto:parse(Msg, Ip, Port) of
-		#cmd{type = ?CMD_V} = Cmd ->
-			% Request basic supported rtpproxy protocol version
-			% see available versions here:
-			% http://sippy.git.sourceforge.net/git/gitweb.cgi?p=sippy/rtpproxy;a=blob;f=rtpp_command.c#l58
-			% We provide only basic functionality, currently.
-			?INFO("SER cmd: ~p", [Cmd]),
-			Data = ser_proto:encode(Cmd, {version, "20040107"}),
-			gen_udp:send(Fd, Ip, Port, Data);
-		#cmd{type = ?CMD_VF, params=Version} = Cmd ->
-			% Request additional rtpproxy protocol extensions
-			% TODO we should check version capabilities here
-			?INFO("SER cmd: ~p", [Cmd]),
-			Data = ser_proto:encode(Cmd, {supported, Version}),
-			gen_udp:send(Fd, Ip, Port, Data);
-		Cmd when Online == online ->
-			?INFO("SER cmd: ~p", [Cmd]),
-			gen_server:cast({global, rtpproxy}, Cmd);
-		Cmd when Online == offline ->
-			?INFO("SER cmd: ~p", [Cmd]),
-			Data = ser_proto:encode(Cmd, {error, software}),
-			gen_udp:send(Fd, Ip, Port, Data)
-	catch
-		throw:{error_syntax, Error} ->
-			?ERR("Bad syntax. [~s -> ~s]~n", [Msg, Error]),
-			Data = ser_proto:encode(Msg, {error, syntax}),
-			gen_udp:send(Fd, Ip, Port, Data);
-		E:C ->
-			?ERR("Exception. [~s -> ~p:~p]~n", [Msg, E, C]),
-			Data = ser_proto:encode(Msg, {error, syntax}),
-			gen_udp:send(Fd, Ip, Port, Data)
-	end,
-	{noreply, State};
 
 handle_info(ping, #state{node = undefined} = State) ->
 	{noreply, State#state{mode = offline}};
