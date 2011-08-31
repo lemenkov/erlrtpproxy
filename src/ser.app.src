@@ -5,7 +5,7 @@
 		{vsn, "%VSN%"},
 		{modules, []},
 		{registered, [ser, ser_sup]},
-		{applications, [kernel, stdlib, erlsyslog]},
+		{applications, [kernel, stdlib]},
 		{mod, {ser_app, []}}
 	    ]
 }.

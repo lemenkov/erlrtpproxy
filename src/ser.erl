@@ -31,7 +31,6 @@
 -export([terminate/2]).
 
 -include("common.hrl").
--include_lib("erlsyslog/include/erlsyslog.hrl").
 
 -record(state, {listen, timer, mode, node}).
 
@@ -60,11 +59,11 @@ init (_Unused) ->
 
 	case Proto of
 		udp ->
-			?INFO("started at [~s:~w]", [inet_parse:ntoa(Ip), Port]),
 			{ok, Listener} = udp_listener:start_link([self(), Ip, Port]),
+			error_logger:info_msg("SER nathelper interface started at ~p~n", [node()]),
 			{ok, #state{listen = Listener, timer = TRef, mode = offline, node = RtpproxyNode}};
 		_ ->
-			?ERR("Proto ~p not supported yet", [Proto]),
+			error_logger:error_msg("Proto ~p not supported yet.~n", [Proto]),
 			{stop, failure}
 	end.
 
@@ -110,22 +109,22 @@ code_change(_OldVsn, State, _Extra) ->
 
 terminate(Reason, #state{timer = TRef}) ->
 	timer:cancel(TRef),
-	?ERR("thread terminated due to reason [~p]", [Reason]).
+	error_logger:error_msg("thread terminated due to reason [~p]~n", [Reason]).
 
 handle_info(ping, #state{node = undefined} = State) ->
 	{noreply, State#state{mode = offline}};
 handle_info(ping, #state{mode = Online, node = RtpproxyNode} = State) ->
 	case net_adm:ping(RtpproxyNode) of
 		pong when Online == offline ->
-			?WARN("Connection to erlrtpproxy restored.~n", []),
+			error_logger:warning_msg("Connection to erlrtpproxy restored.~n"),
 			{noreply, State#state{mode = online}};
 		pong ->
 			{noreply, State#state{mode = online}};
 		pang ->
-			?ERR("Lost connection to erlrtpproxy.~n", []),
+			error_logger:error_msg("Lost connection to erlrtpproxy.~n"),
 			{noreply, State#state{mode = offline}}
 	end;
 
 handle_info(Info, State) ->
-	?WARN("Info [~w]", [Info]),
+	error_logger:warning_msg("Info [~w]~n", [Info]),
 	{noreply, State}.
