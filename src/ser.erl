@@ -44,10 +44,7 @@ init (_Unused) ->
 	process_flag(trap_exit, true),
 
 	% Load parameters
-	{Proto, Ip, Port} = case application:get_env(?MODULE, listen_address) of
-		{ok, {Ip0, Port0}} -> {udp, Ip0, Port0};
-		{ok, {Proto1, Ip1, Port1}} -> {Proto1, Ip1, Port1}
-	end,
+	{ok, {Proto, Ip, Port}} = application:get_env(?MODULE, listen),
 
 	RtpproxyNode = case application:get_env(?MODULE, rtpproxy_node) of
 		undefined -> undefined;
