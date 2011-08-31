@@ -65,11 +65,11 @@ handle_call(_Other, _From, State) ->
 
 % Got two addresses (initial Media stream creation)
 handle_cast({reply, Cmd, Answer, _}, State) ->
-	gen_server:cast(listener, Cmd, Answer),
+	gen_server:cast(listener, {Cmd, Answer}),
 	{noreply, State};
 % TODO deprecate this case
 handle_cast({reply, Cmd, Answer}, State) ->
-	gen_server:cast(listener, Cmd, Answer),
+	gen_server:cast(listener, {Cmd, Answer}),
 	{noreply, State};
 
 handle_cast(#cmd{type = ?CMD_V} = Cmd, State) ->
