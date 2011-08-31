@@ -34,7 +34,7 @@
 -record(state, {timer, mode, node}).
 
 start_link(Args) ->
-	gen_server:start_link(?MODULE, Args, []).
+	gen_server:start_link({local, ser}, ?MODULE, Args, []).
 
 init (_Unused) ->
 	process_flag(trap_exit, true),
