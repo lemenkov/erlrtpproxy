@@ -19,6 +19,7 @@ BuildRequires:	erlang
 BuildRequires:	erlang-eradius
 Requires:	erlang
 Requires:	erlang-eradius
+Obsoletes:	erlrtpproxy-radius
 
 
 %description
