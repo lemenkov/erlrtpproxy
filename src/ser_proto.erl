@@ -306,15 +306,15 @@ parse_params([], Result) ->
 		{undefined, _} ->
 			R2;
 		{_, undefined} ->
-			% FIXME is it ok?
-			% We just don't care of what client will do with transcoded data at all
-			throw({error_syntax, "Requested transcoding but no codecs are available"});
+			% Requested transcoding but no codecs are available - kill transcode
+			proplists:delete(transcode, R2);
 		{Codec, Codecs} ->
 			case lists:member(Codec, Codecs) of
 				true ->
 					R2;
 				_ ->
-					throw({error_syntax, "Requested transcoding to incompatible codec"})
+					% Requested transcoding to incompatible codec - kill transcode
+					proplists:delete(transcode, R2)
 			end
 	end,
 	lists:sort(R3);

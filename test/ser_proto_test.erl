@@ -158,15 +158,56 @@ parse_cmd_u_3_2_transcode_test() ->
 			]
 		}, ser_proto:parse("438_41061 Ut4c8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.0.43.5 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
 
+%parse_cmd_u_3_3_transcode_incompatible_test() ->
+%	?assertThrow(
+%		{error_syntax,"Requested transcoding to incompatible codec"},
+%		ser_proto:parse("438_41061 Ut5c8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
 parse_cmd_u_3_3_transcode_incompatible_test() ->
-	?assertThrow(
-		{error_syntax,"Requested transcoding to incompatible codec"},
-		ser_proto:parse("438_41061 Ut5c8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
+	?assertEqual(
+		#cmd{
+			type=?CMD_U,
+			cookie="438_41061",
+			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
+			callid="e12ea248-94a5e885@192.168.5.3",
+			mediaid=1,
+			from=#party{tag="6b0a8f6cfc543db1o1"},
+			params=[
+				{codecs,[
+						{'PCMU',8000,1},
+						2,
+						{'G723',8000,1},
+						{'PCMA',8000,1},
+						{'G729',8000,1},
+						96,
+						97,
+						98,
+						100,
+						101
+					]
+				},
+				{direction, {external, external}},
+				{symmetric,true}
+			]
+		}, ser_proto:parse("438_41061 Ut5c8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
 
+%parse_cmd_u_3_4_transcode_no_codecs_test() ->
+%	?assertThrow(
+%		{error_syntax,"Requested transcoding but no codecs are available"},
+%		ser_proto:parse("438_41061 Ut1 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
 parse_cmd_u_3_4_transcode_no_codecs_test() ->
-	?assertThrow(
-		{error_syntax,"Requested transcoding but no codecs are available"},
-		ser_proto:parse("438_41061 Ut1 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
+	?assertEqual(
+		#cmd{
+			type=?CMD_U,
+			cookie="438_41061",
+			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
+			callid="e12ea248-94a5e885@192.168.5.3",
+			mediaid=1,
+			from=#party{tag="6b0a8f6cfc543db1o1"},
+			params=[
+				{direction, {external, external}},
+				{symmetric,true}
+			]
+		}, ser_proto:parse("438_41061 Ut1 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
 
 parse_cmd_u_4_zeroes_test() ->
 	?assertEqual(
