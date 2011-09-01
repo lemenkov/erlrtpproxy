@@ -1,17 +1,17 @@
-%global realname rtpproxy_radius
+%global realname rtpproxy_notifier
 %global debug_package %{nil}
 %global git_tag 1234567
 %global patchnumber 0
 
 
-Name:		erlrtpproxy-radius
+Name:		erlrtpproxy-notifier
 Version:	%VSN%
 Release:	1%{?dist}
-Summary:	RADIUS add-on for RTP proxying daemon
+Summary:	Notification add-on for RTP proxying daemon
 Group:		Applications/Internet
 License:	GPLv3+
-URL:		https://github.com/lemenkov/erlrtpproxy-radius
-# wget --no-check-certificate https://github.com/lemenkov/erlrtpproxy-radius/tarball/%VSN%
+URL:		https://github.com/lemenkov/erlrtpproxy-notifier
+# wget --no-check-certificate https://github.com/lemenkov/erlrtpproxy-notifier/tarball/%VSN%
 Source0:	lemenkov-%{name}-%{version}-%{patchnumber}-g%{git_tag}.tar.gz
 BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -22,7 +22,8 @@ Requires:	erlang-eradius
 
 
 %description
-RADIUS add-on for RTP proxying daemon.
+Notification add-on for RTP proxying daemon. It supports RADIUS
+and rtpproxy's own simple notification extension.
 
 
 %prep

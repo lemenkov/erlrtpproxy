@@ -1,4 +1,4 @@
--module(rtpproxy_radius).
+-module(rtpproxy_notifier).
 
 -behaviour(gen_server).
 
@@ -18,13 +18,13 @@ start_link() ->
 	gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init(_) ->
-	error_logger:info_msg("Starting rtpproxy_radius at ~p~n", [node()]),
+	error_logger:info_msg("Starting rtpproxy_notifier at ~p~n", [node()]),
 	{ok, RadAcctServers} = application:get_env(?MODULE, radacct_servers),
 	eradius_dict:start(),
 	eradius_dict:load_tables(["dictionary", "dictionary_cisco"]),
 	eradius_acc:start(),
 	?MODULE = ets:new(?MODULE, [public, named_table]),
-	error_logger:info_msg("Started rtpproxy_radius at ~p~n", [node()]),
+	error_logger:info_msg("Started rtpproxy_notifier at ~p~n", [node()]),
 	{ok, #rad_accreq{servers=RadAcctServers}}.
 
 handle_call(Message, From, State) ->

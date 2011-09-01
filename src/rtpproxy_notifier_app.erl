@@ -1,4 +1,4 @@
--module(rtpproxy_radius_app).
+-module(rtpproxy_notifier_app).
 
 -behaviour(application).
 
@@ -10,7 +10,7 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-    rtpproxy_radius_sup:start_link().
+    rtpproxy_notifier_sup:start_link().
 
 stop(_State) ->
     ok.
