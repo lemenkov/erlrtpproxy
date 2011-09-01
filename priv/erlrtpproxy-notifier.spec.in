@@ -49,9 +49,12 @@ rm -rf $RPM_BUILD_ROOT
 %config(noreplace) %{_sysconfdir}/erl%{realname}.config
 %dir %{_libdir}/erlang/lib/%{realname}-%{version}
 %dir %{_libdir}/erlang/lib/%{realname}-%{version}/ebin
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/backend_sup.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}.app
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_app.beam
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_backend_notify.beam
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_backend_radius.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_sup.beam
 
 
