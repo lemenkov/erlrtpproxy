@@ -39,8 +39,8 @@ get_fd_pair({external, false, SockParams}) ->
 %% Private functions
 %%
 
-get_fd_pair(Ip, _, 0) ->
-	?ERR("Create new socket at ~p FAILED", [Ip]),
+get_fd_pair(Ip, SockParams, 0) ->
+	?ERR("Create new socket at ~p FAILED (~p)", [Ip, SockParams]),
 	error;
 get_fd_pair(Ip, SockParams, NTry) ->
 	case gen_udp:open(0, [binary, {ip, Ip}, {active, once}, {raw,1,11,<<1:32/native>>}] ++ SockParams) of
