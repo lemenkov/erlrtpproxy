@@ -603,6 +603,39 @@ parse_cmd_u_15_discard_non_rfc1918_test() ->
 			]
 		}, ser_proto:parse("438_41061 Ut4p1iec8,0,2,4,18,96,97,98,100,101v0v1v2 e12ea248-94a5e885@192.168.5.3 192.0.43.3 16432 6b0a8f6cfc543db1o1;1", {127,0,0,1}, 1234)).
 
+parse_cmd_u_16_ipv6_source_test() ->
+	?assertEqual(
+		#cmd{
+			type=?CMD_U,
+			cookie="9440_4",
+			origin=#origin{type=ser,pid=self(),ip={127,0,0,1},port=1234},
+			callid="e12050ca82cc434c444ae66fcb30a4c0@0:0:0:0:0:0:0:0",
+			mediaid=1,
+			from=#party{tag="595f563", addr={{8193,1280,136,512,0,0,0,16}, 5000}, rtcpaddr={{8193,1280,136,512,0,0,0,16}, 5001}, proto=udp},
+			params=[
+				ipv6,
+				weak,
+				{codecs,[
+						{'PCMU',8000,1},
+						{'GSM',8000,1},
+						{'DVI4',8000,1},
+						{'DVI4',16000,1},
+						{'PCMA',8000,1},
+						{'G722',8000,1},
+						{'G728',8000,1},
+						96,
+						97,
+						98,
+						100,
+						101
+					]
+				},
+				{direction, {external, external}},
+				{repacketize, 30},
+				{symmetric,true},
+				{transcode,{'GSM',8000,1}}
+			]
+		}, ser_proto:parse("9440_4 UwEEt3Z30c9,96,97,0,8,98,3,100,5,6,15,101 e12050ca82cc434c444ae66fcb30a4c0@0:0:0:0:0:0:0:0 2001:500:88:200:0:0:0:10 5000 595f563;1", {127,0,0,1}, 1234)).
 
 parse_cmd_l_1_test() ->
 	?assertEqual(
@@ -798,8 +831,11 @@ is_rfc1918_test_() ->
 		{"test #2 for non-RFC1918 subnet",
 			fun() -> ?assertEqual(false, ser_proto:is_rfc1918({192,169,127,3})) end
 		},
-		{"test for non-IPv4 subnet",
-			fun() -> ?assertThrow({error, "Not a valid IPv4 address"}, ser_proto:is_rfc1918("::1")) end
+		{"test for IPv6 subnet",
+			fun() -> ?assertEqual(ipv6, ser_proto:is_rfc1918({0,0,0,0,0,0,0,1})) end
+		},
+		{"test for invalid IP address",
+			fun() -> ?assertThrow({error, "Not a valid IP address"}, ser_proto:is_rfc1918({1001,1001,1001,1001})) end
 		}
 	].
 

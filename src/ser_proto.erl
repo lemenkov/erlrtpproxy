@@ -115,14 +115,20 @@ parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId]) 
 % Reinvite, Hold and Resume
 parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, ToTag, MediaId]) ->
 	{GuessIp, GuessPort} = parse_addr(ProbableIp, ProbablePort),
-	Params	= parse_params(Args),
+	Params0 = parse_params(Args),
 
-	% Discart address if it's not consistent with direction - FIXME IPv4 only
-	Addr = case {proplists:get_value(direction, Params), is_rfc1918(GuessIp)} of
+	% Discard address if it's not consistent with direction
+	Addr = case {proplists:get_value(direction, Params0), is_rfc1918(GuessIp)} of
 		{{external, _}, true} -> null;
 		{{internal, _}, true} -> {GuessIp, GuessPort};
 		{{internal, _}, false} -> null;
-		{{external, _}, false} -> {GuessIp, GuessPort}
+		{{external, _}, false} -> {GuessIp, GuessPort};
+		{_, ipv6} -> {GuessIp, GuessPort}
+	end,
+
+	Params1 = case is_rfc1918(GuessIp) of
+		ipv6 -> ensure_alone(Params0, ipv6);
+		_ -> Params0
 	end,
 
 	% Try to guess RTCP address
@@ -135,9 +141,9 @@ parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, T
 		type = ?CMD_U,
 		callid = CallId,
 		mediaid	= parse_media_id(MediaId),
-		from = #party{tag=FromTag, addr=Addr, rtcpaddr=RtcpAddr, proto=proplists:get_value(proto, Params, udp)},
+		from = #party{tag=FromTag, addr=Addr, rtcpaddr=RtcpAddr, proto=proplists:get_value(proto, Params1, udp)},
 		to = ?SAFE_PARTY(ToTag),
-		params= proplists:delete(proto, Params)
+		params = lists:sort(proplists:delete(proto, Params1))
 	};
 
 % Lookup existing session
@@ -459,14 +465,24 @@ guess_codec_n(Codec) ->
 	Y.
 
 % TODO only IPv4 for now
-is_rfc1918({I0,I1,I2,I3} = Ip) when	is_integer(I0), I0 > 0, I0 < 256,
+is_rfc1918({I0,I1,I2,I3} = IPv4) when	is_integer(I0), I0 >=0, I0 < 256,
 					is_integer(I1), I1 >= 0, I1 < 256,
 					is_integer(I2), I2 >= 0, I2 < 256,
 					is_integer(I3), I3 >= 0, I3 < 256
 				->
-	is_rfc1918_guarded(Ip);
+	is_rfc1918_guarded(IPv4);
+is_rfc1918({I0, I1, I2, I3, I4, I5, I6, I7} = IPv6) when
+	is_integer(I0), I0 >= 0, I0 < 65535,
+	is_integer(I1), I1 >= 0, I1 < 65535,
+	is_integer(I2), I2 >= 0, I2 < 65535,
+	is_integer(I3), I3 >= 0, I3 < 65535,
+	is_integer(I4), I4 >= 0, I4 < 65535,
+	is_integer(I5), I5 >= 0, I5 < 65535,
+	is_integer(I6), I6 >= 0, I6 < 65535,
+	is_integer(I7), I7 >= 0, I7 < 65535 ->
+		ipv6;
 is_rfc1918(_) ->
-	throw({error, "Not a valid IPv4 address"}).
+	throw({error, "Not a valid IP address"}).
 
 % Loopback (actually, it's not a RFC1918 network)
 is_rfc1918_guarded({127,_,_,_}) ->
