@@ -793,8 +793,11 @@ parse_cmd_unknown_test() ->
 encode_ok_test() ->
 	?assertEqual("438_41067 0\n", ser_proto:encode(#cmd{cookie="438_41067"}, ok)).
 
-encode_ip_test() ->
+encode_ipv4_test() ->
 	?assertEqual("8411_41413 41212 192.168.100.4\n", ser_proto:encode(#cmd{cookie="8411_41413"}, {{192,168,100,4},41212})).
+
+encode_ipv6_test() ->
+	?assertEqual("8411_41413 41212 2001:500:88:200::10\n", ser_proto:encode(#cmd{cookie="8411_41413"}, {{8193,1280,136,512,0,0,0,16}, 41212})).
 
 encode_version_basic_test() ->
 	?assertEqual("32031_1 20040107\n", ser_proto:encode(#cmd{cookie="32031_1"}, {version, "20040107"})).

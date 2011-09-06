@@ -65,8 +65,22 @@ encode(Cmd, {error, notfound}) ->
 encode(Msg, {error, syntax}) ->
 	[Cookie|_Rest] = string:tokens(Msg, " "),
 	Cookie ++ ?RTPPROXY_ERR_SYNTAX;
-encode(Cmd, {{I0,I1,I2,I3} = Ip, Port}) when is_integer(I0), is_integer(I1), is_integer(I2), is_integer(I3), is_integer(Port) ->
-	Cmd#cmd.cookie ++ " " ++ integer_to_list(Port) ++ " " ++ inet_parse:ntoa(Ip) ++ "\n".
+encode(Cmd, {{I0,I1,I2,I3} = IPv4, Port}) when
+	is_integer(I0), I0 >= 0, I0 < 256,
+	is_integer(I1), I1 >= 0, I1 < 256,
+	is_integer(I2), I2 >= 0, I2 < 256,
+	is_integer(I3), I3 >= 0, I3 < 256 ->
+	Cmd#cmd.cookie ++ " " ++ integer_to_list(Port) ++ " " ++ inet_parse:ntoa(IPv4) ++ "\n";
+encode(Cmd, {{I0,I1,I2,I3,I4,I5,I6,I7} = IPv6, Port}) when
+	is_integer(I0), I0 >= 0, I0 < 65535,
+	is_integer(I1), I1 >= 0, I1 < 65535,
+	is_integer(I2), I2 >= 0, I2 < 65535,
+	is_integer(I3), I3 >= 0, I3 < 65535,
+	is_integer(I4), I4 >= 0, I4 < 65535,
+	is_integer(I5), I5 >= 0, I5 < 65535,
+	is_integer(I6), I6 >= 0, I6 < 65535,
+	is_integer(I7), I7 >= 0, I7 < 65535 ->
+	Cmd#cmd.cookie ++ " " ++ integer_to_list(Port) ++ " " ++ inet_parse:ntoa(IPv6) ++ "\n".
 
 %%
 %% Private functions
