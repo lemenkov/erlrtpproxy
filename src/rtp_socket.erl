@@ -172,14 +172,16 @@ handle_cast({rtcp, Pkts, Parent}, #state{parent = Parent, rtcp = RtcpPid} = Stat
 	gen_server:cast(RtcpPid, {rtcp, Pkts}),
 	{noreply, State};
 
-handle_cast({update, Params}, State) ->
+handle_cast({update, Params}, #state{rtcp = RtcpPid} = State) ->
+	% Also update RTCP socket
+	gen_server:cast(RtcpPid, {update, Params}),
+
 	Weak = proplists:get_value(weak, Params, false),
 	Symmetric = proplists:get_value(symmetric, Params, true),
 	Transcode = proplists:get_value(transcode, Params, null),
 
 	% Get probable IP and port
-	Ip = proplists:get_value(ip, Params, null),
-	Port = proplists:get_value(port, Params, null),
+	{Ip, Port} = proplists:get_value(rtp, Params, {null, null}),
 
 	case State#state.started of
 		true ->

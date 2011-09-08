@@ -69,7 +69,7 @@ init ([Parent, Fd, Transport, Parameters]) ->
 	Symmetric = proplists:get_value(symmetric, Parameters, true),
 
 	% Get probable IP and port
-	{Ip, Port} = proplists:get_value(rtp, Parameters, {null, null}),
+	{Ip, Port} = proplists:get_value(rtcp, Parameters, {null, null}),
 
 	{ok, #state{
 			parent = Parent,
@@ -101,8 +101,7 @@ handle_cast({update, Parameters}, State) ->
 	Symmetric = proplists:get_value(symmetric, Parameters, true),
 
 	% Get probable IP and port
-	Ip = proplists:get_value(ip, Parameters, null),
-	Port = proplists:get_value(port, Parameters, null),
+	{Ip, Port} = proplists:get_value(rtcp, Parameters, {null, null}),
 
 	case State#state.started of
 		true ->
