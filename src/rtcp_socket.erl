@@ -118,11 +118,7 @@ handle_cast({update, Parameters}, State) ->
 					symmetric = Symmetric
 				}
 			}
-	end;
-
-handle_cast(stop, State) ->
-	% Final stop
-	{stop, stop, State}.
+	end.
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
@@ -173,7 +169,6 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{parent = Parent, started = false} =
 		_:_ -> rtp_utils:dump_packet(node(), self(), Msg),
 		{noreply, State}
 	end;
-
 
 handle_info(_Info, State) ->
 	{noreply, State}.

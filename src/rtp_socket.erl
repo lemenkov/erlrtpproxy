@@ -201,15 +201,7 @@ handle_cast({update, Params}, #state{rtcp = RtcpPid} = State) ->
 	end;
 
 handle_cast({neighbour, Pid}, State) when is_pid(Pid) ->
-	{noreply, State#state{neighbour = Pid}};
-
-handle_cast(stop, #state{tref = TRef} = State) ->
-	% Run 30-second Timer instead
-	% We shouldn't stop right here. Instead we need to capture all
-	% remaining packets if any.
-	timer:cancel(TRef),
-	{ok, TRef2} = timer:send_interval(?INTERIM_UPDATE, stop),
-	{noreply, State#state{tref = TRef2}}.
+	{noreply, State#state{neighbour = Pid}}.
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
@@ -266,10 +258,6 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{parent = Parent, started = false, n
 		_:_ -> rtp_utils:dump_packet(node(), self(), Msg),
 		{noreply, State}
 	end;
-
-handle_info(stop, State) ->
-	% Final stop
-	{stop, stop, State};
 
 handle_info(interim_update, #state{started = false} = State) ->
 	% Discard - we didn't start yet

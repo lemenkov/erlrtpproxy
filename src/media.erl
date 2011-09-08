@@ -161,13 +161,27 @@ handle_cast(
 			mediaid = 0,
 			from = #party{tag = TagFrom},
 			to = To} = Cmd,
-		#state{callid = CallId, tag_f = TagF, tag_t = TagT} = State
+		#state{callid = CallId, mediaid = MediaId, tag_f = TagF, tag_t = TagT, tref = TRef} = State
 	) ->
+
 	% FIXME consider checking for direction (is TagFrom  equals to TagF or not?)
-	case To of
-		null -> {stop, cancel, State};
-		_ -> {stop, bye, State}
-	end;
+	Reason = case To of
+		null -> cancel;
+		_ -> bye
+	end,
+
+	% Send stop message earlier
+	gen_server:cast(rtpproxy_notify, {stop, CallId, MediaId}),
+	gen_server:cast({global, rtpproxy}, {'EXIT', self(), Reason}),
+
+	% Run 30-sec timer for catching the remaining RTP/RTCP (w/o sending
+	% them to the other party)
+	timer:cancel(TRef),
+	{ok, TRef2} = timer:send_interval(30000, Reason),
+
+	% FIXME suppress retransmitting of packets here
+
+	{noreply, State#state{tref = TRef2}};
 
 handle_cast({start, Pid}, #state{
 		callid = CallID,
@@ -251,10 +265,6 @@ code_change(_OldVsn, State, _Extra) ->
 
 terminate(Reason, #state{callid = CallId, mediaid = MediaId, tref = TimerRef, from = From, to = To}) ->
 	timer:cancel(TimerRef),
-
-	gen_server:cast({global, rtpproxy}, {'EXIT', self(), Reason}),
-	gen_server:cast(rtpproxy_notify, {stop, CallId, MediaId}),
-
 	?ERR("terminated due to reason [~p]", [Reason]).
 
 % Ping message
@@ -280,6 +290,11 @@ handle_info({'EXIT', Pid, Reason}, #state{from = #media{pid = Pid}} = State) ->
 handle_info({'EXIT', Pid, Reason}, #state{to = #media{pid = Pid}} = State) ->
 	?ERR("RTP To socket died: ~p", [Reason]),
 	{stop, Reason, State};
+
+handle_info(bye, State) ->
+	{stop, bye, State};
+handle_info(cancel, State) ->
+	{stop, cancel, State};
 
 handle_info(Other, State) ->
 	?WARN("Other Info [~p], State [~p]", [Other, State]),
