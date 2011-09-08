@@ -267,9 +267,6 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{parent = Parent, started = false, n
 		{noreply, State}
 	end;
 
-handle_info(ping, State) ->
-	{noreply, State};
-
 handle_info(stop, State) ->
 	% Final stop
 	{stop, stop, State};
