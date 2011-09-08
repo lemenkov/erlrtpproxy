@@ -180,7 +180,7 @@ handle_cast({start, Pid}, #state{
 		PidT -> {SF, rtp}
 	end,
 	case (SF1 == rtp) and (ST1 == rtp) of
-		true -> gen_server:cast(rtpproxy_radius, {start, CallID, MediaID});
+		true -> gen_server:cast(rtpproxy_notify, {start, CallID, MediaID});
 		_ -> ok
 	end,
 	{noreply, State#state{
@@ -198,7 +198,7 @@ handle_cast({interim_update, Pid}, #state{
 		started = true
 	} = State) when Pid == PidF; Pid == PidT ->
 	% Both sides are active, so we need to send interim update here
-	gen_server:cast(rtpproxy_radius, {interim_update, CallID, MediaID}),
+	gen_server:cast(rtpproxy_notify, {interim_update, CallID, MediaID}),
 	{SF1, ST1} = case Pid of
 		PidF -> {rtp, ST};
 		PidT -> {SF, rtp}
@@ -253,7 +253,7 @@ terminate(Reason, #state{callid = CallId, mediaid = MediaId, tref = TimerRef, fr
 	timer:cancel(TimerRef),
 
 	gen_server:cast({global, rtpproxy}, {'EXIT', self(), Reason}),
-	gen_server:cast(rtpproxy_radius, {stop, CallId, MediaId}),
+	gen_server:cast(rtpproxy_notify, {stop, CallId, MediaId}),
 
 	?ERR("terminated due to reason [~p]", [Reason]).
 
