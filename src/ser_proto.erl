@@ -485,7 +485,7 @@ is_rfc1918({I0,I1,I2,I3} = IPv4) when
 	is_integer(I2), I2 >= 0, I2 < 256,
 	is_integer(I3), I3 >= 0, I3 < 256 ->
 	is_rfc1918_guarded(IPv4);
-is_rfc1918({I0, I1, I2, I3, I4, I5, I6, I7} = IPv6) when
+is_rfc1918({I0, I1, I2, I3, I4, I5, I6, I7} = _IPv6) when
 	is_integer(I0), I0 >= 0, I0 < 65535,
 	is_integer(I1), I1 >= 0, I1 < 65535,
 	is_integer(I2), I2 >= 0, I2 < 65535,
