@@ -13,6 +13,7 @@
 -include_lib("eradius/include/eradius_lib.hrl").
 -include_lib("eradius/include/dictionary.hrl").
 -include_lib("eradius/include/dictionary_cisco.hrl").
+-include_lib("eradius/include/dictionary_rfc2866.hrl").
 
 start_link(Args) ->
 	gen_server:start_link({local, ?MODULE}, ?MODULE, Args, []).
