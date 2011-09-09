@@ -20,7 +20,7 @@ start_link(Args) ->
 
 init([RadAcctServers]) ->
 	eradius_dict:start(),
-	eradius_dict:load_tables(["dictionary", "dictionary_cisco"]),
+	eradius_dict:load_tables(["dictionary", "dictionary_cisco", "dictionary_rfc2866"]),
 	eradius_acc:start(),
 	?MODULE = ets:new(?MODULE, [public, named_table]),
 	error_logger:info_msg("Started RADIUS backend at ~p~n", [node()]),
