@@ -37,8 +37,8 @@ start() ->
 	rpc:multicall(Nodes, error_logger, add_report_handler, [erlsyslog, {0, SyslogHost, SyslogPort}]),
 
 	% Run Notifier on each node
-	application:start(rtpproxy_notify),
-	rpc:multicall(Nodes, application, start, [rtpproxy_notify]),
+	application:start(rtpproxy_notifier),
+	rpc:multicall(Nodes, application, start, [rtpproxy_notifier]),
 
 %	mnesia:create_schema([node()]),
 %	mnesia:start(),

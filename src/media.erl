@@ -171,7 +171,7 @@ handle_cast(
 	end,
 
 	% Send stop message earlier
-	gen_server:cast(rtpproxy_notify, {stop, CallId, MediaId}),
+	gen_server:cast(rtpproxy_notifier, {stop, CallId, MediaId}),
 	gen_server:cast({global, rtpproxy}, {'EXIT', self(), Reason}),
 
 	% Run 30-sec timer for catching the remaining RTP/RTCP (w/o sending
@@ -194,7 +194,7 @@ handle_cast({start, Pid}, #state{
 		PidT -> {SF, rtp}
 	end,
 	case (SF1 == rtp) and (ST1 == rtp) of
-		true -> gen_server:cast(rtpproxy_notify, {start, CallID, MediaID});
+		true -> gen_server:cast(rtpproxy_notifier, {start, CallID, MediaID});
 		_ -> ok
 	end,
 	{noreply, State#state{
@@ -212,7 +212,7 @@ handle_cast({interim_update, Pid}, #state{
 		started = true
 	} = State) when Pid == PidF; Pid == PidT ->
 	% Both sides are active, so we need to send interim update here
-	gen_server:cast(rtpproxy_notify, {interim_update, CallID, MediaID}),
+	gen_server:cast(rtpproxy_notifier, {interim_update, CallID, MediaID}),
 	{SF1, ST1} = case Pid of
 		PidF -> {rtp, ST};
 		PidT -> {SF, rtp}
