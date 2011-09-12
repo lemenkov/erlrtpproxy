@@ -24,17 +24,17 @@ handle_call(Message, From, State) ->
 	{reply, {error, unknown_call}, State}.
 
 handle_cast({start, CallId, MediaId}, Fd) ->
-	Msg = io_lib:format("start:~s:~b", [CallId, MediaId]),
+	Msg = io_lib:format("start:'~s'~b", [CallId, MediaId]),
 	gen_tcp:send(Fd, Msg),
 	{noreply, Fd};
 
 handle_cast({interim_update, CallId, MediaId}, Fd) ->
-	Msg = io_lib:format("interim_update:~s:~b", [CallId, MediaId]),
+	Msg = io_lib:format("interim_update'~s'~b", [CallId, MediaId]),
 	gen_tcp:send(Fd, Msg),
 	{noreply, Fd};
 
 handle_cast({stop, CallId, MediaId}, Fd) ->
-	Msg = io_lib:format("stop:~s:~b", [CallId, MediaId]),
+	Msg = io_lib:format("stop'~s'~b", [CallId, MediaId]),
 	gen_tcp:send(Fd, Msg),
 	{noreply, Fd};
 
