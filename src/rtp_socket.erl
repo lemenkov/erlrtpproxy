@@ -93,12 +93,13 @@ init ([Parent, Transport, Params] = InVals) ->
 	{Codecs, Transcode} = case TryTranscode of
 		null -> {[], null};
 		_ ->
-			CodecsVals = proplists:get_value(codecs, Params, null),
-			C1 = run_codecs(CodecsVals),
+			C1 = register_available_codecs(proplists:get_value(codecs, Params, [])),
 			T1 = case TryTranscode of
 				{'PCMU',8000,1} -> {?RTP_PAYLOAD_PCMU, proplists:get_value(?RTP_PAYLOAD_PCMU,C1)};
 				{'GSM',8000,1} -> {?RTP_PAYLOAD_GSM, proplists:get_value(?RTP_PAYLOAD_GSM,C1)};
 				{'PCMA',8000,1} -> {?RTP_PAYLOAD_PCMA, proplists:get_value(?RTP_PAYLOAD_PCMA,C1)};
+				{'G722',8000,1} -> {?RTP_PAYLOAD_G722, proplists:get_value(?RTP_PAYLOAD_G722,C1)};
+				{'DVI4',8000,1} -> {?RTP_PAYLOAD_DVI4_8KHz, proplists:get_value(?RTP_PAYLOAD_DVI4_8KHz,C1)};
 				_ -> undefined
 			end,
 			case T1 of
@@ -294,18 +295,14 @@ transcode(#rtp{payload_type = OldPayloadType, payload = Payload} = Rtp, {Payload
 transcode(Pkts, _, _) ->
 	{rtp, Pkts}.
 
-run_codecs(CodecsVals) ->
-	run_codecs(CodecsVals, []).
-run_codecs([], Ret) ->
+register_available_codecs(CodecsVals) ->
+	register_available_codecs(CodecsVals, []).
+register_available_codecs([], Ret) ->
 	Ret;
-run_codecs([{'PCMU',8000,1} | Rest], Ret) ->
-	{ok, Codec} = codec:start_link([?RTP_PAYLOAD_PCMU, self()]),
-	run_codecs(Rest, Ret ++ [{?RTP_PAYLOAD_PCMU, Codec}]);
-run_codecs([{'PCMA',8000,1} | Rest], Ret) ->
-	{ok, Codec} = codec:start_link([?RTP_PAYLOAD_PCMA, self()]),
-	run_codecs(Rest, Ret ++ [{?RTP_PAYLOAD_PCMA, Codec}]);
-run_codecs([{'GSM',8000,1} | Rest], Ret) ->
-	{ok, Codec} = codec:start_link([?RTP_PAYLOAD_GSM, self()]),
-	run_codecs(Rest, Ret ++ [{?RTP_PAYLOAD_GSM, Codec}]);
-run_codecs([CodecVal | Rest], Ret) ->
-	run_codecs(Rest, Ret ++ [{CodecVal, passthrough}]).
+register_available_codecs([CodecDesc | Rest], Ret) ->
+	case codec:start_link(CodecDesc) of
+		{ok, Codec} ->
+			register_available_codecs(Rest, Ret ++ [{rtp_utils:get_payload_from_codec(CodecDesc), Codec}]);
+		_ ->
+			register_available_codecs(Rest, Ret ++ [{rtp_utils:get_payload_from_codec(CodecDesc), passthrough}])
+	end.
