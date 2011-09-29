@@ -100,6 +100,9 @@ init ([Parent, Transport, Params] = InVals) ->
 				{'PCMA',8000,1} -> {?RTP_PAYLOAD_PCMA, proplists:get_value(?RTP_PAYLOAD_PCMA,C1)};
 				{'G722',8000,1} -> {?RTP_PAYLOAD_G722, proplists:get_value(?RTP_PAYLOAD_G722,C1)};
 				{'DVI4',8000,1} -> {?RTP_PAYLOAD_DVI4_8KHz, proplists:get_value(?RTP_PAYLOAD_DVI4_8KHz,C1)};
+				{'DVI4',11025,1} -> {?RTP_PAYLOAD_DVI4_11KHz, proplists:get_value(?RTP_PAYLOAD_DVI4_11KHz,C1)};
+				{'DVI4',16000,1} -> {?RTP_PAYLOAD_DVI4_16KHz, proplists:get_value(?RTP_PAYLOAD_DVI4_16KHz,C1)};
+				{'DVI4',22050,1} -> {?RTP_PAYLOAD_DVI4_22KHz, proplists:get_value(?RTP_PAYLOAD_DVI4_22KHz,C1)};
 				_ -> undefined
 			end,
 			case T1 of
