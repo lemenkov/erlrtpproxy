@@ -20,8 +20,8 @@
 -module(ser_proto).
 -author('lemenkov@gmail.com').
 
--export([parse/3]).
--export([encode/2]).
+-export([parse/1]).
+-export([encode/1]).
 % To make eunit happy
 -export([is_rfc1918/1]).
 
@@ -35,43 +35,41 @@
 
 -define(SAFE_PARTY(Val), case Val of null -> null; _ -> #party{tag=Val} end).
 
-parse(Msg,Ip, Port) ->
+parse(Msg) ->
 	% Drop accidental zeroes - OpenSIPs inserts them sometimes
 	% FIXME bug in OpenSIPS?
 	[Cookie,C|Rest] = string:tokens([X || X <-  Msg, X /= 0], " ;"),
-	Cmd = parse_splitted([string:to_upper(C)|Rest]),
-	Cmd#cmd{
-		cookie=Cookie,
-		origin=#origin{
-			type=ser,
-			pid=self(),
-			ip=Ip,
-			port=Port
-		}
-	}.
+	case parse_splitted([string:to_upper(C)|Rest]) of
+		#cmd{} = Cmd ->
+			Cmd#cmd{
+				cookie=Cookie,
+				origin=#origin{
+					type=ser,
+					pid=self()
+				}
+			};
+		#response{} = Response ->
+			Response#response{
+				cookie=Cookie
+			}
+	end.
 
-encode(Cmd, Answer) when is_list(Answer) ->
-	Cmd#cmd.cookie ++ " " ++ Answer ++ "\n";
-encode(Cmd, {version, Version}) ->
-	Cmd#cmd.cookie ++ " " ++ Version ++ "\n";
-encode(Cmd, {supported, _Version}) ->
-	Cmd#cmd.cookie ++ ?RTPPROXY_VER_SUPPORTED;
-encode(Cmd, ok) ->
-	Cmd#cmd.cookie ++ ?RTPPROXY_OK;
-encode(Cmd, {error, software}) ->
-	Cmd#cmd.cookie ++ ?RTPPROXY_ERR_SOFTWARE;
-encode(Cmd, {error, notfound}) ->
-	Cmd#cmd.cookie ++ ?RTPPROXY_ERR_NOSESSION;
-encode(Msg, {error, syntax}) when is_list(Msg) ->
+encode({error, syntax, Msg}) when is_list(Msg) ->
 	[Cookie|_Rest] = string:tokens(Msg, " "),
 	Cookie ++ ?RTPPROXY_ERR_SYNTAX;
-encode(Cmd, {{I0,I1,I2,I3} = IPv4, Port}) when
+encode(#response{cookie = Cookie, type = reply, data = ok}) ->
+	Cookie ++ ?RTPPROXY_OK;
+encode(#response{cookie = Cookie, type = reply, data = supported}) ->
+	Cookie ++ ?RTPPROXY_VER_SUPPORTED;
+encode(#response{cookie = Cookie, type = reply, data = {version, Version}}) when is_list(Version) ->
+	Cookie ++ " " ++ Version ++ "\n";
+encode(#response{cookie = Cookie, type = reply, data = {{{I0,I1,I2,I3} = IPv4, Port}, _}}) when
 	is_integer(I0), I0 >= 0, I0 < 256,
 	is_integer(I1), I1 >= 0, I1 < 256,
 	is_integer(I2), I2 >= 0, I2 < 256,
 	is_integer(I3), I3 >= 0, I3 < 256 ->
-	Cmd#cmd.cookie ++ " " ++ integer_to_list(Port) ++ " " ++ inet_parse:ntoa(IPv4) ++ "\n";
-encode(Cmd, {{I0,I1,I2,I3,I4,I5,I6,I7} = IPv6, Port}) when
+	Cookie ++ " " ++ integer_to_list(Port) ++ " " ++ inet_parse:ntoa(IPv4) ++ "\n";
+encode(#response{cookie = Cookie, type = reply, data = {{{I0,I1,I2,I3,I4,I5,I6,I7} = IPv6, Port}, _}}) when
 	is_integer(I0), I0 >= 0, I0 < 65535,
 	is_integer(I1), I1 >= 0, I1 < 65535,
 	is_integer(I2), I2 >= 0, I2 < 65535,
@@ -80,10 +78,22 @@ encode(Cmd, {{I0,I1,I2,I3,I4,I5,I6,I7} = IPv6, Port}) when
 	is_integer(I5), I5 >= 0, I5 < 65535,
 	is_integer(I6), I6 >= 0, I6 < 65535,
 	is_integer(I7), I7 >= 0, I7 < 65535 ->
-	Cmd#cmd.cookie ++ " " ++ integer_to_list(Port) ++ " " ++ inet_parse:ntoa(IPv6) ++ "\n".
+	Cookie ++ " " ++ integer_to_list(Port) ++ " " ++ inet_parse:ntoa(IPv6) ++ "\n";
+encode(#response{cookie = Cookie, type = error, data = syntax}) ->
+	Cookie ++ ?RTPPROXY_ERR_SYNTAX;
+encode(#response{cookie = Cookie, type = error, data = software}) ->
+	Cookie ++ ?RTPPROXY_ERR_SOFTWARE;
+encode(#response{cookie = Cookie, type = error, data = notfound}) ->
+	Cookie ++ ?RTPPROXY_ERR_NOSESSION;
+encode(#response{cookie = Cookie, type = Type, data = Data}) ->
+	ok.
 
 %%
 %% Private functions
+%%
+
+%%
+%% Requests
 %%
 
 % Request basic supported rtpproxy protocol version
@@ -261,6 +271,54 @@ parse_splitted(["I"]) ->
 	#cmd{
 		type=?CMD_I
 	};
+
+
+%%
+%% Replies
+%%
+
+parse_splitted(["0"]) ->
+	#response{type = reply, data = ok};
+
+parse_splitted(["1"]) ->
+	% This really should be ok - that's another one shortcoming
+	#response{type = reply, data = supported};
+
+parse_splitted(["20040107"]) ->
+	#response{type = reply, data = {version, "20040107"}};
+parse_splitted(["20050322"]) ->
+	#response{type = reply, data = {version, "20050322"}};
+parse_splitted(["20060704"]) ->
+	#response{type = reply, data = {version, "20060704"}};
+parse_splitted(["20071116"]) ->
+	#response{type = reply, data = {version, "20071116"}};
+parse_splitted(["20071218"]) ->
+	#response{type = reply, data = {version, "20071218"}};
+parse_splitted(["20080403"]) ->
+	#response{type = reply, data = {version, "20080403"}};
+parse_splitted(["20081102"]) ->
+	#response{type = reply, data = {version, "20081102"}};
+parse_splitted(["20081224"]) ->
+	#response{type = reply, data = {version, "20081224"}};
+parse_splitted(["20090810"]) ->
+	#response{type = reply, data = {version, "20090810"}};
+
+parse_splitted(["E1"]) ->
+	#response{type = error, data = syntax};
+
+parse_splitted(["E7"]) ->
+	#response{type = error, data = software};
+
+parse_splitted(["E8"]) ->
+	#response{type = error, data = notfound};
+
+parse_splitted([P, I]) ->
+	{Ip, Port} = parse_addr(I, P),
+	#response{type = reply, data = {{Ip, Port}, {Ip, Port+1}}};
+
+%%
+%% Error / Unknown request or reply
+%%
 
 parse_splitted(_) ->
 	throw({error_syntax, "Unknown command"}).

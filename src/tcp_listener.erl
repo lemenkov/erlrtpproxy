@@ -90,16 +90,16 @@ handle_info({tcp, Client, Msg}, State) ->
 	inet:setopts(Client, [{active, once}, {packet, raw}, list]),
 	{ok, {Ip, Port}} = inet:peername(Client),
 	try ser_proto:parse(Msg, Ip, Port) of
-		Cmd ->
-			gen_server:cast(ser, Cmd)
+		#cmd{origin = Origin} = Cmd ->
+			gen_server:cast(backend, Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}})
 	catch
 		throw:{error_syntax, Error} ->
 			error_logger:error_msg("Bad syntax. [~s -> ~s]~n", [Msg, Error]),
-			Data = ser_proto:encode(Msg, {error, syntax}),
+			Data = ser_proto:encode({error, syntax, Msg}),
 			gen_tcp:send(Client, Data);
 		E:C ->
 			error_logger:error_msg("Exception. [~s -> ~p:~p]~n", [Msg, E, C]),
-			Data = ser_proto:encode(Msg, {error, syntax}),
+			Data = ser_proto:encode({error, syntax, Msg}),
 			gen_tcp:send(Client, Data)
 	end,
 	{noreply, State};

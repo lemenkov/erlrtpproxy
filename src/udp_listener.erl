@@ -70,17 +70,17 @@ handle_cast(_Request, State) ->
 
 % Fd from which message arrived must be equal to Fd from our state
 handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
-	try ser_proto:parse(Msg, Ip, Port) of
-		Cmd ->
-			gen_server:cast(ser, Cmd)
+	try ser_proto:parse(Msg) of
+		#cmd{origin = Origin} = Cmd ->
+			gen_server:cast(backend, Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}})
 	catch
 		throw:{error_syntax, Error} ->
 			error_logger:error_msg("Bad syntax. [~s -> ~s]~n", [Msg, Error]),
-			Data = ser_proto:encode(Msg, {error, syntax}),
+			Data = ser_proto:encode({error, syntax, Msg}),
 			gen_udp:send(Fd, Ip, Port, Data);
 		E:C ->
 			error_logger:error_msg("Exception. [~s -> ~p:~p]~n", [Msg, E, C]),
-			Data = ser_proto:encode(Msg, {error, syntax}),
+			Data = ser_proto:encode({error, syntax, Msg}),
 			gen_udp:send(Fd, Ip, Port, Data)
 	end,
 	{noreply, Fd};

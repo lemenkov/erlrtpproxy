@@ -11,6 +11,13 @@
 		params=null
 	}).
 
+-record(response, {
+		cookie = null,
+		origin = null,
+		type,
+		data
+	}).
+
 -record(origin, {type, pid, ip, port}).
 -record(party, {tag, addr=null, rtcpaddr=null, proto=udp}).
 
