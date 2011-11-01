@@ -285,10 +285,14 @@ handle_info(ping, State) ->
 
 handle_info({'EXIT', Pid, Reason}, #state{from = #media{pid = Pid}} = State) ->
 	?ERR("RTP From socket died: ~p", [Reason]),
+	gen_server:cast(rtpproxy_notifier, {stop, CallId, MediaId}),
+	gen_server:cast({global, rtpproxy}, {'EXIT', self(), Reason}),
 	{stop, Reason, State};
 
 handle_info({'EXIT', Pid, Reason}, #state{to = #media{pid = Pid}} = State) ->
 	?ERR("RTP To socket died: ~p", [Reason]),
+	gen_server:cast(rtpproxy_notifier, {stop, CallId, MediaId}),
+	gen_server:cast({global, rtpproxy}, {'EXIT', self(), Reason}),
 	{stop, Reason, State};
 
 handle_info(bye, State) ->
