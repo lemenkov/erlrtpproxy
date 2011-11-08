@@ -70,7 +70,7 @@ handle_cast(_Request, State) ->
 
 % Fd from which message arrived must be equal to Fd from our state
 handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
-	try ser_proto:parse(Msg) of
+	try ser_proto:decode(Msg) of
 		#cmd{origin = Origin} = Cmd ->
 			gen_server:cast(backend, Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}})
 	catch

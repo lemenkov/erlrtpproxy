@@ -82,7 +82,7 @@ handle_cast(_Request, State) ->
 
 % Response from rtpproxy
 handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, ip = Ip, port = Port, cmds = Cmds} = State) ->
-	try ser_proto:parse(Msg) of
+	try ser_proto:decode(Msg) of
 		#response{} = Response ->
 			case proplists:get_value(Response#response.cookie) of
 				undefined ->

@@ -20,7 +20,7 @@
 -module(ser_proto).
 -author('lemenkov@gmail.com').
 
--export([parse/1]).
+-export([decode/1]).
 -export([encode/1]).
 % To make eunit happy
 -export([is_rfc1918/1]).
@@ -35,7 +35,7 @@
 
 -define(SAFE_PARTY(Val), case Val of null -> null; _ -> #party{tag=Val} end).
 
-parse(Msg) ->
+decode(Msg) ->
 	% Drop accidental zeroes - OpenSIPs inserts them sometimes
 	% FIXME bug in OpenSIPS?
 	[Cookie,C|Rest] = string:tokens([X || X <-  Msg, X /= 0, X /= $\n], " ;"),
