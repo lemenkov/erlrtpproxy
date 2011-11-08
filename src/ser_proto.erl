@@ -86,7 +86,13 @@ encode(#response{cookie = Cookie, type = error, data = software}) ->
 encode(#response{cookie = Cookie, type = error, data = notfound}) ->
 	Cookie ++ ?RTPPROXY_ERR_NOSESSION;
 encode(#response{cookie = Cookie, type = Type, data = Data}) ->
-	ok.
+	ok;
+
+encode(#cmd{cookie = Cookie, type = ?CMD_V}) ->
+	Cookie ++ " V" ++ "\n";
+
+encode(_) ->
+	throw({error_syntax, "Unknown (or unsupported) #cmd"}).
 
 %%
 %% Private functions

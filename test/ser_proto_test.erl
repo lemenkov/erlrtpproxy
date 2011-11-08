@@ -28,13 +28,21 @@
 
 -include("../src/common.hrl").
 
-parse_cmd_v_test() ->
-	?assertEqual(
-		#cmd{
+cmd_v_test_() ->
+	Cmd = #cmd{
 			type=?CMD_V,
 			cookie="24390_0",
 			origin=#origin{type=ser,pid=self()}
-		}, ser_proto:parse("24390_0 V")).
+		},
+	CmdBin = "24390_0 V\n",
+	[
+		{"decoding from binary",
+			fun() -> ?assertEqual(Cmd, ser_proto:parse(CmdBin)) end
+		},
+		{"encoding to binary",
+			fun() -> ?assertEqual(CmdBin, ser_proto:encode(Cmd)) end
+		}
+	].
 
 parse_cmd_vf_test() ->
 	?assertEqual(
