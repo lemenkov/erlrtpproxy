@@ -22,8 +22,6 @@
 
 -export([decode/1]).
 -export([encode/1]).
-% To make eunit happy
--export([is_rfc1918/1]).
 
 -include("common.hrl").
 
@@ -156,7 +154,7 @@ parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, T
 	Params0 = parse_params(Args),
 
 	% Discard address if it's not consistent with direction
-	Addr = case {proplists:get_value(direction, Params0), is_rfc1918(GuessIp)} of
+	Addr = case {proplists:get_value(direction, Params0), ser_utils:is_rfc1918(GuessIp)} of
 		{{external, _}, true} -> null;
 		{{internal, _}, true} -> {GuessIp, GuessPort};
 		{{internal, _}, false} -> null;
@@ -164,7 +162,7 @@ parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, T
 		{_, ipv6} -> {GuessIp, GuessPort}
 	end,
 
-	Params1 = case is_rfc1918(GuessIp) of
+	Params1 = case ser_utils:is_rfc1918(GuessIp) of
 		ipv6 -> ensure_alone(Params0, ipv6);
 		_ -> Params0
 	end,
@@ -549,38 +547,3 @@ guess_codec(C) -> C.
 guess_codec_n(Codec) ->
 	{Y, _} = string:to_integer(Codec),
 	Y.
-
-% TODO only IPv4 for now
-is_rfc1918({I0,I1,I2,I3} = IPv4) when
-	is_integer(I0), I0 >= 0, I0 < 256,
-	is_integer(I1), I1 >= 0, I1 < 256,
-	is_integer(I2), I2 >= 0, I2 < 256,
-	is_integer(I3), I3 >= 0, I3 < 256 ->
-	is_rfc1918_guarded(IPv4);
-is_rfc1918({I0, I1, I2, I3, I4, I5, I6, I7} = _IPv6) when
-	is_integer(I0), I0 >= 0, I0 < 65535,
-	is_integer(I1), I1 >= 0, I1 < 65535,
-	is_integer(I2), I2 >= 0, I2 < 65535,
-	is_integer(I3), I3 >= 0, I3 < 65535,
-	is_integer(I4), I4 >= 0, I4 < 65535,
-	is_integer(I5), I5 >= 0, I5 < 65535,
-	is_integer(I6), I6 >= 0, I6 < 65535,
-	is_integer(I7), I7 >= 0, I7 < 65535 ->
-		ipv6;
-is_rfc1918(_) ->
-	throw({error, "Not a valid IP address"}).
-
-% Loopback (actually, it's not a RFC1918 network)
-is_rfc1918_guarded({127,_,_,_}) ->
-	true;
-% RFC 1918, 10.0.0.0 - 10.255.255.255
-is_rfc1918_guarded({10,_,_,_}) ->
-	true;
-% RFC 1918, 172.16.0.0 - 172.31.255.255
-is_rfc1918_guarded({172,I1,_,_}) when I1 > 15, I1 < 32 ->
-	true;
-% RFC 1918, 192.168.0.0 - 192.168.255.255
-is_rfc1918_guarded({192,168,_,_}) ->
-	true;
-is_rfc1918_guarded(_) ->
-	false.
