@@ -58,13 +58,14 @@ parse_cmd_vf_test_() ->
 		},
 		{"encoding to binary",
 			fun() -> ?assertEqual(CmdBin, ser_proto:encode(Cmd)) end
+		},
+		{"unknown version (from binary)",
+			fun() -> ?assertThrow(
+						{error_syntax,"Unknown version: 20070101"},
+						ser_proto:parse("24393_1 VF 20070101"))
+			end
 		}
 	].
-
-parse_cmd_vf_unknown_version_test() ->
-	?assertThrow(
-		{error_syntax,"Unknown version: 20070101"},
-		ser_proto:parse("24393_1 VF 20070101")).
 
 parse_cmd_u_1_test() ->
 	?assertEqual(
