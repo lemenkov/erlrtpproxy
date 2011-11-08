@@ -698,20 +698,16 @@ parse_cmd_l_2_test() ->
 			]
 		}, ser_proto:parse("418_41111 LIc8,101,100 a68e961-5f6a75e5-356cafd9-3562@192.168.100.6 192.168.100.4 18756 1372466422;1 60753eabbd87fe6f34068e9d80a9fc1c;1")).
 
-parse_cmd_d_1_test() ->
-	?assertEqual(
-		#cmd{
+parse_cmd_d_test_() ->
+	Cmd1 = #cmd{
 			type=?CMD_D,
 			cookie="441_40922",
 			origin=#origin{type=ser,pid=self()},
 			callid="2498331773@192.168.1.37",
 			mediaid=0,
 			from=#party{tag="8edccef4eb1a16b8cef7192b77b7951a"}
-		}, ser_proto:parse("441_40922 D 2498331773@192.168.1.37 8edccef4eb1a16b8cef7192b77b7951a")).
-
-parse_cmd_d_2_test() ->
-	?assertEqual(
-		#cmd{
+		},
+	Cmd2 = #cmd{
 			type=?CMD_D,
 			cookie="437_40882",
 			origin=#origin{type=ser,pid=self()},
@@ -719,8 +715,24 @@ parse_cmd_d_2_test() ->
 			mediaid=0,
 			from=#party{tag="1372466422"},
 			to=#party{tag="9c56ba15bd794082ce6b166dba6c9c2"}
-		}, ser_proto:parse("437_40882 D 7adc6214-268583a6-1b74a438-3548@192.168.100.6 1372466422 9c56ba15bd794082ce6b166dba6c9c2")).
+		},
+	Cmd1Bin = "441_40922 D 2498331773@192.168.1.37 8edccef4eb1a16b8cef7192b77b7951a\n",
+	Cmd2Bin = "437_40882 D 7adc6214-268583a6-1b74a438-3548@192.168.100.6 1372466422 9c56ba15bd794082ce6b166dba6c9c2\n",
 
+	[
+		{"decoding from binary (no ToTag)",
+			fun() -> ?assertEqual(Cmd1, ser_proto:parse(Cmd1Bin)) end
+		},
+		{"encoding to binary (no ToTag)",
+			fun() -> ?assertEqual(Cmd1Bin, ser_proto:encode(Cmd1)) end
+		},
+		{"decoding from binary",
+			fun() -> ?assertEqual(Cmd2, ser_proto:parse(Cmd2Bin)) end
+		},
+		{"encoding to binary",
+			fun() -> ?assertEqual(Cmd2Bin, ser_proto:encode(Cmd2)) end
+		}
+	].
 
 parse_cmd_r_1_test() ->
 	?assertEqual(

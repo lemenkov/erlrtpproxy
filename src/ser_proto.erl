@@ -94,6 +94,11 @@ encode(#cmd{cookie = Cookie, type = ?CMD_V}) ->
 encode(#cmd{cookie = Cookie, type = ?CMD_VF, params = Version}) ->
 	Cookie ++ " VF " ++ Version ++ "\n";
 
+encode(#cmd{cookie = Cookie, type = ?CMD_D, callid = CallId, from = #party{tag = FromTag}, to = null}) ->
+	Cookie ++ " D " ++ CallId ++ " " ++ FromTag ++ "\n";
+encode(#cmd{cookie = Cookie, type = ?CMD_D, callid = CallId, from = #party{tag = FromTag}, to = #party{tag = ToTag}}) ->
+	Cookie ++ " D " ++ CallId ++ " " ++ FromTag ++ " " ++ ToTag ++ "\n";
+
 encode(_) ->
 	throw({error_syntax, "Unknown (or unsupported) #cmd"}).
 
