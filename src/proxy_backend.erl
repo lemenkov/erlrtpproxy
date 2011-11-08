@@ -74,6 +74,9 @@ handle_cast(#cmd{cookie = Cookie, origin = Origin} = Cmd, #state{fd = Fd, ip = I
 	gen_udp:send(Fd, Ip, Port, ser_proto:encode(Cmd)),
 	{noreply, State#state{cmds = [{Cookie, Origin}]}};
 
+handle_cast(stop, State) ->
+	{stop, stop, State};
+
 handle_cast(_Request, State) ->
 	{noreply, State}.
 

@@ -51,6 +51,8 @@ init (RtpproxyNode) ->
 handle_call(_Other, _From, State) ->
 	{noreply, State}.
 
+handle_cast(stop, State) ->
+	{stop, stop, State};
 % Got two addresses (initial Media stream creation)
 handle_cast({reply, Cmd, Answer, _}, State) ->
 	gen_server:cast(listener, {Cmd, Answer}),
