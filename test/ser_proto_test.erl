@@ -803,16 +803,41 @@ parse_cmd_p_3_wrong_playcount_test() ->
 		{error_syntax,"Wrong PlayCount"},
 		ser_proto:decode("1389_5 Phello 0003e30c-c50c016d-46bbcf2e-6369eecf@192.168.0.100 /var/tmp/rtpproxy_test/media/01.wav session 0003e30cc50ccc5416857d59-357336dc;1 28d49e51a95d5a31d09b31ccc63c5f4b;1")).
 
-parse_cmd_s_1_test() ->
-	?assertEqual(
-		#cmd{
+cmd_s_test_() ->
+	Cmd1 = #cmd{
 			type=?CMD_S,
 			cookie="2154_6",
 			origin=#origin{type=ser,pid=self()},
 			callid="0003e30c-c50c0171-35b90751-013a3ef6@192.168.0.100",
 			mediaid=1,
 			from=#party{tag="0003e30cc50ccc9f743d4fa6-38d0bd14"}
-		}, ser_proto:decode("2154_6 S 0003e30c-c50c0171-35b90751-013a3ef6@192.168.0.100 0003e30cc50ccc9f743d4fa6-38d0bd14;1")).
+		},
+	Cmd2 = #cmd{
+			type=?CMD_S,
+			cookie="2154_6",
+			origin=#origin{type=ser,pid=self()},
+			callid="0003e30c-c50c0171-35b90751-013a3ef6@192.168.0.100",
+			mediaid=1,
+			from=#party{tag="0003e30cc50ccc9f743d4fa6-38d0bd14"},
+			to=#party{tag="9c56ba15bd794082ce6b166dba6c9c2"}
+		},
+	Cmd1Bin = "2154_6 S 0003e30c-c50c0171-35b90751-013a3ef6@192.168.0.100 0003e30cc50ccc9f743d4fa6-38d0bd14;1\n",
+	Cmd2Bin = "2154_6 S 0003e30c-c50c0171-35b90751-013a3ef6@192.168.0.100 0003e30cc50ccc9f743d4fa6-38d0bd14;1 9c56ba15bd794082ce6b166dba6c9c2;1\n",
+
+	[
+		{"decoding from binary (no ToTag)",
+			fun() -> ?assertEqual(Cmd1, ser_proto:decode(Cmd1Bin)) end
+		},
+		{"encoding to binary (no ToTag)",
+			fun() -> ?assertEqual(Cmd1Bin, ser_proto:encode(Cmd1)) end
+		},
+		{"decoding from binary",
+			fun() -> ?assertEqual(Cmd2, ser_proto:decode(Cmd2Bin)) end
+		},
+		{"encoding to binary",
+			fun() -> ?assertEqual(Cmd2Bin, ser_proto:encode(Cmd2)) end
+		}
+	].
 
 parse_cmd_unknown_test() ->
 	?assertThrow(

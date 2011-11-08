@@ -97,6 +97,13 @@ encode(#cmd{cookie = Cookie, type = ?CMD_D, callid = CallId, from = #party{tag =
 encode(#cmd{cookie = Cookie, type = ?CMD_D, callid = CallId, from = #party{tag = FromTag}, to = #party{tag = ToTag}}) ->
 	Cookie ++ " D " ++ CallId ++ " " ++ FromTag ++ " " ++ ToTag ++ "\n";
 
+encode(#cmd{cookie = Cookie, type = ?CMD_S, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag}, to = null}) ->
+	[M] = io_lib:format("~w", [MediaId]),
+	Cookie ++ " S " ++ CallId ++ " " ++ FromTag ++ ";" ++ M ++ "\n";
+encode(#cmd{cookie = Cookie, type = ?CMD_S, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag}, to = #party{tag = ToTag}}) ->
+	[M] = io_lib:format("~w", [MediaId]),
+	Cookie ++ " S " ++ CallId ++ " " ++ FromTag ++ ";" ++ M ++ " " ++ ToTag ++ ";" ++ M ++ "\n";
+
 encode(_) ->
 	throw({error_syntax, "Unknown (or unsupported) #cmd"}).
 
