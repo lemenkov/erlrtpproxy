@@ -89,7 +89,7 @@ handle_cast(_Msg, State) ->
 handle_info({tcp, Client, Msg}, State) ->
 	inet:setopts(Client, [{active, once}, {packet, raw}, list]),
 	{ok, {Ip, Port}} = inet:peername(Client),
-	try ser_proto:parse(Msg, Ip, Port) of
+	try ser_proto:parse(Msg) of
 		#cmd{origin = Origin} = Cmd ->
 			gen_server:cast(backend, Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}})
 	catch
