@@ -44,14 +44,22 @@ cmd_v_test_() ->
 		}
 	].
 
-parse_cmd_vf_test() ->
-	?assertEqual(
-		#cmd{
+parse_cmd_vf_test_() ->
+	Cmd = #cmd{
 			type=?CMD_VF,
 			cookie="24393_1",
 			origin=#origin{type=ser,pid=self()},
 			params="20050322"
-		}, ser_proto:parse("24393_1 VF 20050322")).
+		},
+	CmdBin = "24393_1 VF 20050322\n",
+	[
+		{"decoding from binary",
+			fun() -> ?assertEqual(Cmd, ser_proto:parse(CmdBin)) end
+		},
+		{"encoding to binary",
+			fun() -> ?assertEqual(CmdBin, ser_proto:encode(Cmd)) end
+		}
+	].
 
 parse_cmd_vf_unknown_version_test() ->
 	?assertThrow(

@@ -91,6 +91,9 @@ encode(#response{cookie = Cookie, type = Type, data = Data}) ->
 encode(#cmd{cookie = Cookie, type = ?CMD_V}) ->
 	Cookie ++ " V" ++ "\n";
 
+encode(#cmd{cookie = Cookie, type = ?CMD_VF, params = Version}) ->
+	Cookie ++ " VF " ++ Version ++ "\n";
+
 encode(_) ->
 	throw({error_syntax, "Unknown (or unsupported) #cmd"}).
 
