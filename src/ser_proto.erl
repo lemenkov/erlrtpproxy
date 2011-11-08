@@ -38,7 +38,7 @@
 parse(Msg) ->
 	% Drop accidental zeroes - OpenSIPs inserts them sometimes
 	% FIXME bug in OpenSIPS?
-	[Cookie,C|Rest] = string:tokens([X || X <-  Msg, X /= 0], " ;"),
+	[Cookie,C|Rest] = string:tokens([X || X <-  Msg, X /= 0, X /= $\n], " ;"),
 	case parse_splitted([string:to_upper(C)|Rest]) of
 		#cmd{} = Cmd ->
 			Cmd#cmd{
