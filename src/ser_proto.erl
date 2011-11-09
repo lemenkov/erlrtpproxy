@@ -34,9 +34,14 @@
 -define(SAFE_PARTY(Val), case Val of null -> null; _ -> #party{tag=Val} end).
 
 decode(Msg) ->
+	% Cut last \n if it is exist
+	M = case lists:reverse(Msg) of
+		[$\n | Msg1] -> lists:reverse(Msg1);
+		_ -> Msg
+	end,
 	% Drop accidental zeroes - OpenSIPs inserts them sometimes
 	% FIXME bug in OpenSIPS?
-	[Cookie,C|Rest] = string:tokens([X || X <-  Msg, X /= 0, X /= $\n], " ;"),
+	[Cookie,C|Rest] = string:tokens([X || X <-  M, X /= 0], " ;"),
 	case parse_splitted([string:to_upper(C)|Rest]) of
 		#cmd{} = Cmd ->
 			Cmd#cmd{
