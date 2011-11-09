@@ -44,7 +44,7 @@ cmd_v_test_() ->
 		}
 	].
 
-parse_cmd_vf_test_() ->
+cmd_vf_test_() ->
 	Cmd = #cmd{
 			type=?CMD_VF,
 			cookie="24393_1",
@@ -698,7 +698,7 @@ parse_cmd_l_2_test() ->
 			]
 		}, ser_proto:decode("418_41111 LIc8,101,100 a68e961-5f6a75e5-356cafd9-3562@192.168.100.6 192.168.100.4 18756 1372466422;1 60753eabbd87fe6f34068e9d80a9fc1c;1")).
 
-parse_cmd_d_test_() ->
+cmd_d_test_() ->
 	Cmd1 = #cmd{
 			type=?CMD_D,
 			cookie="441_40922",
