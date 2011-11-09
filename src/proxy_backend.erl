@@ -84,7 +84,7 @@ handle_cast(_Request, State) ->
 handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, ip = Ip, port = Port, cmds = Cmds} = State) ->
 	try ser_proto:decode(Msg) of
 		#response{} = Response ->
-			case proplists:get_value(Response#response.cookie) of
+			case proplists:get_value(Response#response.cookie, Cmds) of
 				undefined ->
 					% FIXME shouldn't happened
 					{noreply, State};
