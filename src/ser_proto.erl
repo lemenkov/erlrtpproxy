@@ -264,11 +264,13 @@ parse_splitted(["S", CallId, FromTag, MediaId, ToTag, MediaId]) ->
 % Record (obsoleted in favor of Copy)
 % No MediaIds and no ToTag
 parse_splitted(["R", CallId, FromTag]) ->
-	parse_splitted(["C", CallId, default, FromTag, "0", null, "0"]);
+	Cmd = parse_splitted(["C", CallId, default, FromTag, "0", null, "0"]),
+	Cmd#cmd{type = ?CMD_R};
 % Record (obsoleted in favor of Copy)
 % No MediaIds
 parse_splitted(["R", CallId, FromTag, ToTag]) ->
-	parse_splitted(["C", CallId, default, FromTag, "0", ToTag, "0"]);
+	Cmd = parse_splitted(["C", CallId, default, FromTag, "0", ToTag, "0"]),
+	Cmd#cmd{type = ?CMD_R};
 % Copy session (same as record, which is now obsolete)
 parse_splitted(["C", CallId, RecordName, FromTag, MediaId, ToTag, MediaId]) ->
 	#cmd{

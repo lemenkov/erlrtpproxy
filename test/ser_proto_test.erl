@@ -751,7 +751,7 @@ cmd_d_test_() ->
 parse_cmd_r_1_test() ->
 	?assertEqual(
 		#cmd{
-			type=?CMD_C,
+			type=?CMD_R,
 			cookie="393_6",
 			origin=#origin{type=ser,pid=self()},
 			callid="0003e348-e21901f6-29cc58a1-379f3ffd@192.168.0.1",
@@ -766,7 +766,7 @@ parse_cmd_r_1_test() ->
 parse_cmd_r_2_test() ->
 	?assertEqual(
 		#cmd{
-			type=?CMD_C,
+			type=?CMD_R,
 			cookie="32711_5",
 			origin=#origin{type=ser,pid=self()},
 			callid="0003e30c-c50c016a-35dc4387-58a65654@192.168.0.100",
