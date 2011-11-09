@@ -74,8 +74,8 @@ init ([{I0, I1, I2, I3} = IPv4, Port]) when
 handle_call(Request, _From, State) ->
 	{stop, {unknown_call, Request}, State}.
 
-handle_cast({#cmd{origin = #origin{type = ser, ip = Ip, port = Port}} = Cmd, Answer}, State = #state{clients=Clients}) ->
-	Data = ser_proto:encode(Cmd, Answer),
+handle_cast(#response{origin = #origin{type = ser, ip = Ip, port = Port}} = Response, State = #state{clients=Clients}) ->
+	Data = ser_proto:encode(Response),
 	% Select proper client
 	case get_socket(Clients, Ip, Port) of
 		error -> ok;

@@ -60,8 +60,8 @@ init ([{I0, I1, I2, I3} = IPv4, Port]) when
 handle_call(_Other, _From, State) ->
 	{noreply, State}.
 
-handle_cast({#cmd{origin = #origin{type = ser, ip = Ip, port = Port}} = Cmd, Answer}, Fd) ->
-	Data = ser_proto:encode(Cmd, Answer),
+handle_cast(#response{origin = #origin{type = ser, ip = Ip, port = Port}} = Response, Fd) ->
+	Data = ser_proto:encode(Response),
 	gen_udp:send(Fd, Ip, Port, Data),
 	{noreply, Fd};
 

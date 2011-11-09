@@ -54,8 +54,8 @@ handle_call(_Other, _From, State) ->
 handle_cast(stop, State) ->
 	{stop, stop, State};
 % Got two addresses (initial Media stream creation)
-handle_cast({reply, Cmd, Answer, _}, State) ->
-	gen_server:cast(listener, {Cmd, Answer}),
+handle_cast({reply, Cmd, {Addr1, Addr2}}, State) ->
+	gen_server:cast(listener, #response{cookie = Cmd#cmd.cookie, type = reply, data = {Addr1, Addr2}}),
 	{noreply, State};
 handle_cast(#cmd{type = ?CMD_V} = Cmd, State) ->
 	% Request basic supported rtpproxy protocol version
@@ -63,12 +63,12 @@ handle_cast(#cmd{type = ?CMD_V} = Cmd, State) ->
 	% http://sippy.git.sourceforge.net/git/gitweb.cgi?p=sippy/rtpproxy;a=blob;f=rtpp_command.c#l58
 	% We provide only basic functionality, currently.
 	error_logger:info_msg("SER cmd V~n"),
-	gen_server:cast(listener, {Cmd, {version, "20040107"}}),
+	gen_server:cast(listener, #response{cookie = Cmd#cmd.cookie, type = reply, data = {version, "20040107"}}),
 	{noreply, State};
 handle_cast(#cmd{type = ?CMD_VF, params=Version} = Cmd, State) ->
 	% Request additional rtpproxy protocol extensions
 	error_logger:info_msg("SER cmd VF: ~s~n", [Version]),
-	gen_server:cast(listener, {Cmd, {supported, Version}}),
+	gen_server:cast(listener, #response{cookie = Cmd#cmd.cookie, type = reply, data = supported}),
 	{noreply, State};
 handle_cast(#cmd{origin = Origin} = Cmd, #state{mode = online} = State) ->
 	error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
@@ -76,7 +76,7 @@ handle_cast(#cmd{origin = Origin} = Cmd, #state{mode = online} = State) ->
 	{noreply, State};
 handle_cast(Cmd, #state{mode = offline} = State) ->
 	error_logger:info_msg("SER cmd (OFFLINE): ~p~n", [Cmd]),
-	gen_server:cast(listener, {Cmd, {error, software}}),
+	gen_server:cast(listener, #response{cookie = Cmd#cmd.cookie, type = error, data = software}),
 	{noreply, State};
 
 handle_cast(_Request, State) ->
