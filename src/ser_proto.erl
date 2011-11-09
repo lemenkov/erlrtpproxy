@@ -178,7 +178,7 @@ parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId]) 
 % Reinvite, Hold and Resume
 parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, ToTag, MediaId]) ->
 	{GuessIp, GuessPort} = parse_addr(ProbableIp, ProbablePort),
-	Params0 = parse_params(Args),
+	Params0 = decode_params(Args),
 
 	% Discard address if it's not consistent with direction
 	Addr = case {proplists:get_value(direction, Params0), ser_utils:is_rfc1918(GuessIp)} of
@@ -403,10 +403,10 @@ parse_playcount(ProbablePlayCount) ->
 	end.
 
 
-parse_params(A) ->
-	parse_params(A, []).
+decode_params(A) ->
+	decode_params(A, []).
 
-parse_params([], Result) ->
+decode_params([], Result) ->
 	% Default parameters are - symmetric NAT, non-RFC1918 IPv4 network
 	R1 = case proplists:get_value(direction, Result) of
 		undefined ->
@@ -439,17 +439,17 @@ parse_params([], Result) ->
 	end,
 	lists:sort(R3);
 % IPv6
-parse_params([$6|Rest], Result) ->
-	parse_params(Rest, ensure_alone(Result, ipv6));
+decode_params([$6|Rest], Result) ->
+	decode_params(Rest, ensure_alone(Result, ipv6));
 % Asymmetric
-parse_params([$A|Rest], Result) ->
-	parse_params(Rest, ensure_alone(proplists:delete(symmetric, Result), asymmetric));
+decode_params([$A|Rest], Result) ->
+	decode_params(Rest, ensure_alone(proplists:delete(symmetric, Result), asymmetric));
 % c0,101,100 - Codecs (a bit tricky)
-parse_params([$C|Rest], Result) ->
+decode_params([$C|Rest], Result) ->
 	case string:span(Rest, "0123456789,") of
 		0 ->
 			% Bogus - skip incomplete modifier
-			parse_params(Rest, Result);
+			decode_params(Rest, Result);
 		Ret ->
 			Rest1 = string:substr(Rest, Ret + 1),
 			% FIXME should we sort codecs at all or should we try to maintain their original order?
@@ -460,86 +460,86 @@ parse_params([$C|Rest], Result) ->
 					)
 				)
 			),
-			parse_params(Rest1, ensure_alone(Result, codecs, Codecs))
+			decode_params(Rest1, ensure_alone(Result, codecs, Codecs))
 	end;
 % Direction:
 % External (non-RFC1918) network
 % Internal (RFC1918) network
 % External to External
-parse_params([$E, $E|Rest], Result) ->
-	parse_params(Rest, ensure_alone(Result, direction, {external, external}));
+decode_params([$E, $E|Rest], Result) ->
+	decode_params(Rest, ensure_alone(Result, direction, {external, external}));
 % External to Internal
-parse_params([$E, $I|Rest], Result) ->
-	parse_params(Rest, ensure_alone(Result, direction, {external, internal}));
+decode_params([$E, $I|Rest], Result) ->
+	decode_params(Rest, ensure_alone(Result, direction, {external, internal}));
 % External to External (single E)
-parse_params([$E|Rest], Result) ->
-	parse_params(Rest, ensure_alone(Result, direction, {external, external}));
+decode_params([$E|Rest], Result) ->
+	decode_params(Rest, ensure_alone(Result, direction, {external, external}));
 % Internal to External
-parse_params([$I, $E|Rest], Result) ->
-	parse_params(Rest, ensure_alone(Result, direction, {internal, external}));
+decode_params([$I, $E|Rest], Result) ->
+	decode_params(Rest, ensure_alone(Result, direction, {internal, external}));
 % Internal to Internal
-parse_params([$I, $I|Rest], Result) ->
-	parse_params(Rest, ensure_alone(Result, direction, {internal, internal}));
+decode_params([$I, $I|Rest], Result) ->
+	decode_params(Rest, ensure_alone(Result, direction, {internal, internal}));
 % Internal to Internal (single I)
-parse_params([$I|Rest], Result) ->
-	parse_params(Rest, ensure_alone(Result, direction, {internal, internal}));
+decode_params([$I|Rest], Result) ->
+	decode_params(Rest, ensure_alone(Result, direction, {internal, internal}));
 % l - local address (?)
-parse_params([$L|Rest], Result) ->
-	parse_params(Rest, ensure_alone(Result, local));
+decode_params([$L|Rest], Result) ->
+	decode_params(Rest, ensure_alone(Result, local));
 % r - remote address (?)
-parse_params([$R|Rest], Result) ->
-	parse_params(Rest, ensure_alone(Result, remote));
+decode_params([$R|Rest], Result) ->
+	decode_params(Rest, ensure_alone(Result, remote));
 % Symmetric
-parse_params([$S|Rest], Result) ->
-	parse_params(Rest, ensure_alone(Result, symmetric));
+decode_params([$S|Rest], Result) ->
+	decode_params(Rest, ensure_alone(Result, symmetric));
 % Weak
-parse_params([$W|Rest], Result) ->
-	parse_params(Rest, ensure_alone(Result, weak));
+decode_params([$W|Rest], Result) ->
+	decode_params(Rest, ensure_alone(Result, weak));
 % zNN - repacketization, NN in msec, for the most codecs its value should be
 %       in 10ms increments, however for some codecs the increment could differ
 %       (e.g. 30ms for GSM or 20ms for G.723).
-parse_params([$Z|Rest], Result) ->
+decode_params([$Z|Rest], Result) ->
 	case string:span(Rest, "0123456789") of
 		0 ->
 			% Bogus - skip incomplete modifier
-			parse_params(Rest, Result);
+			decode_params(Rest, Result);
 		Ret ->
 			Rest1 = string:substr(Rest, Ret + 1),
 			{Value, _} = string:to_integer(string:substr(Rest, 1, Ret)),
-			parse_params(Rest1, ensure_alone(Result, repacketize, Value))
+			decode_params(Rest1, ensure_alone(Result, repacketize, Value))
 	end;
 
 %% Extensions
 
 % Protocol - unofficial extension
-parse_params([$P, $0 |Rest], Result) ->
-	parse_params(Rest, ensure_alone(Result, proto, udp));
-parse_params([$P, $1 |Rest], Result) ->
-	parse_params(Rest, ensure_alone(Result, proto, tcp));
-parse_params([$P, $2 |Rest], Result) ->
-	parse_params(Rest, ensure_alone(Result, proto, sctp));
+decode_params([$P, $0 |Rest], Result) ->
+	decode_params(Rest, ensure_alone(Result, proto, udp));
+decode_params([$P, $1 |Rest], Result) ->
+	decode_params(Rest, ensure_alone(Result, proto, tcp));
+decode_params([$P, $2 |Rest], Result) ->
+	decode_params(Rest, ensure_alone(Result, proto, sctp));
 % Transcode - unofficial extension
-parse_params([$T|Rest], Result) ->
+decode_params([$T|Rest], Result) ->
 	case string:span(Rest, "0123456789") of
 		0 ->
 			% Bogus - skip incomplete modifier
-			parse_params(Rest, Result);
+			decode_params(Rest, Result);
 		Ret ->
 			Rest1 = string:substr(Rest, Ret + 1),
 			{Value, _} = string:to_integer(string:substr(Rest, 1, Ret)),
-			parse_params(Rest1, ensure_alone(Result, transcode, guess_codec(Value)))
+			decode_params(Rest1, ensure_alone(Result, transcode, guess_codec(Value)))
 	end;
 % Accounting - unofficial extension
-parse_params([$V, $0 |Rest], Result) ->
-	parse_params(Rest, ensure_alone(Result, acc, start));
-parse_params([$V, $1 |Rest], Result) ->
-	parse_params(Rest, ensure_alone(Result, acc, interim_update));
-parse_params([$V, $2 |Rest], Result) ->
-	parse_params(Rest, ensure_alone(Result, acc, stop));
+decode_params([$V, $0 |Rest], Result) ->
+	decode_params(Rest, ensure_alone(Result, acc, start));
+decode_params([$V, $1 |Rest], Result) ->
+	decode_params(Rest, ensure_alone(Result, acc, interim_update));
+decode_params([$V, $2 |Rest], Result) ->
+	decode_params(Rest, ensure_alone(Result, acc, stop));
 
-parse_params([_|Rest], Result) ->
+decode_params([_|Rest], Result) ->
 	% Unknown parameter - just skip it
-	parse_params(Rest, Result).
+	decode_params(Rest, Result).
 
 ensure_alone(Proplist, Param) ->
 	proplists:delete(Param, Proplist) ++ [Param].
