@@ -100,10 +100,10 @@ parse_cmd_u_2_test() ->
 			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,9}, 16432},rtcpaddr={{192,0,43,9}, 16433}},
 			params=[
 				{codecs,[
+						{'PCMA',8000,1},
 						{'PCMU',8000,1},
 						2,
 						{'G723',8000,1},
-						{'PCMA',8000,1},
 						{'G729',8000,1},
 						96,
 						97,
@@ -128,10 +128,10 @@ parse_cmd_u_3_1_transcode_test() ->
 			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,3}, 16432},rtcpaddr={{192,0,43,3}, 16433}},
 			params=[
 				{codecs,[
+						{'PCMA',8000,1},
 						{'PCMU',8000,1},
 						2,
 						{'G723',8000,1},
-						{'PCMA',8000,1},
 						{'G729',8000,1},
 						96,
 						97,
@@ -157,10 +157,10 @@ parse_cmd_u_3_2_transcode_test() ->
 			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,5}, 16432},rtcpaddr={{192,0,43,5}, 16433}},
 			params=[
 				{codecs,[
+						{'PCMA',8000,1},
 						{'PCMU',8000,1},
 						2,
 						{'G723',8000,1},
-						{'PCMA',8000,1},
 						{'G729',8000,1},
 						96,
 						97,
@@ -190,10 +190,10 @@ parse_cmd_u_3_3_transcode_incompatible_test() ->
 			from=#party{tag="6b0a8f6cfc543db1o1"},
 			params=[
 				{codecs,[
+						{'PCMA',8000,1},
 						{'PCMU',8000,1},
 						2,
 						{'G723',8000,1},
-						{'PCMA',8000,1},
 						{'G729',8000,1},
 						96,
 						97,
@@ -237,8 +237,8 @@ parse_cmd_u_4_zeroes_test() ->
 			from=#party{tag="186f101b0e04481ea045517edb93b62d",addr={{192,0,43,7}, 19268},rtcpaddr={{192,0,43,7}, 19269}},
 			params=[
 				{codecs,[
-						{'H261',90000,0},
-						{'H263',90000,0}
+						{'H263',90000,0},
+						{'H261',90000,0}
 					]
 				},
 				{direction, {external, external}},
@@ -258,10 +258,10 @@ parse_cmd_u_5_proto_test() ->
 			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,4}, 16432},rtcpaddr={{192,0,43,4}, 16433}, proto=tcp},
 			params=[
 				{codecs,[
+						{'PCMA',8000,1},
 						{'PCMU',8000,1},
 						2,
 						{'G723',8000,1},
-						{'PCMA',8000,1},
 						{'G729',8000,1},
 						96,
 						97,
@@ -287,10 +287,10 @@ parse_cmd_u_6_0_internal_to_internal_test() ->
 			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432},rtcpaddr={{192,168,5,3}, 16433}, proto=tcp},
 			params=[
 				{codecs,[
+						{'PCMA',8000,1},
 						{'PCMU',8000,1},
 						2,
 						{'G723',8000,1},
-						{'PCMA',8000,1},
 						{'G729',8000,1},
 						96,
 						97,
@@ -316,10 +316,10 @@ parse_cmd_u_6_1_internal_to_external_test() ->
 			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432},rtcpaddr={{192,168,5,3}, 16433}, proto=tcp},
 			params=[
 				{codecs,[
+						{'PCMA',8000,1},
 						{'PCMU',8000,1},
 						2,
 						{'G723',8000,1},
-						{'PCMA',8000,1},
 						{'G729',8000,1},
 						96,
 						97,
@@ -345,10 +345,10 @@ parse_cmd_u_6_2_external_to_internal_test() ->
 			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,3}, 16432},rtcpaddr={{192,0,43,3}, 16433}, proto=tcp},
 			params=[
 				{codecs,[
+						{'PCMA',8000,1},
 						{'PCMU',8000,1},
 						2,
 						{'G723',8000,1},
-						{'PCMA',8000,1},
 						{'G729',8000,1},
 						96,
 						97,
@@ -374,10 +374,10 @@ parse_cmd_u_6_3_external_to_external_test() ->
 			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,3}, 16432},rtcpaddr={{192,0,43,3}, 16433}, proto=tcp},
 			params=[
 				{codecs,[
+						{'PCMA',8000,1},
 						{'PCMU',8000,1},
 						2,
 						{'G723',8000,1},
-						{'PCMA',8000,1},
 						{'G729',8000,1},
 						96,
 						97,
@@ -403,10 +403,10 @@ parse_cmd_u_6_4_internal_to_internal_single_test() ->
 			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,168,5,3}, 16432},rtcpaddr={{192,168,5,3}, 16433}, proto=tcp},
 			params=[
 				{codecs,[
+						{'PCMA',8000,1},
 						{'PCMU',8000,1},
 						2,
 						{'G723',8000,1},
-						{'PCMA',8000,1},
 						{'G729',8000,1},
 						96,
 						97,
@@ -432,10 +432,10 @@ parse_cmd_u_6_5_external_to_external_single_test() ->
 			from=#party{tag="6b0a8f6cfc543db1o1",addr={{192,0,43,3}, 16432},rtcpaddr={{192,0,43,3}, 16433}, proto=tcp},
 			params=[
 				{codecs,[
+						{'PCMA',8000,1},
 						{'PCMU',8000,1},
 						2,
 						{'G723',8000,1},
-						{'PCMA',8000,1},
 						{'G729',8000,1},
 						96,
 						97,
@@ -467,10 +467,10 @@ parse_cmd_u_8_acc_start_test() ->
 			params=[
 				{acc, start},
 				{codecs,[
+						{'PCMA',8000,1},
 						{'PCMU',8000,1},
 						2,
 						{'G723',8000,1},
-						{'PCMA',8000,1},
 						{'G729',8000,1},
 						96,
 						97,
@@ -497,10 +497,10 @@ parse_cmd_u_9_acc_interim_update_test() ->
 			params=[
 				{acc, interim_update},
 				{codecs,[
+						{'PCMA',8000,1},
 						{'PCMU',8000,1},
 						2,
 						{'G723',8000,1},
-						{'PCMA',8000,1},
 						{'G729',8000,1},
 						96,
 						97,
@@ -527,10 +527,10 @@ parse_cmd_u_10_acc_stop_test() ->
 			params=[
 				{acc, stop},
 				{codecs,[
+						{'PCMA',8000,1},
 						{'PCMU',8000,1},
 						2,
 						{'G723',8000,1},
-						{'PCMA',8000,1},
 						{'G729',8000,1},
 						96,
 						97,
@@ -572,10 +572,10 @@ parse_cmd_u_14_discard_rfc1918_test() ->
 			params=[
 				{acc, stop},
 				{codecs,[
+						{'PCMA',8000,1},
 						{'PCMU',8000,1},
 						2,
 						{'G723',8000,1},
-						{'PCMA',8000,1},
 						{'G729',8000,1},
 						96,
 						97,
@@ -602,10 +602,10 @@ parse_cmd_u_15_discard_non_rfc1918_test() ->
 			params=[
 				{acc, stop},
 				{codecs,[
+						{'PCMA',8000,1},
 						{'PCMU',8000,1},
 						2,
 						{'G723',8000,1},
-						{'PCMA',8000,1},
 						{'G729',8000,1},
 						96,
 						97,
@@ -633,17 +633,17 @@ parse_cmd_u_16_ipv6_source_test() ->
 				ipv6,
 				weak,
 				{codecs,[
-						{'PCMU',8000,1},
-						{'GSM',8000,1},
-						{'DVI4',8000,1},
-						{'DVI4',16000,1},
-						{'PCMA',8000,1},
 						{'G722',8000,1},
-						{'G728',8000,1},
 						96,
 						97,
+						{'PCMU',8000,1},
+						{'PCMA',8000,1},
 						98,
+						{'GSM',8000,1},
 						100,
+						{'DVI4',8000,1},
+						{'DVI4',16000,1},
+						{'G728',8000,1},
 						101
 					]
 				},
@@ -666,8 +666,8 @@ cmd_l_test_() ->
 			params=[
 				{codecs,[
 						{'PCMU',8000,1},
-						100,
-						101
+						101,
+						100
 					]
 				},
 				{direction, {external, external}},
@@ -685,8 +685,8 @@ cmd_l_test_() ->
 			params=[
 				{codecs,[
 						{'PCMA',8000,1},
-						100,
-						101
+						101,
+						100
 					]
 				},
 				{direction, {internal, internal}},
@@ -697,10 +697,10 @@ cmd_l_test_() ->
 	Cmd1Bin = "413_40797 Lc0,101,100 452ca314-3bbcf0ea@192.168.0.2 192.0.43.4 17050 e4920d0cb29cf52o0;1 8d11d16a3b56fcd588d72b3d359cc4e1;1\n",
 	Cmd2Bin = "418_41111 LIc8,101,100 a68e961-5f6a75e5-356cafd9-3562@192.168.100.6 192.168.100.4 18756 1372466422;1 60753eabbd87fe6f34068e9d80a9fc1c;1\n",
 
-	% Added default parameters and codecs are ordered alphabetically
+	% Added default parameters
 	% FIXME this really needs work
-	Cmd1BinExtended = "413_40797 Leesc0,100,101 452ca314-3bbcf0ea@192.168.0.2 192.0.43.4 17050 e4920d0cb29cf52o0;1 8d11d16a3b56fcd588d72b3d359cc4e1;1\n",
-	Cmd2BinExtended = "418_41111 Liisc8,100,101 a68e961-5f6a75e5-356cafd9-3562@192.168.100.6 192.168.100.4 18756 1372466422;1 60753eabbd87fe6f34068e9d80a9fc1c;1\n",
+	Cmd1BinExtended = "413_40797 Leesc0,101,100 452ca314-3bbcf0ea@192.168.0.2 192.0.43.4 17050 e4920d0cb29cf52o0;1 8d11d16a3b56fcd588d72b3d359cc4e1;1\n",
+	Cmd2BinExtended = "418_41111 Liisc8,101,100 a68e961-5f6a75e5-356cafd9-3562@192.168.100.6 192.168.100.4 18756 1372466422;1 60753eabbd87fe6f34068e9d80a9fc1c;1\n",
 
 	[
 		{"decoding from binary (Ext <-> Ext)",

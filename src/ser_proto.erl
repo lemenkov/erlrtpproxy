@@ -469,12 +469,9 @@ decode_params([$C|Rest], Result) ->
 			decode_params(Rest, Result);
 		Ret ->
 			Rest1 = string:substr(Rest, Ret + 1),
-			% FIXME should we sort codecs at all or should we try to maintain their original order?
 			Codecs = lists:map(fun guess_codec/1,
-				lists:sort(
-					lists:map(fun guess_codec_n/1,
-						string:tokens(string:substr(Rest, 1, Ret), ",")
-					)
+				lists:map(fun guess_codec_n/1,
+					string:tokens(string:substr(Rest, 1, Ret), ",")
 				)
 			),
 			decode_params(Rest1, ensure_alone(Result, codecs, Codecs))
