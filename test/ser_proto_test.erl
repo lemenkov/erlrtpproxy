@@ -657,7 +657,7 @@ parse_cmd_u_16_ipv6_source_test() ->
 parse_cmd_l_1_test() ->
 	?assertEqual(
 		#cmd{
-			type=?CMD_U,
+			type=?CMD_L,
 			cookie="413_40797",
 			origin=#origin{type=ser,pid=self()},
 			callid="452ca314-3bbcf0ea@192.168.0.2",
@@ -679,7 +679,7 @@ parse_cmd_l_1_test() ->
 parse_cmd_l_2_test() ->
 	?assertEqual(
 		#cmd{
-			type=?CMD_U,
+			type=?CMD_L,
 			cookie="418_41111",
 			origin=#origin{type=ser,pid=self()},
 			callid="a68e961-5f6a75e5-356cafd9-3562@192.168.100.6",

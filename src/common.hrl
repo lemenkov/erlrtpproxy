@@ -24,6 +24,7 @@
 -define(CMD_V, message_v).
 -define(CMD_VF,message_vf).
 -define(CMD_U, message_u).
+-define(CMD_L, message_l).
 -define(CMD_D, message_d).
 -define(CMD_P, message_p).
 -define(CMD_S, message_s).

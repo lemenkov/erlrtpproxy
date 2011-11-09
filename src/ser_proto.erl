@@ -202,7 +202,8 @@ parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, T
 % Lookup existing session
 % In fact it differs from CMD_U only by the order of tags
 parse_splitted([[$L|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, ToTag, MediaId]) ->
-	parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, ToTag, MediaId, FromTag, MediaId]);
+	Cmd = parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, ToTag, MediaId, FromTag, MediaId]),
+	Cmd#cmd{type = ?CMD_L};
 
 % delete session (no MediaIds and no ToTag) - Cancel
 parse_splitted(["D", CallId, FromTag]) ->
