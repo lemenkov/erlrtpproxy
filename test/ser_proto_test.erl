@@ -764,9 +764,8 @@ parse_cmd_r_2_test() ->
 			]
 		}, ser_proto:decode("32711_5 R 0003e30c-c50c016a-35dc4387-58a65654@192.168.0.100 eb1f1ca7e74cf0fc8a81ea331486452a 0003e30cc50ccbed0342cc8d-0bddf550")).
 
-parse_cmd_p_1_test() ->
-	?assertEqual(
-		#cmd{
+cmd_p_test_() ->
+	Cmd1 = #cmd{
 			type=?CMD_P,
 			cookie="2154_5",
 			origin=#origin{type=ser,pid=self()},
@@ -779,11 +778,8 @@ parse_cmd_p_1_test() ->
 				{filename,"/var/run/tmp/hello_uac.wav"},
 				{playcount, 20}
 			]
-		}, ser_proto:decode("2154_5 P20 0003e30c-c50c0171-35b90751-013a3ef6@192.168.0.100 /var/run/tmp/hello_uac.wav session 0003e30cc50ccc9f743d4fa6-38d0bd14;1")).
-
-parse_cmd_p_2_test() ->
-	?assertEqual(
-		#cmd{
+		},
+	Cmd2 = #cmd{
 			type=?CMD_P,
 			cookie="1389_5",
 			origin=#origin{type=ser,pid=self()},
@@ -796,12 +792,30 @@ parse_cmd_p_2_test() ->
 				{filename,"/var/tmp/rtpproxy_test/media/01.wav"},
 				{playcount, 10}
 			]
-		}, ser_proto:decode("1389_5 P10 0003e30c-c50c016d-46bbcf2e-6369eecf@192.168.0.100 /var/tmp/rtpproxy_test/media/01.wav session 0003e30cc50ccc5416857d59-357336dc;1 28d49e51a95d5a31d09b31ccc63c5f4b;1")).
+		},
+	Cmd1Bin = "2154_5 P20 0003e30c-c50c0171-35b90751-013a3ef6@192.168.0.100 /var/run/tmp/hello_uac.wav session 0003e30cc50ccc9f743d4fa6-38d0bd14;1\n",
+	Cmd2Bin = "1389_5 P10 0003e30c-c50c016d-46bbcf2e-6369eecf@192.168.0.100 /var/tmp/rtpproxy_test/media/01.wav session 0003e30cc50ccc5416857d59-357336dc;1 28d49e51a95d5a31d09b31ccc63c5f4b;1\n",
 
-parse_cmd_p_3_wrong_playcount_test() ->
-	?assertThrow(
-		{error_syntax,"Wrong PlayCount"},
-		ser_proto:decode("1389_5 Phello 0003e30c-c50c016d-46bbcf2e-6369eecf@192.168.0.100 /var/tmp/rtpproxy_test/media/01.wav session 0003e30cc50ccc5416857d59-357336dc;1 28d49e51a95d5a31d09b31ccc63c5f4b;1")).
+	[
+		{"decoding from binary (no ToTag)",
+			fun() -> ?assertEqual(Cmd1, ser_proto:decode(Cmd1Bin)) end
+		},
+		{"encoding to binary (no ToTag)",
+			fun() -> ?assertEqual(Cmd1Bin, ser_proto:encode(Cmd1)) end
+		},
+		{"decoding from binary",
+			fun() -> ?assertEqual(Cmd2, ser_proto:decode(Cmd2Bin)) end
+		},
+		{"encoding to binary",
+			fun() -> ?assertEqual(Cmd2Bin, ser_proto:encode(Cmd2)) end
+		},
+		{"Wrong PlayCount",
+			fun() -> ?assertThrow(
+						{error_syntax,"Wrong PlayCount"},
+						ser_proto:decode("1389_5 Phello 0003e30c-c50c016d-46bbcf2e-6369eecf@192.168.0.100 /var/tmp/rtpproxy_test/media/01.wav session 0003e30cc50ccc5416857d59-357336dc;1 28d49e51a95d5a31d09b31ccc63c5f4b;1\n"))
+			end
+		}
+	].
 
 cmd_s_test_() ->
 	Cmd1 = #cmd{
