@@ -73,7 +73,6 @@ handle_call(_Other, _From, State) ->
 	{noreply, State}.
 
 handle_cast(#cmd{cookie = Cookie, origin = Origin} = Cmd, #state{fd = Fd, ip = Ip, port = Port, cmds = Cmds} = State) ->
-	error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
 	gen_udp:send(Fd, Ip, Port, ser_proto:encode(Cmd)),
 	{noreply, State#state{cmds = [{Cookie, Origin}]}};
 
