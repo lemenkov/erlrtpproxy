@@ -109,6 +109,11 @@ encode(#cmd{cookie = Cookie, type = ?CMD_S, callid = CallId, mediaid = MediaId, 
 	[M] = io_lib:format("~w", [MediaId]),
 	Cookie ++ " S " ++ CallId ++ " " ++ FromTag ++ ";" ++ M ++ " " ++ ToTag ++ ";" ++ M ++ "\n";
 
+encode(#cmd{cookie = Cookie, type = ?CMD_R, callid = CallId, from = #party{tag = FromTag}, to = null}) ->
+	Cookie ++ " R " ++ CallId ++ " " ++ FromTag ++ "\n";
+encode(#cmd{cookie = Cookie, type = ?CMD_R, callid = CallId, from = #party{tag = FromTag}, to = #party{tag = ToTag}}) ->
+	Cookie ++ " R " ++ CallId ++ " " ++ FromTag ++ " " ++ ToTag ++ "\n";
+
 encode(#cmd{cookie = Cookie, type = ?CMD_Q, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag}, to = #party{tag = ToTag}}) ->
 	[M] = io_lib:format("~w", [MediaId]),
 	Cookie ++ " Q " ++ CallId ++ " " ++ FromTag ++ ";" ++ M ++ " " ++ ToTag ++ ";" ++ M ++ "\n";
