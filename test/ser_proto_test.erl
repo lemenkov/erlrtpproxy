@@ -748,9 +748,8 @@ cmd_d_test_() ->
 		}
 	].
 
-parse_cmd_r_1_test() ->
-	?assertEqual(
-		#cmd{
+cmd_r_test_() ->
+	Cmd1 = #cmd{
 			type=?CMD_R,
 			cookie="393_6",
 			origin=#origin{type=ser,pid=self()},
@@ -761,11 +760,8 @@ parse_cmd_r_1_test() ->
 			params=[
 				{filename, default}
 			]
-		}, ser_proto:decode("393_6 R 0003e348-e21901f6-29cc58a1-379f3ffd@192.168.0.1 0003e348e219767510f1e38f-47c56231")).
-
-parse_cmd_r_2_test() ->
-	?assertEqual(
-		#cmd{
+		},
+	Cmd2 = #cmd{
 			type=?CMD_R,
 			cookie="32711_5",
 			origin=#origin{type=ser,pid=self()},
@@ -776,7 +772,24 @@ parse_cmd_r_2_test() ->
 			params=[
 				{filename, default}
 			]
-		}, ser_proto:decode("32711_5 R 0003e30c-c50c016a-35dc4387-58a65654@192.168.0.100 eb1f1ca7e74cf0fc8a81ea331486452a 0003e30cc50ccbed0342cc8d-0bddf550")).
+		},
+	Cmd1Bin = "393_6 R 0003e348-e21901f6-29cc58a1-379f3ffd@192.168.0.1 0003e348e219767510f1e38f-47c56231\n",
+	Cmd2Bin = "32711_5 R 0003e30c-c50c016a-35dc4387-58a65654@192.168.0.100 eb1f1ca7e74cf0fc8a81ea331486452a 0003e30cc50ccbed0342cc8d-0bddf550\n",
+
+	[
+		{"decoding from binary (no ToTag)",
+			fun() -> ?assertEqual(Cmd1, ser_proto:decode(Cmd1Bin)) end
+		},
+		{"encoding to binary (no ToTag)",
+			fun() -> ?assertEqual(Cmd1Bin, ser_proto:encode(Cmd1)) end
+		},
+		{"decoding from binary",
+			fun() -> ?assertEqual(Cmd2, ser_proto:decode(Cmd2Bin)) end
+		},
+		{"encoding to binary",
+			fun() -> ?assertEqual(Cmd2Bin, ser_proto:encode(Cmd2)) end
+		}
+	].
 
 cmd_p_test_() ->
 	Cmd1 = #cmd{
