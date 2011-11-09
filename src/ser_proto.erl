@@ -104,6 +104,9 @@ encode(#cmd{cookie = Cookie, type = ?CMD_S, callid = CallId, mediaid = MediaId, 
 	[M] = io_lib:format("~w", [MediaId]),
 	Cookie ++ " S " ++ CallId ++ " " ++ FromTag ++ ";" ++ M ++ " " ++ ToTag ++ ";" ++ M ++ "\n";
 
+encode(#cmd{cookie = Cookie, type = ?CMD_I, params = Version}) ->
+	Cookie ++ " I\n";
+
 encode(_) ->
 	throw({error_syntax, "Unknown (or unsupported) #cmd"}).
 
