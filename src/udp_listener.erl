@@ -65,6 +65,9 @@ handle_cast({#cmd{origin = #origin{type = ser, ip = Ip, port = Port}} = Cmd, Ans
 	gen_udp:send(Fd, Ip, Port, Data),
 	{noreply, Fd};
 
+handle_cast(stop, State) ->
+	{stop, stop, State};
+
 handle_cast(_Request, State) ->
 	{noreply, State}.
 
