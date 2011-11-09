@@ -855,6 +855,21 @@ cmd_i_test_() ->
 		}
 	].
 
+cmd_x_test_() ->
+	Cmd = #cmd{
+			type=?CMD_X,
+			cookie="24390_0",
+			origin=#origin{type=ser,pid=self()}
+		},
+	CmdBin = "24390_0 X\n",
+	[
+		{"decoding from binary",
+			fun() -> ?assertEqual(Cmd, ser_proto:decode(CmdBin)) end
+		},
+		{"encoding to binary",
+			fun() -> ?assertEqual(CmdBin, ser_proto:encode(Cmd)) end
+		}
+	].
 
 parse_cmd_unknown_test() ->
 	?assertThrow(
