@@ -839,6 +839,26 @@ cmd_s_test_() ->
 		}
 	].
 
+cmd_q_test_() ->
+	Cmd = #cmd{
+			type=?CMD_Q,
+			cookie="2154_6",
+			origin=#origin{type=ser,pid=self()},
+			callid="0003e30c-c50c0171-35b90751-013a3ef6@192.168.0.100",
+			mediaid=1,
+			from=#party{tag="0003e30cc50ccc9f743d4fa6-38d0bd14"},
+			to=#party{tag="9c56ba15bd794082ce6b166dba6c9c2"}
+		},
+	CmdBin = "2154_6 Q 0003e30c-c50c0171-35b90751-013a3ef6@192.168.0.100 0003e30cc50ccc9f743d4fa6-38d0bd14;1 9c56ba15bd794082ce6b166dba6c9c2;1\n",
+
+	[
+		{"decoding from binary",
+			fun() -> ?assertEqual(Cmd, ser_proto:decode(CmdBin)) end
+		},
+		{"encoding to binary",
+			fun() -> ?assertEqual(CmdBin, ser_proto:encode(Cmd)) end
+		}
+	].
 cmd_i_test_() ->
 	Cmd = #cmd{
 			type=?CMD_I,

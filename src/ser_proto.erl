@@ -104,6 +104,10 @@ encode(#cmd{cookie = Cookie, type = ?CMD_S, callid = CallId, mediaid = MediaId, 
 	[M] = io_lib:format("~w", [MediaId]),
 	Cookie ++ " S " ++ CallId ++ " " ++ FromTag ++ ";" ++ M ++ " " ++ ToTag ++ ";" ++ M ++ "\n";
 
+encode(#cmd{cookie = Cookie, type = ?CMD_Q, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag}, to = #party{tag = ToTag}}) ->
+	[M] = io_lib:format("~w", [MediaId]),
+	Cookie ++ " Q " ++ CallId ++ " " ++ FromTag ++ ";" ++ M ++ " " ++ ToTag ++ ";" ++ M ++ "\n";
+
 encode(#cmd{cookie = Cookie, type = ?CMD_X, params = Version}) ->
 	Cookie ++ " X\n";
 
