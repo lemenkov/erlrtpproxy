@@ -26,6 +26,7 @@
 
 -behaviour(gen_server).
 
+-export([start/1]).
 -export([start_link/1]).
 -export([init/1]).
 -export([handle_call/3]).
@@ -38,6 +39,8 @@
 
 -record(state, {timer, mode, node}).
 
+start(Args) ->
+	gen_server:start({local, backend}, ?MODULE, Args, []).
 start_link(Args) ->
 	gen_server:start_link({local, backend}, ?MODULE, Args, []).
 

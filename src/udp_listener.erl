@@ -21,7 +21,7 @@
 -author('lemenkov@gmail.com').
 
 -behaviour(gen_server).
--export([start_link/1]).
+-export([start/1]).
 -export([init/1]).
 -export([handle_call/3]).
 -export([handle_cast/2]).
@@ -31,6 +31,8 @@
 
 -include("common.hrl").
 
+start(Args) ->
+	gen_server:start({local, listener}, ?MODULE, Args, []).
 start_link(Args) ->
 	gen_server:start_link({local, listener}, ?MODULE, Args, []).
 
