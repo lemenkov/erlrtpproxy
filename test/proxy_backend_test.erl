@@ -117,6 +117,12 @@ run_proxy_test_() ->
 %						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0, 1000),
 						Answer = gen_udp:recv(Fd, 0, 1000),
 						?assertEqual("6721_89367 sessions created: 0\nactive sessions: 0\nactive streams: 0\n", Answer) end
+			},
+			{"Close all active sessions",
+				fun () ->
+						gen_udp:send(Fd, {127,0,0,1}, 22222, "6721_89367 X\n"),
+						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0, 1000),
+						?assertEqual("6721_89367 0\n", Answer) end
 			}
 		]
 	}.
