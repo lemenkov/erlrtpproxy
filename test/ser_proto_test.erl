@@ -654,9 +654,8 @@ parse_cmd_u_16_ipv6_source_test() ->
 			]
 		}, ser_proto:decode("9440_4 UwEEt3Z30c9,96,97,0,8,98,3,100,5,6,15,101 e12050ca82cc434c444ae66fcb30a4c0@0:0:0:0:0:0:0:0 2001:500:88:200:0:0:0:10 5000 595f563;1")).
 
-parse_cmd_l_1_test() ->
-	?assertEqual(
-		#cmd{
+cmd_l_test_() ->
+	Cmd1 = #cmd{
 			type=?CMD_L,
 			cookie="413_40797",
 			origin=#origin{type=ser,pid=self()},
@@ -674,11 +673,8 @@ parse_cmd_l_1_test() ->
 				{direction, {external, external}},
 				{symmetric,true}
 			]
-		}, ser_proto:decode("413_40797 Lc0,101,100 452ca314-3bbcf0ea@192.168.0.2 192.0.43.4 17050 e4920d0cb29cf52o0;1 8d11d16a3b56fcd588d72b3d359cc4e1;1")).
-
-parse_cmd_l_2_test() ->
-	?assertEqual(
-		#cmd{
+		},
+	Cmd2 = #cmd{
 			type=?CMD_L,
 			cookie="418_41111",
 			origin=#origin{type=ser,pid=self()},
@@ -696,7 +692,25 @@ parse_cmd_l_2_test() ->
 				{direction, {internal, internal}},
 				{symmetric,true}
 			]
-		}, ser_proto:decode("418_41111 LIc8,101,100 a68e961-5f6a75e5-356cafd9-3562@192.168.100.6 192.168.100.4 18756 1372466422;1 60753eabbd87fe6f34068e9d80a9fc1c;1")).
+		},
+
+	Cmd1Bin = "413_40797 Lc0,101,100 452ca314-3bbcf0ea@192.168.0.2 192.0.43.4 17050 e4920d0cb29cf52o0;1 8d11d16a3b56fcd588d72b3d359cc4e1;1\n",
+	Cmd2Bin = "418_41111 LIc8,101,100 a68e961-5f6a75e5-356cafd9-3562@192.168.100.6 192.168.100.4 18756 1372466422;1 60753eabbd87fe6f34068e9d80a9fc1c;1\n",
+
+	[
+		{"decoding from binary (Ext <-> Ext)",
+			fun() -> ?assertEqual(Cmd1, ser_proto:decode(Cmd1Bin)) end
+		},
+		{"encoding to binary (Ext <-> Ext)",
+			fun() -> ?assertEqual(Cmd1Bin, ser_proto:encode(Cmd1)) end
+		},
+		{"decoding from binary (Int <-> Int)",
+			fun() -> ?assertEqual(Cmd2, ser_proto:decode(Cmd2Bin)) end
+		},
+		{"encoding to binary (Int <-> Int)",
+			fun() -> ?assertEqual(Cmd2Bin, ser_proto:encode(Cmd2)) end
+		}
+	].
 
 cmd_d_test_() ->
 	Cmd1 = #cmd{
