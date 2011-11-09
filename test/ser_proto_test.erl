@@ -697,18 +697,23 @@ cmd_l_test_() ->
 	Cmd1Bin = "413_40797 Lc0,101,100 452ca314-3bbcf0ea@192.168.0.2 192.0.43.4 17050 e4920d0cb29cf52o0;1 8d11d16a3b56fcd588d72b3d359cc4e1;1\n",
 	Cmd2Bin = "418_41111 LIc8,101,100 a68e961-5f6a75e5-356cafd9-3562@192.168.100.6 192.168.100.4 18756 1372466422;1 60753eabbd87fe6f34068e9d80a9fc1c;1\n",
 
+	% Added default parameters and codecs are ordered alphabetically
+	% FIXME this really needs work
+	Cmd1BinExtended = "413_40797 Leesc0,100,101 452ca314-3bbcf0ea@192.168.0.2 192.0.43.4 17050 e4920d0cb29cf52o0;1 8d11d16a3b56fcd588d72b3d359cc4e1;1\n",
+	Cmd2BinExtended = "418_41111 Liisc8,100,101 a68e961-5f6a75e5-356cafd9-3562@192.168.100.6 192.168.100.4 18756 1372466422;1 60753eabbd87fe6f34068e9d80a9fc1c;1\n",
+
 	[
 		{"decoding from binary (Ext <-> Ext)",
 			fun() -> ?assertEqual(Cmd1, ser_proto:decode(Cmd1Bin)) end
 		},
 		{"encoding to binary (Ext <-> Ext)",
-			fun() -> ?assertEqual(Cmd1Bin, ser_proto:encode(Cmd1)) end
+			fun() -> ?assertEqual(Cmd1BinExtended, ser_proto:encode(Cmd1)) end
 		},
 		{"decoding from binary (Int <-> Int)",
 			fun() -> ?assertEqual(Cmd2, ser_proto:decode(Cmd2Bin)) end
 		},
 		{"encoding to binary (Int <-> Int)",
-			fun() -> ?assertEqual(Cmd2Bin, ser_proto:encode(Cmd2)) end
+			fun() -> ?assertEqual(Cmd2BinExtended, ser_proto:encode(Cmd2)) end
 		}
 	].
 

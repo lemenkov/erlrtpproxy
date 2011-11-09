@@ -97,6 +97,23 @@ encode(#cmd{cookie = Cookie, type = ?CMD_V}) ->
 encode(#cmd{cookie = Cookie, type = ?CMD_VF, params = Version}) ->
 	Cookie ++ " VF " ++ Version ++ "\n";
 
+encode(#cmd{cookie = Cookie, type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag, addr = {GuessIp, GuessPort}}, to = null, params = Params}) ->
+	[M] = io_lib:format("~w", [MediaId]),
+	[P] = io_lib:format("~w", [GuessPort]),
+	ParamsBin = encode_params(Params),
+	Cookie ++ " U" ++ ParamsBin ++ " " ++  CallId ++ " " ++ inet_parse:ntoa(GuessIp) ++ " " ++ P ++ " " ++ FromTag ++ ";" ++ M ++ "\n";
+encode(#cmd{cookie = Cookie, type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag, addr = {GuessIp, GuessPort}}, to = #party{tag = ToTag}, params = Params}) ->
+	[M] = io_lib:format("~w", [MediaId]),
+	[P] = io_lib:format("~w", [GuessPort]),
+	ParamsBin = encode_params(Params),
+	Cookie ++ " U" ++ ParamsBin ++ " " ++  CallId ++ " " ++ inet_parse:ntoa(GuessIp) ++ " " ++ P ++ " " ++ FromTag ++ ";" ++ M ++ " " ++ ToTag ++ ";" ++ M ++ "\n";
+
+encode(#cmd{cookie = Cookie, type = ?CMD_L, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag, addr = {GuessIp, GuessPort}}, to = #party{tag = ToTag}, params = Params}) ->
+	[M] = io_lib:format("~w", [MediaId]),
+	[P] = io_lib:format("~w", [GuessPort]),
+	ParamsBin = encode_params(Params),
+	Cookie ++ " L" ++ ParamsBin ++ " " ++  CallId ++ " " ++ inet_parse:ntoa(GuessIp) ++ " " ++ P ++ " " ++ ToTag ++ ";" ++ M ++ " " ++ FromTag ++ ";" ++ M ++ "\n";
+
 encode(#cmd{cookie = Cookie, type = ?CMD_D, callid = CallId, from = #party{tag = FromTag}, to = null}) ->
 	Cookie ++ " D " ++ CallId ++ " " ++ FromTag ++ "\n";
 encode(#cmd{cookie = Cookie, type = ?CMD_D, callid = CallId, from = #party{tag = FromTag}, to = #party{tag = ToTag}}) ->
@@ -537,9 +554,54 @@ decode_params([$V, $1 |Rest], Result) ->
 decode_params([$V, $2 |Rest], Result) ->
 	decode_params(Rest, ensure_alone(Result, acc, stop));
 
+% Unknown parameter - just skip it
 decode_params([_|Rest], Result) ->
-	% Unknown parameter - just skip it
 	decode_params(Rest, Result).
+
+encode_params(Params) ->
+	encode_params(Params, []).
+
+encode_params([], Result) ->
+	Result;
+encode_params([ipv6|Rest], Result) ->
+	encode_params(Rest, Result ++ [$6]);
+encode_params([asymmetric|Rest], Result) ->
+	encode_params(Rest, Result ++ [$a]);
+encode_params([{direction, {external, external}}|Rest], Result) ->
+	encode_params(Rest, Result ++ "ee");
+encode_params([{direction, {external, internal}}|Rest], Result) ->
+	encode_params(Rest, Result ++ "ei");
+encode_params([{direction, {internal, external}}|Rest], Result) ->
+	encode_params(Rest, Result ++ "ie");
+encode_params([{direction, {internal, internal}}|Rest], Result) ->
+	encode_params(Rest, Result ++ "ii");
+encode_params([local|Rest], Result) ->
+	encode_params(Rest, Result ++ [$l]);
+encode_params([remote|Rest], Result) ->
+	encode_params(Rest, Result ++ [$r]);
+encode_params([symmetric|Rest], Result) ->
+	encode_params(Rest, Result ++ [$s]);
+encode_params([{symmetric, true}|Rest], Result) ->
+	encode_params(Rest, Result ++ [$s]);
+encode_params([weak|Rest], Result) ->
+	encode_params(Rest, Result ++ [$w]);
+encode_params([{codecs, Codecs}|[]], Result) ->
+	% Codecs must be placed at the end of the parameters' list
+	encode_params([], Result ++ [$c] ++ print_codecs(Codecs));
+encode_params([{codecs, Codecs}|Rest], Result) ->
+	encode_params(Rest ++ [{codecs, Codecs}], Result);
+encode_params([_Unknown|Rest], Result) ->
+	error_logger:error_msg("Unsupported parameter: [~p]~n", [_Unknown]),
+	encode_params(Rest, Result).
+
+print_codecs(Codecs) ->
+	print_codecs(Codecs, []).
+print_codecs([], Result) ->
+	Result;
+print_codecs([Codec|[]], Result) ->
+	print_codecs([], Result ++ print_codec(Codec));
+print_codecs([Codec|Rest], Result) ->
+		print_codecs(Rest, Result ++ print_codec(Codec) ++ ",").
 
 ensure_alone(Proplist, Param) ->
 	proplists:delete(Param, Proplist) ++ [Param].
@@ -577,3 +639,29 @@ guess_codec(C) -> C.
 guess_codec_n(Codec) ->
 	{Y, _} = string:to_integer(Codec),
 	Y.
+
+guess_payload({'PCMU',8000,1}) -> 0;
+guess_payload({'GSM',8000,1}) -> 3;
+guess_payload({'G723',8000,1}) -> 4;
+guess_payload({'DVI4',8000,1}) -> 5;
+guess_payload({'DVI4',16000,1}) -> 6;
+guess_payload({'LPC',8000,1}) -> 7;
+guess_payload({'PCMA',8000,1}) -> 8;
+guess_payload({'G722',8000,1}) -> 9;
+guess_payload({'L16',8000,2}) -> 10;
+guess_payload({'L16',8000,1}) -> 11;
+guess_payload({'QCELP',8000,1}) -> 12;
+guess_payload({'CN',8000,1}) -> 13;
+guess_payload({'MPA',90000,0}) -> 14;
+guess_payload({'G728',8000,1}) -> 15;
+guess_payload({'DVI4',11025,1}) -> 16;
+guess_payload({'DVI4',22050,1}) -> 17;
+guess_payload({'G729',8000,1}) -> 18;
+guess_payload({'H261',90000,0}) -> 31;
+guess_payload({'H263',90000,0}) -> 34;
+guess_payload(Number) when is_integer(Number) -> Number.
+
+print_codec(Codec) ->
+	Num = guess_payload(Codec),
+	[Str] = io_lib:format("~b", [Num]),
+	Str.
