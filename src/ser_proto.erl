@@ -466,6 +466,7 @@ decode_params([$C|Rest], Result) ->
 	case string:span(Rest, "0123456789,") of
 		0 ->
 			% Bogus - skip incomplete modifier
+			error_logger:error_msg("Found C parameter w/o necessary values - skipping~n"),
 			decode_params(Rest, Result);
 		Ret ->
 			Rest1 = string:substr(Rest, Ret + 1),
@@ -516,6 +517,7 @@ decode_params([$Z|Rest], Result) ->
 	case string:span(Rest, "0123456789") of
 		0 ->
 			% Bogus - skip incomplete modifier
+			error_logger:error_msg("Found T parameter w/o necessary values - skipping~n"),
 			decode_params(Rest, Result);
 		Ret ->
 			Rest1 = string:substr(Rest, Ret + 1),
@@ -537,6 +539,7 @@ decode_params([$T|Rest], Result) ->
 	case string:span(Rest, "0123456789") of
 		0 ->
 			% Bogus - skip incomplete modifier
+			error_logger:error_msg("Found Z parameter w/o necessary values - skipping~n"),
 			decode_params(Rest, Result);
 		Ret ->
 			Rest1 = string:substr(Rest, Ret + 1),
