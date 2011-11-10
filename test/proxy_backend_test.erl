@@ -111,12 +111,51 @@ run_proxy_test_() ->
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						?assertEqual("6721_89367 E1\n", Answer) end
 			},
+			{"Try to create new session",
+				fun () ->
+						gen_udp:send(Fd, {127,0,0,1}, 22222, "24393_4 Uc0,8,18,101 0003e30c-c50c00f7-123e8bd9-542f2edf@192.168.0.100 192.0.43.10 27686 0003e30cc50cd69210b8c36b-0ecf0120;1\n"),
+						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
+						?assertMatch(
+							#response{
+								cookie = "24393_4",
+								origin = null,
+								type = reply,
+								data = {{{_,_,_,_},_},{{_,_,_,_},_}}
+							},
+							ser_proto:decode(Answer)) end
+			},
+			{"Try to lookup existing session",
+				fun () ->
+						gen_udp:send(Fd, {127,0,0,1}, 22222, "24393_4 Lc0,8,18,101 0003e30c-c50c00f7-123e8bd9-542f2edf@192.168.0.100 192.0.43.11 19686 0003e30cc50cd69210b8c36b-0ecf0120;1 1372466422;1\n"),
+						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
+						?assertMatch(
+							#response{
+								cookie = "24393_4",
+								origin = null,
+								type = reply,
+								data = {{{_,_,_,_},_},{{_,_,_,_},_}}
+							},
+							ser_proto:decode(Answer)) end
+			},
 %			{"Request overall statistics",
 %				fun () ->
 %						gen_udp:send(Fd, {127,0,0,1}, 22222, "6721_89367 I\n"),
 %						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0, 1000),
 %						?assertEqual("6721_89367 sessions created: 0\nactive sessions: 0\nactive streams: 0\n", Answer) end
 %			},
+			{"Try to close existing session",
+				fun () ->
+						gen_udp:send(Fd, {127,0,0,1}, 22222, "24393_4 D 0003e30c-c50c00f7-123e8bd9-542f2edf@192.168.0.100 0003e30cc50cd69210b8c36b-0ecf0120 1372466422\n"),
+						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
+						?assertEqual(
+							#response{
+								cookie = "24393_4",
+								origin = null,
+								type = reply,
+								data = ok
+							},
+							ser_proto:decode(Answer)) end
+			},
 			{"Close all active sessions",
 				fun () ->
 						gen_udp:send(Fd, {127,0,0,1}, 22222, "6721_89367 X\n"),
