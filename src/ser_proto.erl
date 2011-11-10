@@ -602,7 +602,8 @@ encode_params([], Result) ->
 encode_params([ipv6|Rest], Result) ->
 	encode_params(Rest, Result ++ [$6]);
 encode_params([{direction, {external, external}}|Rest], Result) ->
-	encode_params(Rest, Result ++ "ee");
+%	encode_params(Rest, Result ++ "ee");
+	encode_params(Rest, Result);
 encode_params([{direction, {external, internal}}|Rest], Result) ->
 	encode_params(Rest, Result ++ "ei");
 encode_params([{direction, {internal, external}}|Rest], Result) ->
@@ -614,7 +615,8 @@ encode_params([local|Rest], Result) ->
 encode_params([remote|Rest], Result) ->
 	encode_params(Rest, Result ++ [$r]);
 encode_params([{symmetric, true}|Rest], Result) ->
-	encode_params(Rest, Result ++ [$s]);
+%	encode_params(Rest, Result ++ [$s]);
+	encode_params(Rest, Result);
 encode_params([{symmetric, false}|Rest], Result) ->
 	encode_params(Rest, Result ++ [$a]);
 encode_params([weak|Rest], Result) ->
