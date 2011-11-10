@@ -413,7 +413,8 @@ parse_splitted([P, I]) ->
 %% Error / Unknown request or reply
 %%
 
-parse_splitted(_) ->
+parse_splitted(Unknown) ->
+	error_logger:error_msg("Unknown command: ~p~n", [Unknown]),
 	throw({error_syntax, "Unknown command"}).
 
 %%
