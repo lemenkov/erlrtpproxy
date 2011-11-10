@@ -552,7 +552,8 @@ decode_params([$V, $2 |Rest], Result) ->
 	decode_params(Rest, ensure_alone(Result, acc, stop));
 
 % Unknown parameter - just skip it
-decode_params([_|Rest], Result) ->
+decode_params([Unknown|Rest], Result) ->
+	error_logger:error_msg("Unsupported parameter while encoding: [~p]~n", [Unknown]),
 	decode_params(Rest, Result).
 
 encode_params(Params) ->
@@ -587,8 +588,8 @@ encode_params([{codecs, Codecs}|[]], Result) ->
 	encode_params([], Result ++ [$c] ++ print_codecs(Codecs));
 encode_params([{codecs, Codecs}|Rest], Result) ->
 	encode_params(Rest ++ [{codecs, Codecs}], Result);
-encode_params([_Unknown|Rest], Result) ->
-	error_logger:error_msg("Unsupported parameter: [~p]~n", [_Unknown]),
+encode_params([Unknown|Rest], Result) ->
+	error_logger:error_msg("Unsupported parameter while encoding: [~p]~n", [Unknown]),
 	encode_params(Rest, Result).
 
 print_codecs(Codecs) ->
