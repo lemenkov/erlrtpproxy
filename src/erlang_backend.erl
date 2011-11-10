@@ -60,26 +60,26 @@ handle_cast(stop, State) ->
 handle_cast({reply, Cmd, {Addr1, Addr2}}, State) ->
 	gen_server:cast(listener, #response{cookie = Cmd#cmd.cookie, type = reply, data = {Addr1, Addr2}}),
 	{noreply, State};
-handle_cast(#cmd{type = ?CMD_V} = Cmd, State) ->
+handle_cast(#cmd{cookie = Cookie, origin = Origin, type = ?CMD_V} = Cmd, State) ->
 	% Request basic supported rtpproxy protocol version
 	% see available versions here:
 	% http://sippy.git.sourceforge.net/git/gitweb.cgi?p=sippy/rtpproxy;a=blob;f=rtpp_command.c#l58
 	% We provide only basic functionality, currently.
 	error_logger:info_msg("SER cmd V~n"),
-	gen_server:cast(listener, #response{cookie = Cmd#cmd.cookie, type = reply, data = {version, "20040107"}}),
+	gen_server:cast(listener, #response{cookie = Cookie, origin = Origin, type = reply, data = {version, "20040107"}}),
 	{noreply, State};
-handle_cast(#cmd{type = ?CMD_VF, params=Version} = Cmd, State) ->
+handle_cast(#cmd{cookie = Cookie, origin = Origin, type = ?CMD_VF, params=Version} = Cmd, State) ->
 	% Request additional rtpproxy protocol extensions
 	error_logger:info_msg("SER cmd VF: ~s~n", [Version]),
-	gen_server:cast(listener, #response{cookie = Cmd#cmd.cookie, type = reply, data = supported}),
+	gen_server:cast(listener, #response{cookie = Cookie, origin = Origin, type = reply, data = supported}),
 	{noreply, State};
 handle_cast(#cmd{origin = Origin} = Cmd, #state{mode = online} = State) ->
 	error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
 	gen_server:cast({global, rtpproxy}, Cmd#cmd{origin = Origin#origin{pid = self()}}),
 	{noreply, State};
-handle_cast(Cmd, #state{mode = offline} = State) ->
+handle_cast(#cmd{cookie = Cookie, origin = Origin} = Cmd, #state{mode = offline} = State) ->
 	error_logger:info_msg("SER cmd (OFFLINE): ~p~n", [Cmd]),
-	gen_server:cast(listener, #response{cookie = Cmd#cmd.cookie, type = error, data = software}),
+	gen_server:cast(listener, #response{cookie = Cookie, origin = Origin, type = error, data = software}),
 	{noreply, State};
 
 handle_cast(_Request, State) ->
