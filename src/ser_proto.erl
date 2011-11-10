@@ -119,6 +119,41 @@ encode(#cmd{cookie = Cookie, type = ?CMD_D, callid = CallId, from = #party{tag =
 encode(#cmd{cookie = Cookie, type = ?CMD_D, callid = CallId, from = #party{tag = FromTag}, to = #party{tag = ToTag}}) ->
 	Cookie ++ " D " ++ CallId ++ " " ++ FromTag ++ " " ++ ToTag ++ "\n";
 
+encode(
+	#cmd{
+		cookie = Cookie,
+		type = ?CMD_P,
+		callid = CallId,
+		mediaid = MediaId,
+		from = #party{tag = FromTag},
+		to = null,
+		params = [
+				{codecs, Codecs},
+				{filename, Filename},
+				{playcount, Playcount}
+			]
+		}) ->
+	[M] = io_lib:format("~w", [MediaId]),
+	[P] = io_lib:format("~w", [Playcount]),
+	Cookie ++ " P" ++ P ++ " " ++  CallId ++ " " ++ Filename ++ " " ++ Codecs ++ " " ++ FromTag ++ ";" ++ M ++ "\n";
+encode(
+	#cmd{
+		cookie = Cookie,
+		type = ?CMD_P,
+		callid = CallId,
+		mediaid = MediaId,
+		from = #party{tag = FromTag},
+		to = #party{tag = ToTag},
+		params = [
+				{codecs, Codecs},
+				{filename, Filename},
+				{playcount, Playcount}
+			]
+		}) ->
+	[M] = io_lib:format("~w", [MediaId]),
+	[P] = io_lib:format("~w", [Playcount]),
+	Cookie ++ " P" ++ P ++ " " ++  CallId ++ " " ++ Filename ++ " " ++ Codecs ++ " " ++ FromTag ++ ";" ++ M ++ " " ++ ToTag ++ ";" ++ M ++ "\n";
+
 encode(#cmd{cookie = Cookie, type = ?CMD_S, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag}, to = null}) ->
 	[M] = io_lib:format("~w", [MediaId]),
 	Cookie ++ " S " ++ CallId ++ " " ++ FromTag ++ ";" ++ M ++ "\n";
@@ -517,7 +552,7 @@ decode_params([$Z|Rest], Result) ->
 	case string:span(Rest, "0123456789") of
 		0 ->
 			% Bogus - skip incomplete modifier
-			error_logger:error_msg("Found T parameter w/o necessary values - skipping~n"),
+			error_logger:error_msg("Found Z parameter w/o necessary values - skipping~n"),
 			decode_params(Rest, Result);
 		Ret ->
 			Rest1 = string:substr(Rest, Ret + 1),
@@ -539,7 +574,7 @@ decode_params([$T|Rest], Result) ->
 	case string:span(Rest, "0123456789") of
 		0 ->
 			% Bogus - skip incomplete modifier
-			error_logger:error_msg("Found Z parameter w/o necessary values - skipping~n"),
+			error_logger:error_msg("Found T parameter w/o necessary values - skipping~n"),
 			decode_params(Rest, Result);
 		Ret ->
 			Rest1 = string:substr(Rest, Ret + 1),
