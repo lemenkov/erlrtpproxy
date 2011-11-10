@@ -52,9 +52,17 @@ decode(Msg) ->
 				}
 			};
 		#response{} = Response ->
-			Response#response{
-				cookie=Cookie
-			}
+			case  Response#response.type of
+				stats ->
+					Response#response{
+						cookie = Cookie,
+						data = Msg % I contains it's own formatting
+					};
+				_ ->
+					Response#response{
+						cookie=Cookie
+					}
+			end
 	end.
 
 encode({error, syntax, Msg}) when is_list(Msg) ->
@@ -408,6 +416,10 @@ parse_splitted(["E8"]) ->
 parse_splitted([P, I]) ->
 	{Ip, Port} = parse_addr(I, P),
 	#response{type = reply, data = {{Ip, Port}, {Ip, Port+1}}};
+
+% Special case - stats
+parse_splitted(["SESSIONS", "created:" | Rest]) ->
+	#response{type = stats};
 
 %%
 %% Error / Unknown request or reply
