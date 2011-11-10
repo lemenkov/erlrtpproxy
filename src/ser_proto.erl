@@ -366,7 +366,6 @@ parse_splitted(["I"]) ->
 		type=?CMD_I
 	};
 
-
 %%
 %% Replies
 %%
