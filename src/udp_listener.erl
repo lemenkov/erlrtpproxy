@@ -22,6 +22,7 @@
 
 -behaviour(gen_server).
 -export([start/1]).
+-export([start_link/1]).
 -export([init/1]).
 -export([handle_call/3]).
 -export([handle_cast/2]).
