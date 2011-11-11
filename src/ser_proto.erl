@@ -25,24 +25,14 @@
 
 -include("common.hrl").
 
--define(RTPPROXY_OK, " 0\n").
--define(RTPPROXY_VER_SUPPORTED, " 1\n").
--define(RTPPROXY_ERR_SYNTAX,    " E1\n").
--define(RTPPROXY_ERR_SOFTWARE,  " E7\n").
--define(RTPPROXY_ERR_NOSESSION, " E8\n").
+-define(SAFE_PARTY(Val0), case Val0 of null -> null; _ -> [Val, _] = binary_split(Val0, $;), #party{tag = Val} end).
 
--define(SAFE_PARTY(Val), case Val of null -> null; _ -> #party{tag=Val} end).
-
-decode(Msg) ->
-	% Cut last \n if it is exist
-	M = case lists:reverse(Msg) of
-		[$\n | Msg1] -> lists:reverse(Msg1);
-		_ -> Msg
-	end,
+decode(Msg) when is_binary(Msg) ->
+	% Cut last \n if it is exist and
 	% Drop accidental zeroes - OpenSIPs inserts them sometimes
 	% FIXME bug in OpenSIPS?
-	[Cookie,C|Rest] = string:tokens([X || X <-  M, X /= 0], " ;"),
-	case parse_splitted([string:to_upper(C)|Rest]) of
+	[Cookie,C|Rest] = binary_split(cut_newline(drop_zeroes(Msg)), $ ),
+	case parse_splitted([binary_to_upper(C)|Rest]) of
 		#cmd{} = Cmd ->
 			Cmd#cmd{
 				cookie=Cookie,
@@ -56,30 +46,35 @@ decode(Msg) ->
 				stats ->
 					Response#response{
 						cookie = Cookie,
-						data = Msg % I contains it's own formatting
+						data = binary_to_list(Msg) % I contains it's own formatting
 					};
 				_ ->
 					Response#response{
 						cookie=Cookie
 					}
 			end
-	end.
+	end;
 
-encode({error, syntax, Msg}) when is_list(Msg) ->
-	[Cookie|_Rest] = string:tokens(Msg, " "),
-	Cookie ++ ?RTPPROXY_ERR_SYNTAX;
+decode(Msg) when is_list(Msg) ->
+	decode(list_to_binary(Msg)).
+
+encode({error, syntax, Msg}) when is_binary(Msg) ->
+	[Cookie|_] = binary_split(Msg, $ ),
+	<<Cookie/binary, <<" E1\n">>/binary>>;
 encode(#response{cookie = Cookie, type = reply, data = ok}) ->
-	Cookie ++ ?RTPPROXY_OK;
+	<<Cookie/binary, <<" 0\n">>/binary>>;
 encode(#response{cookie = Cookie, type = reply, data = supported}) ->
-	Cookie ++ ?RTPPROXY_VER_SUPPORTED;
-encode(#response{cookie = Cookie, type = reply, data = {version, Version}}) when is_list(Version) ->
-	Cookie ++ " " ++ Version ++ "\n";
+	<<Cookie/binary, <<" 1\n">>/binary>>;
+encode(#response{cookie = Cookie, type = reply, data = {version, Version}}) when is_binary(Version) ->
+	<<Cookie/binary, <<" ">>/binary, Version/binary, <<"\n">>/binary>>;
 encode(#response{cookie = Cookie, type = reply, data = {{{I0,I1,I2,I3} = IPv4, Port}, _}}) when
 	is_integer(I0), I0 >= 0, I0 < 256,
 	is_integer(I1), I1 >= 0, I1 < 256,
 	is_integer(I2), I2 >= 0, I2 < 256,
 	is_integer(I3), I3 >= 0, I3 < 256 ->
-	Cookie ++ " " ++ integer_to_list(Port) ++ " " ++ inet_parse:ntoa(IPv4) ++ "\n";
+	I = list_to_binary(inet_parse:ntoa(IPv4)),
+	P = list_to_binary(integer_to_list(Port)),
+	<<Cookie/binary, <<" ">>/binary, P/binary, <<" ">>/binary, I/binary, <<"\n">>/binary>>;
 encode(#response{cookie = Cookie, type = reply, data = {{{I0,I1,I2,I3,I4,I5,I6,I7} = IPv6, Port}, _}}) when
 	is_integer(I0), I0 >= 0, I0 < 65535,
 	is_integer(I1), I1 >= 0, I1 < 65535,
@@ -89,43 +84,46 @@ encode(#response{cookie = Cookie, type = reply, data = {{{I0,I1,I2,I3,I4,I5,I6,I
 	is_integer(I5), I5 >= 0, I5 < 65535,
 	is_integer(I6), I6 >= 0, I6 < 65535,
 	is_integer(I7), I7 >= 0, I7 < 65535 ->
-	Cookie ++ " " ++ integer_to_list(Port) ++ " " ++ inet_parse:ntoa(IPv6) ++ "\n";
+	I = list_to_binary(inet_parse:ntoa(IPv6)),
+	P = list_to_binary(integer_to_list(Port)),
+	<<Cookie/binary, <<" ">>/binary, P/binary, <<" ">>/binary, I/binary, <<"\n">>/binary>>;
 encode(#response{cookie = Cookie, type = error, data = syntax}) ->
-	Cookie ++ ?RTPPROXY_ERR_SYNTAX;
+	<<Cookie/binary, <<" E1\n">>/binary>>;
 encode(#response{cookie = Cookie, type = error, data = software}) ->
-	Cookie ++ ?RTPPROXY_ERR_SOFTWARE;
+	<<Cookie/binary, <<" E7\n">>/binary>>;
 encode(#response{cookie = Cookie, type = error, data = notfound}) ->
-	Cookie ++ ?RTPPROXY_ERR_NOSESSION;
-encode(#response{cookie = Cookie, type = Type, data = Data}) ->
-	ok;
+	<<Cookie/binary, <<" E8\n">>/binary>>;
+encode(#response{} = Unknown) ->
+	error_logger:error_msg("Unknown response: ~p~n", [Unknown]),
+	throw({error_syntax, "Unknown (or unsupported) #response"});
 
 encode(#cmd{cookie = Cookie, type = ?CMD_V}) ->
-	Cookie ++ " V" ++ "\n";
+	<<Cookie/binary, <<" V\n">>/binary>>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_VF, params = Version}) ->
-	Cookie ++ " VF " ++ Version ++ "\n";
+	<<Cookie/binary, <<" VF ">>/binary, Version/binary, <<"\n">>/binary>>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag, addr = {GuessIp, GuessPort}}, to = null, params = Params}) ->
-	[M] = io_lib:format("~w", [MediaId]),
-	[P] = io_lib:format("~w", [GuessPort]),
 	ParamsBin = encode_params(Params),
-	Cookie ++ " U" ++ ParamsBin ++ " " ++  CallId ++ " " ++ inet_parse:ntoa(GuessIp) ++ " " ++ P ++ " " ++ FromTag ++ ";" ++ M ++ "\n";
+	Ip = list_to_binary(inet_parse:ntoa(GuessIp)),
+	Port = list_to_binary(io_lib:format("~b", [GuessPort])),
+	<<Cookie/binary, <<" U">>/binary, ParamsBin/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Ip/binary, <<" ">>/binary, Port/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
 encode(#cmd{cookie = Cookie, type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag, addr = {GuessIp, GuessPort}}, to = #party{tag = ToTag}, params = Params}) ->
-	[M] = io_lib:format("~w", [MediaId]),
-	[P] = io_lib:format("~w", [GuessPort]),
 	ParamsBin = encode_params(Params),
-	Cookie ++ " U" ++ ParamsBin ++ " " ++  CallId ++ " " ++ inet_parse:ntoa(GuessIp) ++ " " ++ P ++ " " ++ FromTag ++ ";" ++ M ++ " " ++ ToTag ++ ";" ++ M ++ "\n";
+	Ip = list_to_binary(inet_parse:ntoa(GuessIp)),
+	Port = list_to_binary(io_lib:format("~b", [GuessPort])),
+	<<Cookie/binary, <<" U">>/binary, ParamsBin/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Ip/binary, <<" ">>/binary, Port/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<" ">>/binary, ToTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_L, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag, addr = {GuessIp, GuessPort}}, to = #party{tag = ToTag}, params = Params}) ->
-	[M] = io_lib:format("~w", [MediaId]),
-	[P] = io_lib:format("~w", [GuessPort]),
 	ParamsBin = encode_params(Params),
-	Cookie ++ " L" ++ ParamsBin ++ " " ++  CallId ++ " " ++ inet_parse:ntoa(GuessIp) ++ " " ++ P ++ " " ++ ToTag ++ ";" ++ M ++ " " ++ FromTag ++ ";" ++ M ++ "\n";
+	Ip = list_to_binary(inet_parse:ntoa(GuessIp)),
+	Port = list_to_binary(io_lib:format("~b", [GuessPort])),
+	<<Cookie/binary, <<" L">>/binary, ParamsBin/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Ip/binary, <<" ">>/binary, Port/binary, <<" ">>/binary, ToTag/binary, <<";">>/binary, MediaId/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_D, callid = CallId, from = #party{tag = FromTag}, to = null}) ->
-	Cookie ++ " D " ++ CallId ++ " " ++ FromTag ++ "\n";
+	<<Cookie/binary, <<" D ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<"\n">>/binary>>;
 encode(#cmd{cookie = Cookie, type = ?CMD_D, callid = CallId, from = #party{tag = FromTag}, to = #party{tag = ToTag}}) ->
-	Cookie ++ " D " ++ CallId ++ " " ++ FromTag ++ " " ++ ToTag ++ "\n";
+	<<Cookie/binary, <<" D ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<" ">>/binary, ToTag/binary, <<"\n">>/binary>>;
 
 encode(
 	#cmd{
@@ -141,9 +139,8 @@ encode(
 				{playcount, Playcount}
 			]
 		}) ->
-	[M] = io_lib:format("~w", [MediaId]),
-	[P] = io_lib:format("~w", [Playcount]),
-	Cookie ++ " P" ++ P ++ " " ++  CallId ++ " " ++ Filename ++ " " ++ Codecs ++ " " ++ FromTag ++ ";" ++ M ++ "\n";
+	P = list_to_binary(io_lib:format("~b", [Playcount])),
+	<<Cookie/binary, <<" P">>/binary, P/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Filename/binary, <<" ">>/binary, Codecs/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
 encode(
 	#cmd{
 		cookie = Cookie,
@@ -158,33 +155,30 @@ encode(
 				{playcount, Playcount}
 			]
 		}) ->
-	[M] = io_lib:format("~w", [MediaId]),
-	[P] = io_lib:format("~w", [Playcount]),
-	Cookie ++ " P" ++ P ++ " " ++  CallId ++ " " ++ Filename ++ " " ++ Codecs ++ " " ++ FromTag ++ ";" ++ M ++ " " ++ ToTag ++ ";" ++ M ++ "\n";
+	P = list_to_binary(io_lib:format("~b", [Playcount])),
+	<<Cookie/binary, <<" P">>/binary, P/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Filename/binary, <<" ">>/binary, Codecs/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<" ">>/binary, ToTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_S, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag}, to = null}) ->
-	[M] = io_lib:format("~w", [MediaId]),
-	Cookie ++ " S " ++ CallId ++ " " ++ FromTag ++ ";" ++ M ++ "\n";
+	<<Cookie/binary, <<" S ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
 encode(#cmd{cookie = Cookie, type = ?CMD_S, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag}, to = #party{tag = ToTag}}) ->
-	[M] = io_lib:format("~w", [MediaId]),
-	Cookie ++ " S " ++ CallId ++ " " ++ FromTag ++ ";" ++ M ++ " " ++ ToTag ++ ";" ++ M ++ "\n";
+	<<Cookie/binary, <<" S ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<" ">>/binary, ToTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_R, callid = CallId, from = #party{tag = FromTag}, to = null}) ->
-	Cookie ++ " R " ++ CallId ++ " " ++ FromTag ++ "\n";
+	<<Cookie/binary, <<" R ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<"\n">>/binary>>;
 encode(#cmd{cookie = Cookie, type = ?CMD_R, callid = CallId, from = #party{tag = FromTag}, to = #party{tag = ToTag}}) ->
-	Cookie ++ " R " ++ CallId ++ " " ++ FromTag ++ " " ++ ToTag ++ "\n";
+	<<Cookie/binary, <<" R ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<" ">>/binary, ToTag/binary, <<"\n">>/binary>>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_Q, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag}, to = #party{tag = ToTag}}) ->
-	[M] = io_lib:format("~w", [MediaId]),
-	Cookie ++ " Q " ++ CallId ++ " " ++ FromTag ++ ";" ++ M ++ " " ++ ToTag ++ ";" ++ M ++ "\n";
+	<<Cookie/binary, <<" Q ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<" ">>/binary, ToTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_X, params = Version}) ->
-	Cookie ++ " X\n";
+	<<Cookie/binary, <<" X\n">>/binary>>;
 
-encode(#cmd{cookie = Cookie, type = ?CMD_I, params = Version}) ->
-	Cookie ++ " I\n";
+encode(#cmd{cookie = Cookie, type = ?CMD_I}) ->
+	<<Cookie/binary, <<" I\n">>/binary>>;
 
-encode(_) ->
+encode(#cmd{} = Unknown) ->
+	error_logger:error_msg("Unknown command: ~p~n", [Unknown]),
 	throw({error_syntax, "Unknown (or unsupported) #cmd"}).
 
 %%
@@ -196,48 +190,33 @@ encode(_) ->
 %%
 
 % Request basic supported rtpproxy protocol version
-parse_splitted(["V"]) ->
+parse_splitted([<<"V">>]) ->
 	#cmd{
 		type=?CMD_V
 	};
 
 % Request additional rtpproxy protocol extensions
-parse_splitted(["VF", "20040107"]) ->
-	% Basic RTP proxy functionality
-	#cmd{type=?CMD_VF, params="20040107"};
-parse_splitted(["VF", "20050322"]) ->
-	% Support for multiple RTP streams and MOH
-	#cmd{type=?CMD_VF, params="20050322"};
-parse_splitted(["VF", "20060704"]) ->
-	% Support for extra parameter in the V command
-	#cmd{type=?CMD_VF, params="20060704"};
-parse_splitted(["VF", "20071116"]) ->
-	% Support for RTP re-packetization
-	#cmd{type=?CMD_VF, params="20071116"};
-parse_splitted(["VF", "20071218"]) ->
-	% Support for forking (copying) RTP stream
-	#cmd{type=?CMD_VF, params="20071218"};
-parse_splitted(["VF", "20080403"]) ->
-	% Support for RTP statistics querying
-	#cmd{type=?CMD_VF, params="20080403"};
-parse_splitted(["VF", "20081102"]) ->
-	% Support for setting codecs in the update/lookup command
-	#cmd{type=?CMD_VF, params="20081102"};
-parse_splitted(["VF", "20081224"]) ->
-	% Support for session timeout notifications
-	#cmd{type=?CMD_VF, params="20081224"};
-parse_splitted(["VF", "20090810"]) ->
-	% Support for automatic bridging
-	#cmd{type=?CMD_VF, params="20090810"};
-parse_splitted(["VF", Unknown]) ->
-	throw({error_syntax, "Unknown version: " ++ Unknown});
+parse_splitted([<<"VF">>, Version]) when
+	Version == <<"20040107">>; % Basic RTP proxy functionality
+	Version == <<"20050322">>; % Support for multiple RTP streams and MOH
+	Version == <<"20060704">>; % Support for extra parameter in the V command
+	Version == <<"20071116">>; % Support for RTP re-packetization
+	Version == <<"20071218">>; % Support for forking (copying) RTP stream
+	Version == <<"20080403">>; % Support for RTP statistics querying
+	Version == <<"20081102">>; % Support for setting codecs in the update/lookup command
+	Version == <<"20081224">>; % Support for session timeout notifications
+	Version == <<"20090810">> -> % Support for automatic bridging
+	#cmd{type=?CMD_VF, params = Version};
+parse_splitted([<<"VF">>, Unknown]) ->
+	throw({error_syntax, "Unknown version: " ++ binary_to_list(Unknown)});
 
 % Create session (no ToTag)
-parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId]) ->
-	parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, null, MediaId]);
+parse_splitted([<<$U:8,Args/binary>>, CallId, ProbableIp, ProbablePort, FromTag]) ->
+	parse_splitted([<<$U:8,Args/binary>>, CallId, ProbableIp, ProbablePort, FromTag, null]);
 % Reinvite, Hold and Resume
-parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, ToTag, MediaId]) ->
-	{GuessIp, GuessPort} = parse_addr(ProbableIp, ProbablePort),
+parse_splitted([<<$U:8,Args/binary>>, CallId, ProbableIp, ProbablePort, FromTag0, ToTag]) ->
+	[FromTag, MediaId] = binary_split(FromTag0, $;),
+	{GuessIp, GuessPort} = parse_addr(binary_to_list(ProbableIp), binary_to_list(ProbablePort)),
 	Params0 = decode_params(Args),
 
 	% Discard address if it's not consistent with direction
@@ -263,7 +242,7 @@ parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, T
 	#cmd{
 		type = ?CMD_U,
 		callid = CallId,
-		mediaid	= parse_media_id(MediaId),
+		mediaid	= MediaId,
 		from = #party{tag=FromTag, addr=Addr, rtcpaddr=RtcpAddr, proto=proplists:get_value(proto, Params1, udp)},
 		to = ?SAFE_PARTY(ToTag),
 		params = lists:sort(proplists:delete(proto, Params1))
@@ -271,105 +250,112 @@ parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, T
 
 % Lookup existing session
 % In fact it differs from CMD_U only by the order of tags
-parse_splitted([[$L|Args], CallId, ProbableIp, ProbablePort, FromTag, MediaId, ToTag, MediaId]) ->
-	Cmd = parse_splitted([[$U|Args], CallId, ProbableIp, ProbablePort, ToTag, MediaId, FromTag, MediaId]),
+parse_splitted([<<$L:8,Args/binary>>, CallId, ProbableIp, ProbablePort, FromTag, ToTag]) ->
+	Cmd = parse_splitted([<<$U:8,Args/binary>>, CallId, ProbableIp, ProbablePort, ToTag, FromTag]),
 	Cmd#cmd{type = ?CMD_L};
 
 % delete session (no MediaIds and no ToTag) - Cancel
-parse_splitted(["D", CallId, FromTag]) ->
-	parse_splitted(["D", CallId, FromTag, null]);
+parse_splitted([<<"D">>, CallId, FromTag]) ->
+	parse_splitted([<<"D">>, CallId, FromTag, null]);
 % delete session (no MediaIds) - Bye
-parse_splitted(["D", CallId, FromTag, ToTag]) ->
+parse_splitted([<<"D">>, CallId, FromTag, ToTag]) ->
 	#cmd{
 		type=?CMD_D,
 		callid=CallId,
 		from=#party{tag=FromTag},
-		to = ?SAFE_PARTY(ToTag)
+		to = case ToTag of null -> null; _ -> #party{tag=ToTag} end
 	};
 
 % Playback pre-recorded audio (Music-on-hold and resume, no ToTag)
-parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, MediaId]) ->
+parse_splitted([<<$P:8,Args/binary>>, CallId, PlayName, Codecs, FromTag0]) ->
+	[FromTag, MediaId] = binary_split(FromTag0, $;),
 	#cmd{
 		type=?CMD_P,
 		callid=CallId,
-		mediaid=parse_media_id(MediaId),
+		mediaid=MediaId,
 		from=#party{tag=FromTag},
 		params=lists:sort(parse_playcount(Args) ++ [{filename, PlayName}, {codecs, Codecs}])
 	};
 % Playback pre-recorded audio (Music-on-hold and resume)
-parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, MediaId, ToTag, MediaId]) ->
+parse_splitted([<<$P:8,Args/binary>>, CallId, PlayName, Codecs, FromTag0, ToTag]) ->
+	[FromTag, MediaId] = binary_split(FromTag0, $;),
 	#cmd{
 		type=?CMD_P,
 		callid=CallId,
-		mediaid=parse_media_id(MediaId),
+		mediaid=MediaId,
 		from=#party{tag=FromTag},
-		to=#party{tag=ToTag},
+		to = ?SAFE_PARTY(ToTag),
 		params=lists:sort(parse_playcount(Args) ++ [{filename, PlayName}, {codecs, Codecs}])
 	};
 % Playback pre-recorded audio (Music-on-hold and resume)
-parse_splitted([[$P|Args], CallId, PlayName, Codecs, FromTag, MediaId, ToTag, MediaId, ProbableIp, ProbablePort]) ->
-	{GuessIp, GuessPort} = parse_addr(ProbableIp, ProbablePort),
+parse_splitted([<<$P:8,Args/binary>>, CallId, PlayName, Codecs, FromTag0, ToTag, ProbableIp, ProbablePort]) ->
+	[FromTag, MediaId] = binary_split(FromTag0, $;),
+	{GuessIp, GuessPort} = parse_addr(binary_to_list(ProbableIp), binary_to_list(ProbablePort)),
 	#cmd{
 		type=?CMD_P,
 		callid=CallId,
-		mediaid=parse_media_id(MediaId),
+		mediaid=MediaId,
 		from=#party{tag=FromTag},
-		to=#party{tag=ToTag},
+		to = ?SAFE_PARTY(ToTag),
 		params=lists:sort(parse_playcount(Args) ++ [{filename, PlayName}, {codecs, Codecs}, {addr, {GuessIp, GuessPort}}])
 	};
 
 % Stop playback or record (no ToTag)
-parse_splitted(["S", CallId, FromTag, MediaId]) ->
-	parse_splitted(["S", CallId, FromTag, MediaId, null, MediaId]);
+parse_splitted([<<"S">>, CallId, FromTag]) ->
+	parse_splitted([<<"S">>, CallId, FromTag, null]);
 % Stop playback or record
-parse_splitted(["S", CallId, FromTag, MediaId, ToTag, MediaId]) ->
+parse_splitted([<<"S">>, CallId, FromTag0, ToTag]) ->
+	[FromTag, MediaId] = binary_split(FromTag0, $;),
 	#cmd{
 		type=?CMD_S,
 		callid=CallId,
-		mediaid=parse_media_id(MediaId),
+		mediaid=MediaId,
 		from=#party{tag=FromTag},
 		to = ?SAFE_PARTY(ToTag)
 	};
 
 % Record (obsoleted in favor of Copy)
 % No MediaIds and no ToTag
-parse_splitted(["R", CallId, FromTag]) ->
-	Cmd = parse_splitted(["C", CallId, default, FromTag, "0", null, "0"]),
+parse_splitted([<<"R">>, CallId, FromTag]) ->
+	Cmd = parse_splitted([<<"C">>, CallId, default, <<FromTag/binary, <<";0">>/binary>>, null]),
 	Cmd#cmd{type = ?CMD_R};
 % Record (obsoleted in favor of Copy)
 % No MediaIds
-parse_splitted(["R", CallId, FromTag, ToTag]) ->
-	Cmd = parse_splitted(["C", CallId, default, FromTag, "0", ToTag, "0"]),
+parse_splitted([<<"R">>, CallId, FromTag, ToTag]) ->
+	Cmd = parse_splitted([<<"C">>, CallId, default, <<FromTag/binary, <<";0">>/binary>>, <<ToTag/binary, <<";0">>/binary>>]),
 	Cmd#cmd{type = ?CMD_R};
 % Copy session (same as record, which is now obsolete)
-parse_splitted(["C", CallId, RecordName, FromTag, MediaId, ToTag, MediaId]) ->
+parse_splitted([<<"C">>, CallId, RecordName, FromTag0, ToTag]) ->
+	[FromTag, MediaId] = binary_split(FromTag0, $;),
 	#cmd{
 		type=?CMD_C,
 		callid=CallId,
-		mediaid=parse_media_id(MediaId),
+		mediaid=MediaId,
 		from=#party{tag=FromTag},
 		to = ?SAFE_PARTY(ToTag),
 		params=[{filename, RecordName}]
 	};
 
 % Query information about one particular session
-parse_splitted(["Q", CallId, FromTag, MediaId, ToTag, MediaId]) ->
+parse_splitted([<<"Q">>, CallId, FromTag0, ToTag0]) ->
+	[FromTag, MediaId] = binary_split(FromTag0, $;),
+	[ToTag, _] = binary_split(ToTag0, $;),
 	#cmd{
 		type=?CMD_Q,
 		callid=CallId,
-		mediaid=parse_media_id(MediaId),
+		mediaid=MediaId,
 		from=#party{tag=FromTag},
 		to=#party{tag=ToTag}
 	};
 
 % Stop all active sessions
-parse_splitted(["X"]) ->
+parse_splitted([<<"X">>]) ->
 	#cmd{
 		type=?CMD_X
 	};
 
 % Get overall statistics
-parse_splitted(["I"]) ->
+parse_splitted([<<"I">>]) ->
 	#cmd{
 		type=?CMD_I
 	};
@@ -378,43 +364,43 @@ parse_splitted(["I"]) ->
 %% Replies
 %%
 
-parse_splitted(["0"]) ->
+parse_splitted([<<"0">>]) ->
 	#response{type = reply, data = ok};
 
-parse_splitted(["1"]) ->
+parse_splitted([<<"1">>]) ->
 	% This really should be ok - that's another one shortcoming
 	#response{type = reply, data = supported};
 
-parse_splitted(["20040107"]) ->
-	#response{type = reply, data = {version, "20040107"}};
-parse_splitted(["20050322"]) ->
-	#response{type = reply, data = {version, "20050322"}};
-parse_splitted(["20060704"]) ->
-	#response{type = reply, data = {version, "20060704"}};
-parse_splitted(["20071116"]) ->
-	#response{type = reply, data = {version, "20071116"}};
-parse_splitted(["20071218"]) ->
-	#response{type = reply, data = {version, "20071218"}};
-parse_splitted(["20080403"]) ->
-	#response{type = reply, data = {version, "20080403"}};
-parse_splitted(["20081102"]) ->
-	#response{type = reply, data = {version, "20081102"}};
-parse_splitted(["20081224"]) ->
-	#response{type = reply, data = {version, "20081224"}};
-parse_splitted(["20090810"]) ->
-	#response{type = reply, data = {version, "20090810"}};
+parse_splitted([<<"20040107">>]) ->
+	#response{type = reply, data = {version, <<"20040107">>}};
+parse_splitted([<<"20050322">>]) ->
+	#response{type = reply, data = {version, <<"20050322">>}};
+parse_splitted([<<"20060704">>]) ->
+	#response{type = reply, data = {version, <<"20060704">>}};
+parse_splitted([<<"20071116">>]) ->
+	#response{type = reply, data = {version, <<"20071116">>}};
+parse_splitted([<<"20071218">>]) ->
+	#response{type = reply, data = {version, <<"20071218">>}};
+parse_splitted([<<"20080403">>]) ->
+	#response{type = reply, data = {version, <<"20080403">>}};
+parse_splitted([<<"20081102">>]) ->
+	#response{type = reply, data = {version, <<"20081102">>}};
+parse_splitted([<<"20081224">>]) ->
+	#response{type = reply, data = {version, <<"20081224">>}};
+parse_splitted([<<"20090810">>]) ->
+	#response{type = reply, data = {version, <<"20090810">>}};
 
-parse_splitted(["E1"]) ->
+parse_splitted([<<"E1">>]) ->
 	#response{type = error, data = syntax};
 
-parse_splitted(["E7"]) ->
+parse_splitted([<<"E7">>]) ->
 	#response{type = error, data = software};
 
-parse_splitted(["E8"]) ->
+parse_splitted([<<"E8">>]) ->
 	#response{type = error, data = notfound};
 
 parse_splitted([P, I]) ->
-	{Ip, Port} = parse_addr(I, P),
+	{Ip, Port} = parse_addr(binary_to_list(I), binary_to_list(P)),
 	#response{type = reply, data = {{Ip, Port}, {Ip, Port+1}}};
 
 % Special case - stats
@@ -452,15 +438,9 @@ parse_addr(ProbableIp, ProbablePort) ->
 			throw({error_syntax, "Wrong IP"})
 	end.
 
-parse_media_id(ProbableMediaId) when is_list(ProbableMediaId) ->
-	try list_to_integer (ProbableMediaId)
-	catch
-		_:_ ->
-			throw({error_syntax, "Wrong MediaID"})
-	end.
-
 parse_playcount(ProbablePlayCount) ->
-	try [{playcount, list_to_integer (ProbablePlayCount)}]
+	error_logger:error_msg("ProbablePlayCount: ~p~n", [ProbablePlayCount]),
+	try [{playcount, list_to_integer (binary_to_list(ProbablePlayCount))}]
 	catch
 		_:_ ->
 			throw({error_syntax, "Wrong PlayCount"})
@@ -468,7 +448,7 @@ parse_playcount(ProbablePlayCount) ->
 
 
 decode_params(A) ->
-	decode_params(A, []).
+	decode_params(binary_to_list(A), []).
 
 decode_params([], Result) ->
 	% Default parameters are - symmetric NAT, non-RFC1918 IPv4 network
@@ -610,10 +590,11 @@ encode_params(Params) ->
 	encode_params(Params, []).
 
 encode_params([], Result) ->
-	Result;
+	list_to_binary(Result);
 encode_params([ipv6|Rest], Result) ->
 	encode_params(Rest, Result ++ [$6]);
 encode_params([{direction, {external, external}}|Rest], Result) ->
+	% FIXME
 %	encode_params(Rest, Result ++ "ee");
 	encode_params(Rest, Result);
 encode_params([{direction, {external, internal}}|Rest], Result) ->
@@ -627,6 +608,7 @@ encode_params([local|Rest], Result) ->
 encode_params([remote|Rest], Result) ->
 	encode_params(Rest, Result ++ [$r]);
 encode_params([{symmetric, true}|Rest], Result) ->
+	% FIXME
 %	encode_params(Rest, Result ++ [$s]);
 	encode_params(Rest, Result);
 encode_params([{symmetric, false}|Rest], Result) ->
@@ -713,3 +695,43 @@ print_codec(Codec) ->
 	Num = guess_payload(Codec),
 	[Str] = io_lib:format("~b", [Num]),
 	Str.
+
+%%
+%% Binary helper functions
+%%
+
+drop_zeroes(Binary) when is_binary(Binary) ->
+	drop_zeroes(<<>>, Binary).
+drop_zeroes(Result, <<>>) ->
+	Result;
+drop_zeroes(Result, <<0:8, Rest/binary>>) ->
+	drop_zeroes(Result, Rest);
+drop_zeroes(Result, <<Symbol:8, Rest/binary>>) ->
+	drop_zeroes(<<Result/binary, Symbol:8>>, Rest).
+
+cut_newline(Binary) when is_binary(Binary) ->
+	Size = size(Binary) - 1,
+	case Binary of
+		<<Ret:Size/binary, $\n:8>> -> Ret;
+		_ -> Binary
+	end.
+
+binary_to_upper(Binary) when is_binary(Binary) ->
+	binary_to_upper(<<>>, Binary).
+binary_to_upper(Result, <<>>) ->
+	Result;
+binary_to_upper(Result, <<C:8, Rest/binary>>) when $a =< C, C =< $z ->
+	Symbol = C - 32,
+	binary_to_upper(<<Result/binary, Symbol:8>>, Rest);
+binary_to_upper(Result, <<C:8, Rest/binary>>) ->
+	binary_to_upper(<<Result/binary, C:8>>, Rest).
+
+binary_split(Binary, Val) when is_binary(Binary) ->
+	binary_split(<<>>, Binary, Val, []).
+
+binary_split(Head, <<>>, Val, Result) ->
+	lists:reverse([Head | Result]);
+binary_split(Head, <<Val:8, Rest/binary>>, Val, Result) ->
+	binary_split(<<>>, Rest, Val, [Head | Result]);
+binary_split(Head, <<OtherVal:8, Rest/binary>>, Val, Result) ->
+	binary_split(<<Head/binary, OtherVal:8>>, Rest, Val, Result).

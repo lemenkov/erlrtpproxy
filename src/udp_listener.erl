@@ -47,7 +47,7 @@ init ([{I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
 	is_integer(I6), I6 >= 0, I6 < 65535,
 	is_integer(I7), I7 >= 0, I7 < 65535 ->
 	process_flag(trap_exit, true),
-	{ok, Fd} = gen_udp:open(Port, [{ip, IPv6}, {active, true}, list, inet6]),
+	{ok, Fd} = gen_udp:open(Port, [{ip, IPv6}, {active, true}, binary, inet6]),
 	error_logger:info_msg("UDP listener started at [~s:~w]~n", [inet_parse:ntoa(IPv6), Port]),
 	{ok, Fd};
 init ([{I0, I1, I2, I3} = IPv4, Port]) when
@@ -56,7 +56,7 @@ init ([{I0, I1, I2, I3} = IPv4, Port]) when
 	is_integer(I2), I2 >= 0, I2 < 256,
 	is_integer(I3), I3 >= 0, I3 < 256 ->
 	process_flag(trap_exit, true),
-	{ok, Fd} = gen_udp:open(Port, [{ip, IPv4}, {active, true}, list]),
+	{ok, Fd} = gen_udp:open(Port, [{ip, IPv4}, {active, true}, binary]),
 	error_logger:info_msg("UDP listener started at [~s:~w]~n", [inet_parse:ntoa(IPv4), Port]),
 	{ok, Fd}.
 

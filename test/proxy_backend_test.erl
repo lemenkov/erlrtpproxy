@@ -117,7 +117,7 @@ run_proxy_test_() ->
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						?assertMatch(
 							#response{
-								cookie = "24393_4",
+								cookie = <<"24393_4">>,
 								origin = null,
 								type = reply,
 								data = {{{_,_,_,_},_},{{_,_,_,_},_}}
@@ -130,7 +130,7 @@ run_proxy_test_() ->
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						?assertMatch(
 							#response{
-								cookie = "24393_4",
+								cookie = <<"24393_4">>,
 								origin = null,
 								type = reply,
 								data = {{{_,_,_,_},_},{{_,_,_,_},_}}
@@ -149,7 +149,7 @@ run_proxy_test_() ->
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						?assertEqual(
 							#response{
-								cookie = "24393_4",
+								cookie = <<"24393_4">>,
 								origin = null,
 								type = reply,
 								data = ok
