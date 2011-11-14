@@ -108,17 +108,15 @@ encode(#cmd{cookie = Cookie, type = ?CMD_U, callid = CallId, mediaid = MediaId, 
 	Ip = list_to_binary(inet_parse:ntoa(GuessIp)),
 	Port = list_to_binary(io_lib:format("~b", [GuessPort])),
 	<<Cookie/binary, <<" U">>/binary, ParamsBin/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Ip/binary, <<" ">>/binary, Port/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
-encode(#cmd{cookie = Cookie, type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag, addr = {GuessIp, GuessPort}}, to = #party{tag = ToTag}, params = Params}) ->
+encode(#cmd{cookie = Cookie, type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag, addr = Addr}, to = #party{tag = ToTag}, params = Params}) ->
 	ParamsBin = encode_params(Params),
-	Ip = list_to_binary(inet_parse:ntoa(GuessIp)),
-	Port = list_to_binary(io_lib:format("~b", [GuessPort])),
-	<<Cookie/binary, <<" U">>/binary, ParamsBin/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Ip/binary, <<" ">>/binary, Port/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<" ">>/binary, ToTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
+	BinAddr = binary_print_addr(Addr),
+	<<Cookie/binary, <<" U">>/binary, ParamsBin/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, BinAddr/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<" ">>/binary, ToTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
 
-encode(#cmd{cookie = Cookie, type = ?CMD_L, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag, addr = {GuessIp, GuessPort}}, to = #party{tag = ToTag}, params = Params}) ->
+encode(#cmd{cookie = Cookie, type = ?CMD_L, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag, addr = Addr}, to = #party{tag = ToTag}, params = Params}) ->
 	ParamsBin = encode_params(Params),
-	Ip = list_to_binary(inet_parse:ntoa(GuessIp)),
-	Port = list_to_binary(io_lib:format("~b", [GuessPort])),
-	<<Cookie/binary, <<" L">>/binary, ParamsBin/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Ip/binary, <<" ">>/binary, Port/binary, <<" ">>/binary, ToTag/binary, <<";">>/binary, MediaId/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
+	BinAddr = binary_print_addr(Addr),
+	<<Cookie/binary, <<" L">>/binary, ParamsBin/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, BinAddr/binary, <<" ">>/binary, ToTag/binary, <<";">>/binary, MediaId/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_D, callid = CallId, from = #party{tag = FromTag}, to = null}) ->
 	<<Cookie/binary, <<" D ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<"\n">>/binary>>;
@@ -735,3 +733,10 @@ binary_split(Head, <<Val:8, Rest/binary>>, Val, Result) ->
 	binary_split(<<>>, Rest, Val, [Head | Result]);
 binary_split(Head, <<OtherVal:8, Rest/binary>>, Val, Result) ->
 	binary_split(<<Head/binary, OtherVal:8>>, Rest, Val, Result).
+
+binary_print_addr({Ip, Port}) ->
+	BinIp = list_to_binary(inet_parse:ntoa(Ip)),
+	BinPort = list_to_binary(io_lib:format("~b", [Port])),
+	<<BinIp/binary, <<" ">>/binary, BinPort/binary>>;
+binary_print_addr(null) ->
+	<<"127.0.0.1 10000">>.
