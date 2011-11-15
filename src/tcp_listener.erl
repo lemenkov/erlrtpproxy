@@ -56,7 +56,7 @@ init ([{I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
 	is_integer(I6), I6 >= 0, I6 < 65535,
 	is_integer(I7), I7 >= 0, I7 < 65535 ->
 	process_flag(trap_exit, true),
-	Opts = [{ip, IPv6}, list, {packet, raw}, {reuseaddr, true}, {keepalive, true}, {backlog, 30}, {active, false}, inet6],
+	Opts = [{ip, IPv6}, binary, {packet, raw}, {reuseaddr, true}, {keepalive, true}, {backlog, 30}, {active, false}, inet6],
 	{ok, Socket} = gen_tcp:listen(Port, Opts),
 	{ok, Ref} = prim_inet:async_accept(Socket, -1),
 	error_logger:info_msg("TCP listener started at [~s:~w]~n", [inet_parse:ntoa(IPv6), Port]),
@@ -68,7 +68,7 @@ init ([{I0, I1, I2, I3} = IPv4, Port]) when
 	is_integer(I2), I2 >= 0, I2 < 256,
 	is_integer(I3), I3 >= 0, I3 < 256 ->
 	process_flag(trap_exit, true),
-	Opts = [{ip, IPv4}, list, {packet, raw}, {reuseaddr, true}, {keepalive, true}, {backlog, 30}, {active, false}],
+	Opts = [{ip, IPv4}, binary, {packet, raw}, {reuseaddr, true}, {keepalive, true}, {backlog, 30}, {active, false}],
 	{ok, Socket} = gen_tcp:listen(Port, Opts),
 	{ok, Ref} = prim_inet:async_accept(Socket, -1),
 	error_logger:info_msg("TCP listener started at [~s:~w]~n", [inet_parse:ntoa(IPv4), Port]),
@@ -93,7 +93,7 @@ handle_cast(_Msg, State) ->
 	{noreply, State}.
 
 handle_info({tcp, Client, Msg}, State) ->
-	inet:setopts(Client, [{active, once}, {packet, raw}, list]),
+	inet:setopts(Client, [{active, once}, {packet, raw}, binary]),
 	{ok, {Ip, Port}} = inet:peername(Client),
 	try ser_proto:decode(Msg) of
 		#cmd{origin = Origin} = Cmd ->
@@ -121,7 +121,7 @@ handle_info({inet_async, ListSock, Ref, {ok, CliSocket}}, #state{listener=ListSo
 		{error, Reason} -> exit({set_sockopt, Reason})
 	end,
 
-	inet:setopts(CliSocket, [{active, once}, {packet, raw}, list]),
+	inet:setopts(CliSocket, [{active, once}, {packet, raw}, binary]),
 
 	case prim_inet:async_accept(ListSock, -1) of
 		{ok, NewRef} -> ok;
