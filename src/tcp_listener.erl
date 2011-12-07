@@ -140,7 +140,7 @@ handle_info(_Info, State) ->
 terminate(Reason, #state{listener = Listener, clients = Clients}) ->
 	gen_tcp:close(Listener),
 	lists:map(fun gen_tcp:close/1, Clients),
-	error_logger:error_msg("TCP lisener closed: ~p~n", [Reason]),
+	error_logger:error_msg("TCP listener closed: ~p~n", [Reason]),
 	ok.
 
 code_change(_OldVsn, State, _Extra) ->

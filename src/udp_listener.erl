@@ -100,6 +100,6 @@ code_change(_OldVsn, State, _Extra) ->
 
 terminate(Reason, Fd) ->
 	gen_udp:close(Fd),
-	error_logger:error_msg("UDP lisener closed: ~p~n", [Reason]),
+	error_logger:error_msg("UDP listener closed: ~p~n", [Reason]),
 	ok.
 
