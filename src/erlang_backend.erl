@@ -66,7 +66,7 @@ handle_cast(#cmd{cookie = Cookie, origin = Origin, type = ?CMD_V} = Cmd, State) 
 	% http://sippy.git.sourceforge.net/git/gitweb.cgi?p=sippy/rtpproxy;a=blob;f=rtpp_command.c#l58
 	% We provide only basic functionality, currently.
 	error_logger:info_msg("SER cmd V~n"),
-	gen_server:cast(listener, #response{cookie = Cookie, origin = Origin, type = reply, data = {version, "20040107"}}),
+	gen_server:cast(listener, #response{cookie = Cookie, origin = Origin, type = reply, data = {version, <<"20040107">>}}),
 	{noreply, State};
 handle_cast(#cmd{cookie = Cookie, origin = Origin, type = ?CMD_VF, params=Version} = Cmd, State) ->
 	% Request additional rtpproxy protocol extensions
