@@ -58,7 +58,7 @@ handle_cast(stop, State) ->
 	{stop, stop, State};
 % Got two addresses (initial Media stream creation)
 handle_cast({reply, Cmd, {Addr1, Addr2}}, State) ->
-	gen_server:cast(listener, #response{cookie = Cmd#cmd.cookie, type = reply, data = {Addr1, Addr2}}),
+	gen_server:cast(listener, #response{cookie = Cmd#cmd.cookie, origin = Cmd#cmd.origin, type = reply, data = {Addr1, Addr2}}),
 	{noreply, State};
 handle_cast(#cmd{cookie = Cookie, origin = Origin, type = ?CMD_V} = Cmd, State) ->
 	% Request basic supported rtpproxy protocol version
