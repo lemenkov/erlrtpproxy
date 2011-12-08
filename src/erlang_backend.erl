@@ -61,6 +61,9 @@ handle_cast(stop, State) ->
 handle_cast({reply, Cmd, {Addr1, Addr2}}, State) ->
 	gen_server:cast(listener, #response{cookie = Cmd#cmd.cookie, origin = Cmd#cmd.origin, type = reply, data = {Addr1, Addr2}}),
 	{noreply, State};
+handle_cast({reply, Cmd, ok}, State) ->
+	gen_server:cast(listener, #response{cookie = Cmd#cmd.cookie, origin = Cmd#cmd.origin, type = reply, data = ok}),
+	{noreply, State};
 handle_cast(#cmd{cookie = Cookie, origin = Origin, type = ?CMD_V} = Cmd, State) ->
 	% Request basic supported rtpproxy protocol version
 	% see available versions here:
