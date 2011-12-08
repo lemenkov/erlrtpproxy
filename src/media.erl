@@ -146,7 +146,9 @@ handle_cast(
 
 			gen_server:cast(P, {update, Params ++ RtpParamsAddon ++ RtcpParamsAddon}),
 
-			gen_server:cast(Pid, {reply, Cmd, {Ip, Port}}),
+			% FIXME - this is just wrong. Instead of {Ip, Port + 1} we should supply the other's
+			% side IP address.
+			gen_server:cast(Pid, {reply, Cmd, {{Ip, Port}, {Ip, Port + 1}}}),
 
 			case Dir of
 				to -> {noreply, State#state{tag_t = Tag}};
@@ -315,6 +317,6 @@ try_notify_parent(Cmd, _, #media{ip = null, port = null}) ->
 try_notify_parent(#cmd{origin = #origin{type = ser, pid = Pid}, callid = CallId, mediaid = MediaId} = Cmd, #media{pid = Pid0, ip = I0, port = P0}, #media{pid = Pid1, ip = I1, port = P1}) ->
 	gen_server:cast(Pid0, {neighbour, Pid1}),
 	gen_server:cast(Pid1, {neighbour, Pid0}),
-	gen_server:cast(Pid, {reply, Cmd, {I0, P0}, {I1, P1}}),
+	gen_server:cast(Pid, {reply, Cmd, {{I0, P0}, {I1, P1}}}),
 	gen_server:cast({global, rtpproxy}, {created, self(), {CallId, MediaId}}),
 	ok.
