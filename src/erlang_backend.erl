@@ -77,6 +77,11 @@ handle_cast(#cmd{cookie = Cookie, origin = Origin, type = ?CMD_VF, params=Versio
 	error_logger:info_msg("SER cmd VF: ~s~n", [Version]),
 	gen_server:cast(listener, #response{cookie = Cookie, origin = Origin, type = reply, data = supported}),
 	{noreply, State};
+% Fix for CMD_L
+handle_cast(#cmd{origin = Origin, type = ?CMD_L} = Cmd, #state{mode = online} = State) ->
+	error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
+	gen_server:cast({global, rtpproxy}, Cmd#cmd{origin = Origin#origin{pid = self()}, type = ?CMD_U}),
+	{noreply, State};
 handle_cast(#cmd{origin = Origin} = Cmd, #state{mode = online} = State) ->
 	error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
 	gen_server:cast({global, rtpproxy}, Cmd#cmd{origin = Origin#origin{pid = self()}}),
