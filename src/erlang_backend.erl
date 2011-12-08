@@ -51,7 +51,8 @@ init (RtpproxyNode) ->
 	error_logger:info_msg("Erlrtpproxy backend started at ~p~n", [node()]),
 	{ok, #state{timer = TRef, mode = offline, node = RtpproxyNode}}.
 
-handle_call(_Other, _From, State) ->
+handle_call(Other, _From, State) ->
+	error_logger:warning_msg("Erlrtpproxy backend: strange call: ~p~n", [Other]),
 	{noreply, State}.
 
 handle_cast(stop, State) ->
@@ -82,7 +83,8 @@ handle_cast(#cmd{cookie = Cookie, origin = Origin} = Cmd, #state{mode = offline}
 	gen_server:cast(listener, #response{cookie = Cookie, origin = Origin, type = error, data = software}),
 	{noreply, State};
 
-handle_cast(_Request, State) ->
+handle_cast(Other, State) ->
+	error_logger:warning_msg("Erlrtpproxy backend: strange cast: ~p~n", [Other]),
 	{noreply, State}.
 
 handle_info(ping, #state{node = undefined} = State) ->
@@ -100,7 +102,7 @@ handle_info(ping, #state{mode = Online, node = RtpproxyNode} = State) ->
 	end;
 
 handle_info(Info, State) ->
-	error_logger:warning_msg("Info [~p]~n", [Info]),
+	error_logger:warning_msg("Erlrtpproxy backend: strange info: ~p~n", [Info]),
 	{noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->

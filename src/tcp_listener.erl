@@ -74,8 +74,9 @@ init ([{I0, I1, I2, I3} = IPv4, Port]) when
 	error_logger:info_msg("TCP listener started at [~s:~w]~n", [inet_parse:ntoa(IPv4), Port]),
 	{ok, #state{listener = Socket, acceptor = Ref}}.
 
-handle_call(Request, _From, State) ->
-	{stop, {unknown_call, Request}, State}.
+handle_call(Other, _From, State) ->
+	error_logger:warning_msg("TCP listener: strange call: ~p~n", [Other]),
+	{noreply, State}.
 
 handle_cast(#response{origin = #origin{type = ser, ip = Ip, port = Port}} = Response, State = #state{clients=Clients}) ->
 	Data = ser_proto:encode(Response),
@@ -89,7 +90,8 @@ handle_cast(#response{origin = #origin{type = ser, ip = Ip, port = Port}} = Resp
 handle_cast(stop, State) ->
 	{stop, stop, State};
 
-handle_cast(_Msg, State) ->
+handle_cast(Other, State) ->
+	error_logger:warning_msg("TCP listener: strange cast: ~p~n", [Other]),
 	{noreply, State}.
 
 handle_info({tcp, Client, Msg}, State) ->
@@ -134,7 +136,8 @@ handle_info({inet_async, ListSock, Ref, Error}, #state{listener=ListSock, accept
 	error_logger:error_msg("Error in socket acceptor: ~p.~n", [Error]),
 	{stop, Error, State};
 
-handle_info(_Info, State) ->
+handle_info(Info, State) ->
+	error_logger:warning_msg("TCP listener: strange info: ~p~n", [Info]),
 	{noreply, State}.
 
 terminate(Reason, #state{listener = Listener, clients = Clients}) ->

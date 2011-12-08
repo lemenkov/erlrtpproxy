@@ -60,7 +60,8 @@ init ([{I0, I1, I2, I3} = IPv4, Port]) when
 	error_logger:info_msg("UDP listener started at [~s:~w]~n", [inet_parse:ntoa(IPv4), Port]),
 	{ok, Fd}.
 
-handle_call(_Other, _From, State) ->
+handle_call(Other, _From, State) ->
+	error_logger:warning_msg("UDP listener: strange call: ~p~n", [Other]),
 	{noreply, State}.
 
 handle_cast(#response{origin = #origin{type = ser, ip = Ip, port = Port}} = Response, Fd) ->
@@ -71,7 +72,8 @@ handle_cast(#response{origin = #origin{type = ser, ip = Ip, port = Port}} = Resp
 handle_cast(stop, State) ->
 	{stop, stop, State};
 
-handle_cast(_Request, State) ->
+handle_cast(Other, State) ->
+	error_logger:warning_msg("UDP listener: strange cast: ~p~n", [Other]),
 	{noreply, State}.
 
 % Fd from which message arrived must be equal to Fd from our state
@@ -92,7 +94,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 	{noreply, Fd};
 
 handle_info(Info, State) ->
-	error_logger:warning_msg("Info [~p]~n", [Info]),
+	error_logger:warning_msg("UDP listener: strange info: ~p~n", [Info]),
 	{noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->

@@ -69,7 +69,8 @@ init ([{I0, I1, I2, I3} = IPv4, Port]) when
 	error_logger:info_msg("Proxy backend started.~n"),
 	{ok, #state{fd = Fd, ip = IPv4, port = Port}}.
 
-handle_call(_Other, _From, State) ->
+handle_call(Other, _From, State) ->
+	error_logger:warning_msg("Rtpproxy backend: strange call: ~p~n", [Other]),
 	{noreply, State}.
 
 handle_cast(#cmd{cookie = Cookie, origin = Origin} = Cmd, #state{fd = Fd, ip = Ip, port = Port, cmds = Cmds} = State) ->
@@ -79,7 +80,8 @@ handle_cast(#cmd{cookie = Cookie, origin = Origin} = Cmd, #state{fd = Fd, ip = I
 handle_cast(stop, State) ->
 	{stop, stop, State};
 
-handle_cast(_Request, State) ->
+handle_cast(Other, State) ->
+	error_logger:warning_msg("Rtpproxy backend: strange cast: ~p~n", [Other]),
 	{noreply, State}.
 
 % Response from rtpproxy
@@ -108,7 +110,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, ip = Ip, port = Port, cmds
 	end;
 
 handle_info(Info, State) ->
-	error_logger:warning_msg("Info [~p]~n", [Info]),
+	error_logger:warning_msg("Rtpproxy backend: strange info: ~p~n", [Info]),
 	{noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->
