@@ -13,7 +13,7 @@ init([]) ->
 	MaxTimeBetweenRestarts = 1,
 	SupFlags = {RestartStrategy, MaxRestarts, MaxTimeBetweenRestarts},
 
-	Child = {rtpproxy,{rtpproxy,start_link,[ignored]},permanent,2000,worker,[rtpproxy]},
+	RtpProxy = {rtpproxy,{rtpproxy,start_link,[ignored]},permanent,2000,worker,[rtpproxy]},
 
-	{ok,{SupFlags, [Child]}}.
+	{ok,{SupFlags, [RtpProxy]}}.
 
