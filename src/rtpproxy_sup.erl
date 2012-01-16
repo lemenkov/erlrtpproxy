@@ -23,17 +23,8 @@ init([]) ->
 			{udp_listener, {udp_listener, start_link, [[Ip, Port]]}, permanent, 10000, worker, []}
 	end,
 
-	% Load backend
-	{ok, {Type, Addr}} = application:get_env(ser, backend),
-	BackendProcess = case Type of
-		erlang ->
-			{erlang_backend, {erlang_backend, start_link, [Addr]}, permanent, 10000, worker, []};
-		proxy ->
-			{proxy_backend, {proxy_backend, start_link, [Addr]}, permanent, 10000, worker, []}
-	end,
-
 	% Load main module
 	RtpProxy = {rtpproxy,{rtpproxy,start_link,[ignored]},permanent,2000,worker,[rtpproxy]},
 
-	{ok,{SupFlags, [ListenerProcess, BackendProcess, RtpProxy]}}.
+	{ok,{SupFlags, [ListenerProcess, RtpProxy]}}.
 
