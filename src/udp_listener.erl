@@ -80,7 +80,7 @@ handle_cast(Other, State) ->
 handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 	try ser_proto:decode(Msg) of
 		#cmd{origin = Origin} = Cmd ->
-			gen_server:cast(backend, Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}})
+			gen_server:cast(rtpproxy, Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port, pid = self()}})
 	catch
 		throw:{error_syntax, Error} ->
 			error_logger:error_msg("Bad syntax. [~s -> ~s]~n", [Msg, Error]),
