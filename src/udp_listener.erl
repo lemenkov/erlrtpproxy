@@ -94,10 +94,10 @@ handle_info({udp, Fd, Ip, Port, Msg}, Fd) ->
 			gen_udp:send(Fd, Ip, Port, Data);
 		#cmd{origin = Origin, type = ?CMD_L} = Cmd ->
 			error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
-			gen_server:cast(rtpproxy, Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port, pid = self()}, type = ?CMD_U});
+			gen_server:cast({global, rtpproxy}, Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port, pid = self()}, type = ?CMD_U});
 		#cmd{origin = Origin} = Cmd ->
 			error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
-			gen_server:cast(rtpproxy, Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port, pid = self()}})
+			gen_server:cast({global, rtpproxy}, Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port, pid = self()}})
 	catch
 		throw:{error_syntax, Error} ->
 			error_logger:error_msg("Bad syntax. [~s -> ~s]~n", [Msg, Error]),
