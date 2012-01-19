@@ -69,6 +69,18 @@ handle_cast(#response{origin = #origin{type = ser, ip = Ip, port = Port}} = Resp
 	gen_udp:send(Fd, Ip, Port, Data),
 	{noreply, Fd};
 
+handle_cast({reply, Cmd = #cmd{origin = #origin{type = ser, ip = Ip, port = Port}}, {Addr1, Addr2}}, Fd) ->
+	error_logger:info_msg("SER reply ~p~n", [{Addr1, Addr2}]),
+	Data = ser_proto:encode(#response{cookie = Cmd#cmd.cookie, origin = Cmd#cmd.origin, type = reply, data = {Addr1, Addr2}}),
+	gen_udp:send(Fd, Ip, Port, Data),
+	{noreply, Fd};
+
+handle_cast({reply, Cmd = #cmd{origin = #origin{type = ser, ip = Ip, port = Port}}, ok}, Fd) ->
+	error_logger:info_msg("SER reply ok~n"),
+	Data = ser_proto:encode(#response{cookie = Cmd#cmd.cookie, origin = Cmd#cmd.origin, type = reply, data = ok}),
+	gen_udp:send(Fd, Ip, Port, Data),
+	{noreply, Fd};
+
 handle_cast(stop, State) ->
 	{stop, stop, State};
 
