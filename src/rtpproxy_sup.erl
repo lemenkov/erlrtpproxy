@@ -14,6 +14,7 @@ init([]) ->
 	SupFlags = {RestartStrategy, MaxRestarts, MaxTimeBetweenRestarts},
 
 	% Load listener
+	application:load(ser),
 	{ok, {Proto, IpStr, Port}} = application:get_env(ser, listen),
 	{ok, Ip} = inet_parse:address(IpStr),
 	ListenerProcess = case Proto of
