@@ -13,7 +13,19 @@ init([]) ->
 	MaxTimeBetweenRestarts = 1,
 	SupFlags = {RestartStrategy, MaxRestarts, MaxTimeBetweenRestarts},
 
-	Child = {rtpproxy,{rtpproxy,start_link,[ignored]},permanent,2000,worker,[rtpproxy]},
+	% Load listener
+	application:load(ser),
+	{ok, {Proto, IpStr, Port}} = application:get_env(ser, listen),
+	{ok, Ip} = inet_parse:address(IpStr),
+	ListenerProcess = case Proto of
+		tcp ->
+			{tcp_listener, {tcp_listener, start_link, [[Ip, Port]]}, permanent, 10000, worker, []};
+		udp ->
+			{udp_listener, {udp_listener, start_link, [[Ip, Port]]}, permanent, 10000, worker, []}
+	end,
 
-	{ok,{SupFlags, [Child]}}.
+	% Load main module
+	RtpProxy = {rtpproxy,{rtpproxy,start_link,[ignored]},permanent,2000,worker,[rtpproxy]},
+
+	{ok,{SupFlags, [ListenerProcess, RtpProxy]}}.
 
