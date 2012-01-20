@@ -133,6 +133,8 @@ terminate(Reason, #state{parent = Parent, fd = Fd, transport = Transport}) ->
 	Type:close(Fd),
 	ok.
 
+-ifdef(ENABLE_RTCP).
+
 handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, parent = Parent, started = true, weak = true, symmetric = Symmetric} = State) ->
 	inet:setopts(Fd, [{active, once}]),
 	try
@@ -172,3 +174,10 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{parent = Parent, started = false} =
 
 handle_info(_Info, State) ->
 	{noreply, State}.
+
+-else.
+
+handle_info(_Info, State) ->
+	{noreply, State}.
+
+-endif.
