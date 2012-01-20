@@ -93,17 +93,17 @@ run_proxy_test_() ->
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						?assertEqual("6721_89367 1\n", Answer) end
 			},
-			{"Request support for session timeout notifications (ver. 20081224 - not supported by this proxy)",
+			{"Request support for session timeout notifications (ver. 20081224)",
 				fun () ->
 						gen_udp:send(Fd, {127,0,0,1}, 22222, "6721_89367 VF 20081224\n"),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
-						?assertEqual("6721_89367 0\n", Answer) end
+						?assertEqual("6721_89367 1\n", Answer) end
 			},
-			{"Request support for automatic bridging (ver. 20090810 - not supported by this proxy)",
+			{"Request support for automatic bridging (ver. 20090810)",
 				fun () ->
 						gen_udp:send(Fd, {127,0,0,1}, 22222, "6721_89367 VF 20090810\n"),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
-						?assertEqual("6721_89367 0\n", Answer) end
+						?assertEqual("6721_89367 1\n", Answer) end
 			},
 			{"Request for unsupported extensions",
 				fun () ->
