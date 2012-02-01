@@ -4,6 +4,7 @@ REBAR_FLAGS ?=
 VSN := "0.4.4"
 BUILD_DATE := `LANG=C date +"%a %b %d %Y"`
 NAME := rtpproxy
+UNAME := $(shell uname -s)
 
 ERLANG_ROOT := $(shell erl -eval 'io:format("~s", [code:root_dir()])' -s init stop -noshell)
 ERLDIR=$(ERLANG_ROOT)/lib/$(NAME)-$(VSN)
@@ -16,9 +17,21 @@ APP_FILE := $(EBIN_DIR)/$(NAME).app
 all: compile
 
 compile:
-	VSN=$(VSN) BUILD_DATE=$(BUILD_DATE) $(REBAR) compile $(REBAR_FLAGS)
+	@VSN=$(VSN) BUILD_DATE=$(BUILD_DATE) $(REBAR) compile $(REBAR_FLAGS)
 
 install: all
+ifeq ($(UNAME), Darwin)
+	@test -d $(ERLDIR) || mkdir -p $(ERLDIR)/$(EBIN_DIR)
+	@install -p -m 0644 $(APP_FILE) $(DESTDIR)$(ERLDIR)/$(APP_FILE)
+	@install -p -m 0644 $(ERL_OBJECTS) $(DESTDIR)$(ERLDIR)/$(EBIN_DIR)
+	@install -p -m 0644 priv/erlrtpproxy.config $(DESTDIR)/etc/erl$(NAME).config
+#	@install -p -m 0755 priv/erlrtpproxy.init $(DESTDIR)/etc/rc.d/init.d/erl$(NAME)
+	@install -p -m 0644 priv/erlrtpproxy.sysconfig $(DESTDIR)/etc/erl$(NAME)
+	@install -d $(DESTDIR)/var/lib/erl$(NAME)
+	@install -p -m 0644 priv/erlang.cookie $(DESTDIR)/var/lib/erl$(NAME)/.erlang.cookie
+	@install -p -m 0644 priv/hosts.erlang $(DESTDIR)/var/lib/erl$(NAME)/.hosts.erlang
+	@echo "erl$(NAME) installed. \n"
+else
 	install -D -p -m 0644 $(APP_FILE) $(DESTDIR)$(ERLDIR)/$(APP_FILE)
 	install -p -m 0644 $(ERL_OBJECTS) $(DESTDIR)$(ERLDIR)/$(EBIN_DIR)
 	install -D -p -m 0644 priv/erlrtpproxy.config $(DESTDIR)/etc/erl$(NAME).config
@@ -27,9 +40,10 @@ install: all
 	install -d $(DESTDIR)/var/lib/erl$(NAME)
 	install -D -p -m 0644 priv/erlang.cookie $(DESTDIR)/var/lib/erl$(NAME)/.erlang.cookie
 	install -D -p -m 0644 priv/hosts.erlang $(DESTDIR)/var/lib/erl$(NAME)/.hosts.erlang
+endif
 
 test:
 	$(REBAR) eunit $(REBAR_FLAGS)
 
 clean:
-	$(REBAR) clean $(REBAR_FLAGS)
+	@$(REBAR) clean $(REBAR_FLAGS)
