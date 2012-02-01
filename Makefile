@@ -53,3 +53,10 @@ endif
 
 clean:
 	@$(REBAR) clean $(REBAR_FLAGS)
+
+uninstall:
+	@if test -d $(ERLDIR); then rm -rf $(ERLDIR); fi
+	if test -f /etc/$(NAME).config; then rm -rf /etc/$(NAME).config; fi
+	@if test -f /etc/$(NAME); then rm -rf /etc/$(NAME); fi
+	@if test -d /var/lib/$(NAME); then rm -rf /var/lib/$(NAME); fi
+	@echo "$(NAME) uninstalled. \n
