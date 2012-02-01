@@ -4,6 +4,7 @@ REBAR_FLAGS ?=
 VSN := "0.9.7"
 BUILD_DATE := `LANG=C date +"%a %b %d %Y"`
 NAME := ser
+UNAME := $(shell uname -s)
 
 ERLANG_ROOT := $(shell erl -eval 'io:format("~s", [code:root_dir()])' -s init stop -noshell)
 ERLDIR=$(ERLANG_ROOT)/lib/$(NAME)-$(VSN)
@@ -16,7 +17,7 @@ APP_FILE := $(EBIN_DIR)/$(NAME).app
 all: compile
 
 compile:
-	VSN=$(VSN) BUILD_DATE=$(BUILD_DATE) $(REBAR) compile $(REBAR_FLAGS)
+	@VSN=$(VSN) BUILD_DATE=$(BUILD_DATE) $(REBAR) compile $(REBAR_FLAGS)
 
 rel: compile
 	rm -rf rel/ser
@@ -32,12 +33,23 @@ test: all
 
 
 install: all
+ifeq ($(UNAME), Darwin)
+	@test -d $(DESTDIR)$(ERLDIR) || mkdir -p $(DESTDIR)$(ERLDIR)/$(EBIN_DIR)
+	@install -p -m 0644 $(APP_FILE) $(DESTDIR)$(ERLDIR)/$(APP_FILE)
+	@install -p -m 0644 $(ERL_OBJECTS) $(DESTDIR)$(ERLDIR)/$(EBIN_DIR)
+	@install -p -m 0644 priv/erlrtpproxy-ser.config $(DESTDIR)$(prefix)/etc/$(NAME).config
+#	@install -p -m 0755 priv/erlrtpproxy-ser.init $(DESTDIR)$(prefix)/etc/rc.d/init.d/$(NAME)
+	@install -p -m 0644 priv/erlrtpproxy-ser.sysconfig $(DESTDIR)$(prefix)/etc/$(NAME)
+	@install -d $(DESTDIR)$(prefix)/var/lib/$(NAME)
+	@echo "$(NAME) installed. \n"
+else
 	install -D -p -m 0644 $(APP_FILE) $(DESTDIR)$(ERLDIR)/$(APP_FILE)
 	install -p -m 0644 $(ERL_OBJECTS) $(DESTDIR)$(ERLDIR)/$(EBIN_DIR)
 	install -D -p -m 0644 priv/erlrtpproxy-ser.config $(DESTDIR)/etc/$(NAME).config
 	install -D -p -m 0755 priv/erlrtpproxy-ser.init $(DESTDIR)/etc/rc.d/init.d/$(NAME)
 	install -D -p -m 0644 priv/erlrtpproxy-ser.sysconfig $(DESTDIR)/etc/sysconfig/$(NAME)
 	install -d $(DESTDIR)/var/lib/$(NAME)
+endif
 
 clean:
-	$(REBAR) clean $(REBAR_FLAGS)
+	@$(REBAR) clean $(REBAR_FLAGS)
