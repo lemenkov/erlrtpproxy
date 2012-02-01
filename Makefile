@@ -47,3 +47,7 @@ test:
 
 clean:
 	@$(REBAR) clean $(REBAR_FLAGS)
+
+uninstall:
+	@if test -d $(ERLDIR); then rm -rf $(ERLDIR); fi
+	@echo "$(NAME) uninstalled. \n
