@@ -119,6 +119,7 @@ handle_cast(
 			mediaid = MediaId,
 			from = #media{pid = PidF, ip = IpF, port = PortF},
 			to = #media{pid = PidT, ip = IpT, port = PortT},
+			started = Started,
 			tag_f = TagF,
 			tag_t = TagT} = State
 	) ->
@@ -129,10 +130,16 @@ handle_cast(
 		_ when TagT == null -> {to, PidF, IpT, PortT};
 		_ -> {notfound, null, null, null}
 	end,
+	NewStarted = case proplists:get_value(acc, Params) of
+		start ->
+			gen_server:cast(rtpproxy_notifier, {start, CallId, MediaId}),
+			true;
+		_  -> Started
+	end,
 	case Dir of
 		notfound ->
 			gen_server:cast(Pid, {reply, Cmd, {error, notfound}}),
-			{noreply, State};
+			{noreply, State#state{started = NewStarted}};
 		_ ->
 			RtpParamsAddon = case FAddr of
 				null -> [];
@@ -151,10 +158,30 @@ handle_cast(
 			gen_server:cast(Pid, {reply, Cmd, {{Ip, Port}, {Ip, Port + 1}}}),
 
 			case Dir of
-				to -> {noreply, State#state{tag_t = Tag}};
-				_ -> {noreply, State}
+				to -> {noreply, State#state{tag_t = Tag, started = NewStarted}};
+				_ -> {noreply, State#state{started = NewStarted}}
 			end
 	end;
+
+handle_cast(
+		#cmd{
+			type = ?CMD_U,
+			origin = #origin{pid = Pid},
+			callid = CallId,
+			mediaid = MediaId,
+			params = Params} = Cmd,
+		#state{
+			callid = CallId,
+			mediaid = MediaId,
+			started = Started } = State
+	) ->
+	NewStarted = case proplists:get_value(acc, Params) of
+		start ->
+			gen_server:cast(rtpproxy_notifier, {start, CallId, MediaId}),
+			true;
+		_  -> Started
+	end,
+	{noreply, State#state{started = NewStarted}};
 
 handle_cast(
 		#cmd{
@@ -196,11 +223,11 @@ handle_cast({start, Pid}, #state{
 		PidT -> {SF, rtp}
 	end,
 	case (SF1 == rtp) and (ST1 == rtp) of
-		true -> gen_server:cast(rtpproxy_notifier, {start, CallID, MediaID});
+%		true -> gen_server:cast(rtpproxy_notifier, {start, CallID, MediaID});
 		_ -> ok
 	end,
 	{noreply, State#state{
-			started = (SF1 == rtp) and (ST1 == rtp),
+%			started = (SF1 == rtp) and (ST1 == rtp),
 			from = From#media{rtpstate=SF1},
 			to = To#media{rtpstate=ST1}
 		}
