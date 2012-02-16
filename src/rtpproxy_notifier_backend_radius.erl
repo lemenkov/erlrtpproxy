@@ -50,7 +50,11 @@ handle_cast({interim_update, CallId, MediaId}, State) ->
 	error_logger:info_msg("Got interim update from ~s ~p at ~p~n", [CallId, MediaId, node()]),
 	case ets:lookup(?MODULE, {callid, CallId, mediaid, MediaId}) of
 		[{{callid,CallId,mediaid,MediaId},{req,Req0}}] ->
-			eradius_acc:acc_update(Req0);
+			Login = to_now(Req0#rad_accreq.login_time),
+			SessTime = calendar:datetime_to_gregorian_seconds(
+				calendar:now_to_local_time(erlang:now())) -
+			        calendar:datetime_to_gregorian_seconds(calendar:now_to_local_time(Login)),
+			eradius_acc:acc_update(Req0#rad_accreq{session_time = SessTime});
 		_ ->
 			% Bogus - discard
 			ok
@@ -97,3 +101,8 @@ date_time_fmt() ->
 	% DayNumber = calendar:day_of_the_week({YYYY,MM,DD}),
 	% lists:flatten(io_lib:format("~s ~3s ~2.2.0w ~2.2.0w:~2.2.0w:~2.2.0w ~4.4.0w",[httpd_util:day(DayNumber),httpd_util:month(MM),DD,Hour,Min,Sec,YYYY])).
 	lists:flatten(io_lib:format("~4.4.0w-~2.2.0w-~2.2.0w ~2.2.0w:~2.2.0w:~2.2.0w", [YYYY, MM, DD, Hour,Min,Sec])).
+
+to_now(Now = {MSec, Sec, USec}) when is_integer(MSec), is_integer(Sec), is_integer(USec) ->
+	Now;
+to_now(Now) when is_integer(Now) ->
+	{Now div 1000000, Now rem 1000000, 0}.
