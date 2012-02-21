@@ -21,7 +21,7 @@ compile:
 
 install: all
 ifeq ($(UNAME), Darwin)
-	@test -d $(ERLDIR) || mkdir -p $(ERLDIR)/$(EBIN_DIR)
+	@test -d $(DESTDIR)$(ERLDIR) || mkdir -p $(DESTDIR)$(ERLDIR)/$(EBIN_DIR)
 	@install -p -m 0644 $(APP_FILE) $(DESTDIR)$(ERLDIR)/$(APP_FILE)
 	@install -p -m 0644 $(ERL_OBJECTS) $(DESTDIR)$(ERLDIR)/$(EBIN_DIR)
 	@install -p -m 0644 priv/erlrtpproxy.config $(DESTDIR)/etc/erl$(NAME).config
