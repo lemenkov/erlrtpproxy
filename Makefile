@@ -24,12 +24,12 @@ ifeq ($(UNAME), Darwin)
 	@test -d $(DESTDIR)$(ERLDIR) || mkdir -p $(DESTDIR)$(ERLDIR)/$(EBIN_DIR)
 	@install -p -m 0644 $(APP_FILE) $(DESTDIR)$(ERLDIR)/$(APP_FILE)
 	@install -p -m 0644 $(ERL_OBJECTS) $(DESTDIR)$(ERLDIR)/$(EBIN_DIR)
-	@install -p -m 0644 priv/erlrtpproxy.config $(DESTDIR)/etc/erl$(NAME).config
+	@install -p -m 0644 priv/erlrtpproxy.config $(DESTDIR)${prefix}/etc/erl$(NAME).config
 #	@install -p -m 0755 priv/erlrtpproxy.init $(DESTDIR)/etc/rc.d/init.d/erl$(NAME)
-	@install -p -m 0644 priv/erlrtpproxy.sysconfig $(DESTDIR)/etc/erl$(NAME)
-	@install -d $(DESTDIR)/var/lib/erl$(NAME)
-	@install -p -m 0644 priv/erlang.cookie $(DESTDIR)/var/lib/erl$(NAME)/.erlang.cookie
-	@install -p -m 0644 priv/hosts.erlang $(DESTDIR)/var/lib/erl$(NAME)/.hosts.erlang
+	@install -p -m 0644 priv/erlrtpproxy.sysconfig $(DESTDIR)${prefix}/etc/erl$(NAME)
+	@install -d $(DESTDIR)${prefix}/var/lib/erl$(NAME)
+	@install -p -m 0644 priv/erlang.cookie $(DESTDIR)${prefix}/var/lib/erl$(NAME)/.erlang.cookie
+	@install -p -m 0644 priv/hosts.erlang $(DESTDIR)${prefix}/var/lib/erl$(NAME)/.hosts.erlang
 	@echo "erl$(NAME) installed. \n"
 else
 	install -D -p -m 0644 $(APP_FILE) $(DESTDIR)$(ERLDIR)/$(APP_FILE)
