@@ -286,7 +286,8 @@ handle_cast({started, Pid, {I0, P0}, {I1, P1}}, #state{from = From, to = #media{
 	try_notify_parent(Cmd, From, To#media{ip = I0, port = P0}),
 	{noreply, State#state{to = To#media{ip = I0, port = P0}}};
 
-handle_cast(_Other, State) ->
+handle_cast(Other, State) ->
+	?ERR("Unmatched cast [~p]", [Other]),
 	{noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->
