@@ -10,8 +10,8 @@ ERLDIR=$(ERLANG_ROOT)/lib/$(NAME)-$(VSN)
 
 EBIN_DIR := ebin
 ERL_SOURCES  := $(wildcard src/*.erl)
-ERL_OBJECTS  := $(ERL_SOURCES:src/%.erl=$(EBIN_DIR)/%.beam)
-APP_FILE := $(EBIN_DIR)/$(NAME).app
+ERL_OBJECTS  := $(ERL_SOURCES:src/%.erl=ebin/%.beam)
+APP_FILE := ebin/$(NAME).app
 
 all: compile
 
@@ -19,9 +19,11 @@ compile:
 	VSN=$(VSN) BUILD_DATE=$(BUILD_DATE) $(REBAR) compile $(REBAR_FLAGS)
 
 install: all
-	install -D -p -m 0644 $(APP_FILE) $(DESTDIR)$(ERLDIR)/$(APP_FILE)
-	install -p -m 0644 $(ERL_OBJECTS) $(DESTDIR)$(ERLDIR)/$(EBIN_DIR)
-	install -D -p -m 0644 priv/erl$(NAME).config $(DESTDIR)/etc/erl$(NAME).config
+	test -d $(DESTDIR)$(ERLDIR)/ebin || mkdir -p $(DESTDIR)$(ERLDIR)/ebin
+	test -d $(DESTDIR)$(prefix)/etc || mkdir -p $(DESTDIR)$(prefix)/etc
+	install -p -m 0644 $(APP_FILE) $(DESTDIR)$(ERLDIR)/ebin
+	install -p -m 0644 $(ERL_OBJECTS) $(DESTDIR)$(ERLDIR)/ebin
+	install -p -m 0644 priv/erl$(NAME).config $(DESTDIR)/etc
 
 test:
 	$(REBAR) eunit $(REBAR_FLAGS)
