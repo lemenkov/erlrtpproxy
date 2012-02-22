@@ -9,10 +9,9 @@ UNAME := $(shell uname -s)
 ERLANG_ROOT := $(shell erl -eval 'io:format("~s", [code:root_dir()])' -s init stop -noshell)
 ERLDIR=$(ERLANG_ROOT)/lib/$(NAME)-$(VSN)
 
-EBIN_DIR := ebin
 ERL_SOURCES  := $(wildcard src/*.erl)
-ERL_OBJECTS  := $(ERL_SOURCES:src/%.erl=$(EBIN_DIR)/%.beam)
-APP_FILE := $(EBIN_DIR)/$(NAME).app
+ERL_OBJECTS  := $(ERL_SOURCES:src/%.erl=ebin/%.beam)
+APP_FILE := ebin/$(NAME).app
 
 all: compile
 
@@ -20,28 +19,23 @@ compile:
 	@VSN=$(VSN) BUILD_DATE=$(BUILD_DATE) $(REBAR) compile $(REBAR_FLAGS)
 
 install: all
-ifeq ($(UNAME), Darwin)
-	@test -d $(DESTDIR)$(ERLDIR) || mkdir -p $(DESTDIR)$(ERLDIR)/$(EBIN_DIR)
-	# FIXME remove in the future releases
-	@export
-	@install -p -m 0644 $(APP_FILE) $(DESTDIR)$(ERLDIR)/$(APP_FILE)
-	@install -p -m 0644 $(ERL_OBJECTS) $(DESTDIR)$(ERLDIR)/$(EBIN_DIR)
+	@test -d $(DESTDIR)$(ERLDIR)/ebin || mkdir -p $(DESTDIR)$(ERLDIR)/ebin
+	@test -d $(DESTDIR)$(prefix)/etc || mkdir -p $(DESTDIR)$(prefix)/etc
+	@test -d $(DESTDIR)$(prefix)/var/lib/erl$(NAME) || mkdir -p $(DESTDIR)$(prefix)/var/lib/erl$(NAME)
+
+	@install -p -m 0644 $(APP_FILE) $(DESTDIR)$(ERLDIR)/ebin
+	@install -p -m 0644 $(ERL_OBJECTS) $(DESTDIR)$(ERLDIR)/ebin
 	@install -p -m 0644 priv/erlrtpproxy.config $(DESTDIR)$(prefix)/etc/erl$(NAME).config
-#	@install -p -m 0755 priv/erlrtpproxy.init $(DESTDIR)/etc/rc.d/init.d/erl$(NAME)
-	@install -p -m 0644 priv/erlrtpproxy.sysconfig $(DESTDIR)$(prefix)/etc/erl$(NAME)
-	@install -d $(DESTDIR)$(prefix)/var/lib/erl$(NAME)
 	@install -p -m 0644 priv/erlang.cookie $(DESTDIR)$(prefix)/var/lib/erl$(NAME)/.erlang.cookie
 	@install -p -m 0644 priv/hosts.erlang $(DESTDIR)$(prefix)/var/lib/erl$(NAME)/.hosts.erlang
+ifeq ($(UNAME), Darwin)
+	@install -p -m 0644 priv/erlrtpproxy.sysconfig $(DESTDIR)$(prefix)/etc/erl$(NAME)
 	@echo "erl$(NAME) installed. \n"
 else
-	install -D -p -m 0644 $(APP_FILE) $(DESTDIR)$(ERLDIR)/$(APP_FILE)
-	install -p -m 0644 $(ERL_OBJECTS) $(DESTDIR)$(ERLDIR)/$(EBIN_DIR)
-	install -D -p -m 0644 priv/erlrtpproxy.config $(DESTDIR)/etc/erl$(NAME).config
-	install -D -p -m 0755 priv/erlrtpproxy.init $(DESTDIR)/etc/rc.d/init.d/erl$(NAME)
-	install -D -p -m 0644 priv/erlrtpproxy.sysconfig $(DESTDIR)/etc/sysconfig/erl$(NAME)
-	install -d $(DESTDIR)/var/lib/erl$(NAME)
-	install -D -p -m 0644 priv/erlang.cookie $(DESTDIR)/var/lib/erl$(NAME)/.erlang.cookie
-	install -D -p -m 0644 priv/hosts.erlang $(DESTDIR)/var/lib/erl$(NAME)/.hosts.erlang
+	@test -d $(DESTDIR)$(prefix)/etc/rc.d/init.d || mkdir -p $(DESTDIR)$(prefix)/etc/rc.d/init.d
+	@test -d $(DESTDIR)$(prefix)/etc/sysconfig || mkdir -p $(DESTDIR)$(prefix)/etc/sysconfig
+	@install -p -m 0644 priv/erlrtpproxy.sysconfig $(DESTDIR)$(prefix)/etc/sysconfig/erl$(NAME)
+	@install -p -m 0755 priv/erlrtpproxy.init $(DESTDIR)$(prefix)/etc/rc.d/init.d/erl$(NAME)
 endif
 
 test:
