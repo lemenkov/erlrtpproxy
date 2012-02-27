@@ -82,18 +82,21 @@ run_proxy_test_() ->
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						?assertEqual(<<"6721_89367 1\n">>, Answer) end
 			},
+			% FIXME
 			{"Request support for session timeout notifications (ver. 20081224 - not supported by this proxy)",
 				fun () ->
 						gen_udp:send(Fd, {127,0,0,1}, 33333, <<"6721_89367 VF 20081224\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						?assertEqual(<<"6721_89367 0\n">>, Answer) end
 			},
+			% FIXME
 			{"Request support for automatic bridging (ver. 20090810 - not supported by this proxy)",
 				fun () ->
 						gen_udp:send(Fd, {127,0,0,1}, 33333, <<"6721_89367 VF 20090810\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						?assertEqual(<<"6721_89367 0\n">>, Answer) end
 			},
+			% FIXME should be E1
 			{"Request for unsupported extensions",
 				fun () ->
 						gen_udp:send(Fd, {127,0,0,1}, 33333, <<"6721_89367 VF 20111109\n">>),
