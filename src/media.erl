@@ -302,7 +302,8 @@ handle_info(ping, #state{from = #media{rtpstate = rtp}, to = #media{rtpstate = r
 	% Both sides are active, so we just set state to 'nortp' and continue
 	{noreply, State#state{from=(State#state.from)#media{rtpstate=nortp}, to=(State#state.to)#media{rtpstate=nortp}}};
 
-handle_info(ping, State) ->
+handle_info(ping, #state{callid = CallId, mediaid = MediaId} = State) ->
+	?ERR("RTP timeout at ~p ~p.", [CallId, MediaId]),
 	% We didn't get new RTP messages since last ping - we should close this mediastream
 	% we should rely on rtcp
 %	case (timer:now_diff(now(),(State#state.fromrtcp)#media.lastseen) > ?RTCP_TIME_TO_LIVE) and (timer:now_diff(now(),(State#state.tortcp)#media.lastseen) > ?RTCP_TIME_TO_LIVE) of
@@ -311,6 +312,8 @@ handle_info(ping, State) ->
 %		false ->
 %			{noreply, State}
 %	end
+	gen_server:cast(rtpproxy_notifier, {stop, CallId, MediaId}),
+	gen_server:cast({global, rtpproxy}, {'EXIT', self(), Reason}),
 	{stop, nortp, State};
 
 handle_info({'EXIT', Pid, Reason}, #state{callid = CallId, mediaid = MediaId, from = #media{pid = Pid}} = State) ->
