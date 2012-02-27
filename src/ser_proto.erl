@@ -208,14 +208,19 @@ parse_splitted([<<"VF">>, Version]) when
 parse_splitted([<<"VF">>, Unknown]) ->
 	throw({error_syntax, "Unknown version: " ++ binary_to_list(Unknown)});
 
-% Create session (no ToTag)
+% Create session (no ToTag, no Notify extension)
 parse_splitted([<<$U:8,Args/binary>>, CallId, ProbableIp, ProbablePort, FromTag]) ->
-	parse_splitted([<<$U:8,Args/binary>>, CallId, ProbableIp, ProbablePort, FromTag, null]);
-% Reinvite, Hold and Resume
-parse_splitted([<<$U:8,Args/binary>>, CallId, ProbableIp, ProbablePort, FromTag0, ToTag]) ->
+	parse_splitted([<<$U:8,Args/binary>>, CallId, ProbableIp, ProbablePort, FromTag, null, null, null]);
+% Reinvite, Hold and Resume (no Notify extension)
+parse_splitted([<<$U:8,Args/binary>>, CallId, ProbableIp, ProbablePort, FromTag, ToTag]) ->
+	parse_splitted([<<$U:8,Args/binary>>, CallId, ProbableIp, ProbablePort, FromTag, ToTag, null, null]);
+parse_splitted([<<$U:8,Args/binary>>, CallId, ProbableIp, ProbablePort, FromTag0, ToTag, NotifyAddr, NotifyTag]) ->
 	[FromTag, MediaId] = binary_split(FromTag0, $;),
 	{GuessIp, GuessPort} = parse_addr(binary_to_list(ProbableIp), binary_to_list(ProbablePort)),
-	Params0 = decode_params(Args),
+	Params0 = case {NotifyAddr, NotifyTag} of
+		{null, null} -> decode_params(Args);
+		_ -> decode_params(Args) ++ [{notify, [{addr, NotifyAddr}, {tag, NotifyTag}]}]
+	end,
 
 	% Discard address if it's not consistent with direction
 	Addr = case {proplists:get_value(direction, Params0), ser_utils:is_rfc1918(GuessIp)} of
