@@ -219,7 +219,7 @@ parse_splitted([<<$U:8,Args/binary>>, CallId, ProbableIp, ProbablePort, FromTag0
 	{GuessIp, GuessPort} = parse_addr(binary_to_list(ProbableIp), binary_to_list(ProbablePort)),
 	Params0 = case {NotifyAddr, NotifyTag} of
 		{null, null} -> decode_params(Args);
-		_ -> decode_params(Args) ++ [{notify, [{addr, NotifyAddr}, {tag, NotifyTag}]}]
+		_ -> decode_params(Args) ++ [{notify, [{addr, parse_notify_addr(NotifyAddr)}, {tag, NotifyTag}]}]
 	end,
 
 	% Discard address if it's not consistent with direction
@@ -449,6 +449,15 @@ parse_playcount(ProbablePlayCount) ->
 			throw({error_syntax, {"Wrong PlayCount", ProbablePlayCount}})
 	end.
 
+parse_notify_addr(NotifyAddr) ->
+	case binary_split(NotifyAddr, $:) of
+		[Port] ->
+			list_to_integer(binary_to_list(Port));
+		[IP, Port] ->
+			parse_addr(binary_to_list(IP), binary_to_list(Port));
+		List when is_list(List) -> % IPv6 probably FIXME
+			throw({error, ipv6notsupported})
+	end.
 
 decode_params(A) ->
 	decode_params(binary_to_list(A), []).

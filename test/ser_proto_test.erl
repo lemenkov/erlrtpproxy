@@ -655,7 +655,7 @@ parse_cmd_u_16_ipv6_source_test() ->
 			]
 		}, ser_proto:decode(<<"9440_4 UwEEt3Z30c9,96,97,0,8,98,3,100,5,6,15,101 e12050ca82cc434c444ae66fcb30a4c0@0:0:0:0:0:0:0:0 2001:500:88:200:0:0:0:10 5000 595f563;1">>)).
 
-parse_cmd_u_17_notify_test() ->
+parse_cmd_u_17_notify_port_test() ->
 	?assertEqual(
 		#cmd{
 			type = ?CMD_U,
@@ -680,12 +680,73 @@ parse_cmd_u_17_notify_test() ->
 					]
 				},
 				{direction, {external, external}},
-				{notify, [{addr, <<"4123">>}, {tag, <<"27124048">>}]},
+				{notify, [{addr, 4123}, {tag, <<"27124048">>}]},
 				{symmetric, true},
 				{transcode, {'G723',8000,1}}
 			]
 		}, ser_proto:decode(<<"438_41061 Ut4p1c8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.0.43.4 16432 6b0a8f6cfc543db1o1;1 595f563;1 4123 27124048">>)).
 
+parse_cmd_u_18_notify_ipv4_and_port_test() ->
+	?assertEqual(
+		#cmd{
+			type = ?CMD_U,
+			cookie = <<"438_41061">>,
+			origin = #origin{type = ser, pid = self()},
+			callid = <<"e12ea248-94a5e885@192.168.5.3">>,
+			mediaid = <<"1">>,
+			from = #party{tag = <<"6b0a8f6cfc543db1o1">>, addr = {{192,0,43,4}, 16432}, rtcpaddr = {{192,0,43,4}, 16433}, proto = tcp},
+			to = #party{tag = <<"595f563">>},
+			params = [
+				{codecs, [
+						{'PCMA',8000,1},
+						{'PCMU',8000,1},
+						2,
+						{'G723',8000,1},
+						{'G729',8000,1},
+						96,
+						97,
+						98,
+						100,
+						101
+					]
+				},
+				{direction, {external, external}},
+				{notify, [{addr, {{192,168,0,1},4123}}, {tag, <<"27124048">>}]},
+				{symmetric, true},
+				{transcode, {'G723',8000,1}}
+			]
+		}, ser_proto:decode(<<"438_41061 Ut4p1c8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.0.43.4 16432 6b0a8f6cfc543db1o1;1 595f563;1 192.168.0.1:4123 27124048">>)).
+
+%parse_cmd_u_19_notify_ipv6_and_port_test() ->
+%	?assertEqual(
+%		#cmd{
+%			type = ?CMD_U,
+%			cookie = <<"438_41061">>,
+%			origin = #origin{type = ser, pid = self()},
+%			callid = <<"e12ea248-94a5e885@192.168.5.3">>,
+%			mediaid = <<"1">>,
+%			from = #party{tag = <<"6b0a8f6cfc543db1o1">>, addr = {{192,0,43,4}, 16432}, rtcpaddr = {{192,0,43,4}, 16433}, proto = tcp},
+%			to = #party{tag = <<"595f563">>},
+%			params = [
+%				{codecs, [
+%						{'PCMA',8000,1},
+%						{'PCMU',8000,1},
+%						2,
+%						{'G723',8000,1},
+%						{'G729',8000,1},
+%						96,
+%						97,
+%						98,
+%						100,
+%						101
+%					]
+%				},
+%				{direction, {external, external}},
+%				{notify, [{addr, {{8193,1280,136,512,0,0,0,16},4123}}, {tag, <<"27124048">>}]},
+%				{symmetric, true},
+%				{transcode, {'G723',8000,1}}
+%			]
+%		}, ser_proto:decode(<<"438_41061 Ut4p1c8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.0.43.4 16432 6b0a8f6cfc543db1o1;1 595f563;1 2001:500:88:200:0:0:0:10:4123 27124048">>)).
 
 cmd_l_test_() ->
 	Cmd1 = #cmd{
