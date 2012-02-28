@@ -11,7 +11,7 @@ Summary:	RTP proxying daemon interface
 Group:		Applications/Internet
 License:	GPLv3+
 URL:		https://github.com/lemenkov/erlrtpproxy-ser
-# wget --no-check-certificate https://github.com/lemenkov/erlrtpproxy-ser/tarball/%VSN%
+# wget --content-disposition --no-check-certificate https://github.com/lemenkov/erlrtpproxy-ser/tarball/%VSN%
 Source0:	lemenkov-erlrtpproxy-%{realname}-%{version}-%{patchnumber}-g%{git_tag}.tar.gz
 BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
