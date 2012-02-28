@@ -3,7 +3,7 @@
 
 -export([init/1]).
 
-init(Args) ->
+init(_Args) ->
 	% Load listener
 	{ok, {Proto, IpStr, Port}} = application:get_env(ser, listen),
 	{ok, Ip} = inet_parse:address(IpStr),

@@ -172,7 +172,7 @@ encode(#cmd{cookie = Cookie, type = ?CMD_R, callid = CallId, from = #party{tag =
 encode(#cmd{cookie = Cookie, type = ?CMD_Q, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag}, to = #party{tag = ToTag}}) ->
 	<<Cookie/binary, <<" Q ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<" ">>/binary, ToTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
 
-encode(#cmd{cookie = Cookie, type = ?CMD_X, params = Version}) ->
+encode(#cmd{cookie = Cookie, type = ?CMD_X}) ->
 	<<Cookie/binary, <<" X\n">>/binary>>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_I}) ->
