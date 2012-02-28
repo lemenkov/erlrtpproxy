@@ -78,12 +78,11 @@ handle_call(Other, _From, State) ->
 	error_logger:warning_msg("TCP listener: strange call: ~p~n", [Other]),
 	{noreply, State}.
 
-handle_cast(#response{origin = #origin{type = ser, ip = Ip, port = Port}} = Response, State = #state{clients=Clients}) ->
-	Data = ser_proto:encode(Response),
+handle_cast({msg, Msg, Ip, Port}, State = #state{clients=Clients}) ->
 	% Select proper client
 	case get_socket(Clients, Ip, Port) of
 		error -> ok;
-		Fd -> gen_tcp:send(Fd, Data)
+		Fd -> gen_tcp:send(Fd, Msg)
 	end,
 	{noreply, State};
 
@@ -97,36 +96,7 @@ handle_cast(Other, State) ->
 handle_info({tcp, Client, Msg}, State) ->
 	inet:setopts(Client, [{active, once}, {packet, raw}, binary]),
 	{ok, {Ip, Port}} = inet:peername(Client),
-	try ser_proto:decode(Msg) of
-		#cmd{cookie = Cookie, origin = Origin, type = ?CMD_V} ->
-			% Request basic supported rtpproxy protocol version
-			% see available versions here:
-			% http://sippy.git.sourceforge.net/git/gitweb.cgi?p=sippy/rtpproxy;a=blob;f=rtpp_command.c#l58
-			% We provide only basic functionality, currently.
-			error_logger:info_msg("SER cmd V~n"),
-			Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = {version, <<"20040107">>}}),
-			gen_udp:send(Client, Data);
-		#cmd{cookie = Cookie, origin = Origin, type = ?CMD_VF, params=Version} ->
-			% Request additional rtpproxy protocol extensions
-			error_logger:info_msg("SER cmd VF: ~s~n", [Version]),
-			Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = supported}),
-			gen_udp:send(Client, Data);
-		#cmd{origin = Origin, type = ?CMD_L} = Cmd ->
-			error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
-			gen_server:cast(rtpproxy, Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port, pid = self()}, type = ?CMD_U});
-		#cmd{origin = Origin} = Cmd ->
-			error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
-			gen_server:cast(rtpproxy, Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port, pid = self()}})
-	catch
-		throw:{error_syntax, Error} ->
-			error_logger:error_msg("Bad syntax. [~s -> ~s]~n", [Msg, Error]),
-			Data = ser_proto:encode({error, syntax, Msg}),
-			gen_tcp:send(Client, Data);
-		E:C ->
-			error_logger:error_msg("Exception. [~s -> ~p:~p]~n", [Msg, E, C]),
-			Data = ser_proto:encode({error, syntax, Msg}),
-			gen_tcp:send(Client, Data)
-	end,
+	gen_server:cast(backend, {msg, Msg, Ip, Port}),
 	{noreply, State};
 
 handle_info({tcp_closed, Client}, State = #state{clients=Clients}) ->

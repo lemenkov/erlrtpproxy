@@ -21,7 +21,7 @@
 %% THE SOFTWARE.
 %%
 
--module(erlang_backend).
+-module(backend).
 -author('lemenkov@gmail.com').
 
 -behaviour(gen_server).
@@ -57,38 +57,61 @@ handle_call(Other, _From, State) ->
 
 handle_cast(stop, State) ->
 	{stop, stop, State};
-% Got two addresses (initial Media stream creation)
-handle_cast({reply, Cmd, {Addr1, Addr2}}, State) ->
-	gen_server:cast(listener, #response{cookie = Cmd#cmd.cookie, origin = Cmd#cmd.origin, type = reply, data = {Addr1, Addr2}}),
+
+handle_cast(#response{origin = #origin{type = ser, ip = Ip, port = Port}} = Response, State) ->
+	Data = ser_proto:encode(Response),
+	gen_server:cast(listener, {msg, Data, Ip, Port}),
 	{noreply, State};
-handle_cast({reply, Cmd, ok}, State) ->
-	gen_server:cast(listener, #response{cookie = Cmd#cmd.cookie, origin = Cmd#cmd.origin, type = reply, data = ok}),
+
+handle_cast({reply, Cmd = #cmd{origin = #origin{type = ser, ip = Ip, port = Port}}, {Addr1, Addr2}}, State) ->
+	error_logger:info_msg("SER reply ~p~n", [{Addr1, Addr2}]),
+	Data = ser_proto:encode(#response{cookie = Cmd#cmd.cookie, origin = Cmd#cmd.origin, type = reply, data = {Addr1, Addr2}}),
+	gen_server:cast(listener, {msg, Data, Ip, Port}),
 	{noreply, State};
-handle_cast(#cmd{cookie = Cookie, origin = Origin, type = ?CMD_V} = Cmd, State) ->
-	% Request basic supported rtpproxy protocol version
-	% see available versions here:
-	% http://sippy.git.sourceforge.net/git/gitweb.cgi?p=sippy/rtpproxy;a=blob;f=rtpp_command.c#l58
-	% We provide only basic functionality, currently.
-	error_logger:info_msg("SER cmd V~n"),
-	gen_server:cast(listener, #response{cookie = Cookie, origin = Origin, type = reply, data = {version, <<"20040107">>}}),
+
+handle_cast({reply, Cmd = #cmd{origin = #origin{type = ser, ip = Ip, port = Port}}, ok}, State) ->
+	error_logger:info_msg("SER reply ok~n"),
+	Data = ser_proto:encode(#response{cookie = Cmd#cmd.cookie, origin = Cmd#cmd.origin, type = reply, data = ok}),
+	gen_server:cast(listener, {msg, Data, Ip, Port}),
 	{noreply, State};
-handle_cast(#cmd{cookie = Cookie, origin = Origin, type = ?CMD_VF, params=Version} = Cmd, State) ->
-	% Request additional rtpproxy protocol extensions
-	error_logger:info_msg("SER cmd VF: ~s~n", [Version]),
-	gen_server:cast(listener, #response{cookie = Cookie, origin = Origin, type = reply, data = supported}),
+
+handle_cast({msg, Msg, Ip, Port}, #state{mode = offline} = State) ->
+	error_logger:info_msg("SER cmd (OFFLINE): ~p~n", [Msg]),
+	Data = ser_proto:encode({error, software, Msg}),
+	gen_server:cast(listener, {msg, Data, Ip, Port}),
 	{noreply, State};
-% Fix for CMD_L
-handle_cast(#cmd{origin = Origin, type = ?CMD_L} = Cmd, #state{mode = online} = State) ->
-	error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
-	gen_server:cast({global, rtpproxy}, Cmd#cmd{origin = Origin#origin{pid = self()}, type = ?CMD_U}),
-	{noreply, State};
-handle_cast(#cmd{origin = Origin} = Cmd, #state{mode = online} = State) ->
-	error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
-	gen_server:cast({global, rtpproxy}, Cmd#cmd{origin = Origin#origin{pid = self()}}),
-	{noreply, State};
-handle_cast(#cmd{cookie = Cookie, origin = Origin} = Cmd, #state{mode = offline} = State) ->
-	error_logger:info_msg("SER cmd (OFFLINE): ~p~n", [Cmd]),
-	gen_server:cast(listener, #response{cookie = Cookie, origin = Origin, type = error, data = software}),
+
+handle_cast({msg, Msg, Ip, Port}, State) ->
+	try ser_proto:decode(Msg) of
+		#cmd{cookie = Cookie, origin = Origin, type = ?CMD_V} ->
+			% Request basic supported rtpproxy protocol version
+			% see available versions here:
+			% http://sippy.git.sourceforge.net/git/gitweb.cgi?p=sippy/rtpproxy;a=blob;f=rtpp_command.c#l58
+			% We provide only basic functionality, currently.
+			error_logger:info_msg("SER cmd V~n"),
+			Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = {version, <<"20040107">>}}),
+			gen_server:cast(listener, {msg, Data, Ip, Port});
+		#cmd{cookie = Cookie, origin = Origin, type = ?CMD_VF, params=Version} ->
+			% Request additional rtpproxy protocol extensions
+			error_logger:info_msg("SER cmd VF: ~s~n", [Version]),
+			Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = supported}),
+			gen_server:cast(listener, {msg, Data, Ip, Port});
+		#cmd{origin = Origin, type = ?CMD_L} = Cmd ->
+			error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
+			gen_server:cast({global, rtpproxy}, Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, type = ?CMD_U});
+		#cmd{origin = Origin} = Cmd ->
+			error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
+			gen_server:cast({global, rtpproxy}, Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}})
+	catch
+		throw:{error_syntax, Error} ->
+			error_logger:error_msg("Bad syntax. [~s -> ~s]~n", [Msg, Error]),
+			Data = ser_proto:encode({error, syntax, Msg}),
+			gen_server:cast(listener, {msg, Data, Ip, Port});
+		E:C ->
+			error_logger:error_msg("Exception. [~s -> ~p:~p]~n", [Msg, E, C]),
+			Data = ser_proto:encode({error, syntax, Msg}),
+			gen_server:cast(listener, {msg, Data, Ip, Port})
+	end,
 	{noreply, State};
 
 handle_cast(Other, State) ->

@@ -15,13 +15,8 @@ init(Args) ->
 	end,
 
 	% Load backend
-	{ok, {Type, Addr}} = application:get_env(ser, backend),
-	BackendProcess = case Type of
-		erlang ->
-			{erlang_backend, {erlang_backend, start_link, [Addr]}, permanent, 10000, worker, []};
-		proxy ->
-			{proxy_backend, {proxy_backend, start_link, [Addr]}, permanent, 10000, worker, []}
-	end,
+	{ok, Addr} = application:get_env(ser, backend),
+	BackendProcess = {backend, {backend, start_link, [Addr]}, permanent, 10000, worker, []},
 
 	{ok,{{one_for_one,10,1}, [ListenerProcess, BackendProcess]}}.
 
