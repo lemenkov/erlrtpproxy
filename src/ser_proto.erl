@@ -61,6 +61,9 @@ decode(Msg) when is_list(Msg) ->
 encode({error, syntax, Msg}) when is_binary(Msg) ->
 	[Cookie|_] = binary_split(Msg, $ ),
 	<<Cookie/binary, <<" E1\n">>/binary>>;
+encode({error, software, Msg}) when is_binary(Msg) ->
+	[Cookie|_] = binary_split(Msg, $ ),
+	<<Cookie/binary, <<" E7\n">>/binary>>;
 encode(#response{cookie = Cookie, type = reply, data = ok}) ->
 	<<Cookie/binary, <<" 0\n">>/binary>>;
 encode(#response{cookie = Cookie, type = reply, data = supported}) ->
