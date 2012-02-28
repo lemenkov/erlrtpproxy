@@ -429,16 +429,16 @@ parse_addr(ProbableIp, ProbablePort) ->
 				GuessPort when GuessPort >= 0, GuessPort < 65536 ->
 					{GuessIp, GuessPort};
 				_ ->
-					throw({error_syntax, "Wrong port"})
+					throw({error_syntax, {"Wrong port", ProbablePort}})
 			catch
 				_:_ ->
-					throw ({error_syntax, "Wrong port"})
+					throw({error_syntax, {"Wrong port", ProbablePort}})
 			end;
 		_ ->
-			throw({error_syntax, "Wrong IP"})
+			throw({error_syntax, {"Wrong IP", ProbableIp}})
 	catch
 		_:_ ->
-			throw({error_syntax, "Wrong IP"})
+			throw({error_syntax, {"Wrong IP", ProbableIp}})
 	end.
 
 parse_playcount(ProbablePlayCount) ->
@@ -446,7 +446,7 @@ parse_playcount(ProbablePlayCount) ->
 	try [{playcount, list_to_integer (binary_to_list(ProbablePlayCount))}]
 	catch
 		_:_ ->
-			throw({error_syntax, "Wrong PlayCount"})
+			throw({error_syntax, {"Wrong PlayCount", ProbablePlayCount}})
 	end.
 
 

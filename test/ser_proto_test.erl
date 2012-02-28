@@ -547,12 +547,12 @@ parse_cmd_u_10_acc_stop_test() ->
 
 parse_cmd_u_11_wrong_ipv4_test() ->
 	?assertThrow(
-		{error_syntax, "Wrong IP"},
+		{error_syntax, {"Wrong IP","892.168.0.100"}},
 		ser_proto:decode(<<"24393_4 Uc0,8,18,101 0003e30c-c50c00f7-123e8bd9-542f2edf@192.168.0.100 892.168.0.100 27686 0003e30cc50cd69210b8c36b-0ecf0120;1">>)).
 
 parse_cmd_u_12_wrong_port_test() ->
 	?assertThrow(
-		{error_syntax, "Wrong port"},
+		{error_syntax, {"Wrong port", "627686"}},
 		ser_proto:decode(<<"24393_4 Uc0,8,18,101 0003e30c-c50c00f7-123e8bd9-542f2edf@192.168.0.100 192.168.0.100 627686 0003e30cc50cd69210b8c36b-0ecf0120;1">>)).
 
 % MediaID is just an arbitrary tag within session so it depends on backend how to process it
@@ -876,7 +876,7 @@ cmd_p_test_() ->
 		},
 		{"Wrong PlayCount",
 			fun() -> ?assertThrow(
-						{error_syntax, "Wrong PlayCount"},
+						{error_syntax, {"Wrong PlayCount", <<"HELLO">>}},
 						ser_proto:decode(<<"1389_5 Phello 0003e30c-c50c016d-46bbcf2e-6369eecf@192.168.0.100 /var/tmp/rtpproxy_test/media/01.wav session 0003e30cc50ccc5416857d59-357336dc;1 28d49e51a95d5a31d09b31ccc63c5f4b;1\n">>))
 			end
 		}
