@@ -1016,13 +1016,31 @@ cmd_q_test_() ->
 			fun() -> ?assertEqual(CmdBin, ser_proto:encode(Cmd)) end
 		}
 	].
-cmd_i_test_() ->
+cmd_i_1_test_() ->
 	Cmd = #cmd{
 			type = ?CMD_I,
 			cookie = <<"24390_0">>,
-			origin = #origin{type = ser, pid = self()}
+			origin = #origin{type = ser, pid = self()},
+			params = []
 		},
 	CmdBin = <<"24390_0 I\n">>,
+	[
+		{"decoding from binary",
+			fun() -> ?assertEqual(Cmd, ser_proto:decode(CmdBin)) end
+		},
+		{"encoding to binary",
+			fun() -> ?assertEqual(CmdBin, ser_proto:encode(Cmd)) end
+		}
+	].
+
+cmd_i_2_brief_test_() ->
+	Cmd = #cmd{
+			type = ?CMD_I,
+			cookie = <<"24390_0">>,
+			origin = #origin{type = ser, pid = self()},
+			params = [brief]
+		},
+	CmdBin = <<"24390_0 IB\n">>,
 	[
 		{"decoding from binary",
 			fun() -> ?assertEqual(Cmd, ser_proto:decode(CmdBin)) end

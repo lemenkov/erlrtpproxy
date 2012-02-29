@@ -175,8 +175,10 @@ encode(#cmd{cookie = Cookie, type = ?CMD_Q, callid = CallId, mediaid = MediaId, 
 encode(#cmd{cookie = Cookie, type = ?CMD_X}) ->
 	<<Cookie/binary, <<" X\n">>/binary>>;
 
-encode(#cmd{cookie = Cookie, type = ?CMD_I}) ->
+encode(#cmd{cookie = Cookie, type = ?CMD_I, params = []}) ->
 	<<Cookie/binary, <<" I\n">>/binary>>;
+encode(#cmd{cookie = Cookie, type = ?CMD_I, params = [brief]}) ->
+	<<Cookie/binary, <<" IB\n">>/binary>>;
 
 encode(#cmd{} = Unknown) ->
 	error_logger:error_msg("Unknown command: ~p~n", [Unknown]),
@@ -363,7 +365,13 @@ parse_splitted([<<"X">>]) ->
 % Get overall statistics
 parse_splitted([<<"I">>]) ->
 	#cmd{
-		type=?CMD_I
+		type=?CMD_I,
+		params=[]
+	};
+parse_splitted([<<"IB">>]) ->
+	#cmd{
+		type=?CMD_I,
+		params=[brief]
 	};
 
 %%
