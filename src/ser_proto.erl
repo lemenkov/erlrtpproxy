@@ -409,7 +409,7 @@ parse_splitted([P, I]) ->
 	{Ip, Port} = parse_addr(binary_to_list(I), binary_to_list(P)),
 	#response{type = reply, data = {{Ip, Port}, {Ip, Port+1}}};
 
-% Special case - stats
+% FIXME Special case - stats
 parse_splitted(["SESSIONS", "created:" | Rest]) ->
 	#response{type = stats};
 
