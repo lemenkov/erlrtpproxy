@@ -25,7 +25,7 @@
 
 -include("common.hrl").
 
--define(SAFE_PARTY(Val0), case Val0 of null -> null; _ -> [Val, _] = binary_split(Val0, $;), #party{tag = Val} end).
+-define(SAFE_PARTY(Val0), case Val0 of null -> null; _ -> [Val, _] = ensure_mediaid(binary_split(Val0, $;)), #party{tag = Val} end).
 
 decode(Msg) when is_binary(Msg) ->
 	% Cut last \n if it is exist and
@@ -218,7 +218,7 @@ parse_splitted([<<$U:8,Args/binary>>, CallId, ProbableIp, ProbablePort, FromTag]
 parse_splitted([<<$U:8,Args/binary>>, CallId, ProbableIp, ProbablePort, FromTag, ToTag]) ->
 	parse_splitted([<<$U:8,Args/binary>>, CallId, ProbableIp, ProbablePort, FromTag, ToTag, null, null]);
 parse_splitted([<<$U:8,Args/binary>>, CallId, ProbableIp, ProbablePort, FromTag0, ToTag, NotifyAddr, NotifyTag]) ->
-	[FromTag, MediaId] = binary_split(FromTag0, $;),
+	[FromTag, MediaId] = ensure_mediaid(binary_split(FromTag0, $;)),
 	{GuessIp, GuessPort} = parse_addr(binary_to_list(ProbableIp), binary_to_list(ProbablePort)),
 	Params0 = case {NotifyAddr, NotifyTag} of
 		{null, null} -> decode_params(Args);
@@ -274,7 +274,7 @@ parse_splitted([<<"D">>, CallId, FromTag, ToTag]) ->
 
 % Playback pre-recorded audio (Music-on-hold and resume, no ToTag)
 parse_splitted([<<$P:8,Args/binary>>, CallId, PlayName, Codecs, FromTag0]) ->
-	[FromTag, MediaId] = binary_split(FromTag0, $;),
+	[FromTag, MediaId] = ensure_mediaid(binary_split(FromTag0, $;)),
 	#cmd{
 		type=?CMD_P,
 		callid=CallId,
@@ -284,7 +284,7 @@ parse_splitted([<<$P:8,Args/binary>>, CallId, PlayName, Codecs, FromTag0]) ->
 	};
 % Playback pre-recorded audio (Music-on-hold and resume)
 parse_splitted([<<$P:8,Args/binary>>, CallId, PlayName, Codecs, FromTag0, ToTag]) ->
-	[FromTag, MediaId] = binary_split(FromTag0, $;),
+	[FromTag, MediaId] = ensure_mediaid(binary_split(FromTag0, $;)),
 	#cmd{
 		type=?CMD_P,
 		callid=CallId,
@@ -295,7 +295,7 @@ parse_splitted([<<$P:8,Args/binary>>, CallId, PlayName, Codecs, FromTag0, ToTag]
 	};
 % Playback pre-recorded audio (Music-on-hold and resume)
 parse_splitted([<<$P:8,Args/binary>>, CallId, PlayName, Codecs, FromTag0, ToTag, ProbableIp, ProbablePort]) ->
-	[FromTag, MediaId] = binary_split(FromTag0, $;),
+	[FromTag, MediaId] = ensure_mediaid(binary_split(FromTag0, $;)),
 	{GuessIp, GuessPort} = parse_addr(binary_to_list(ProbableIp), binary_to_list(ProbablePort)),
 	#cmd{
 		type=?CMD_P,
@@ -311,7 +311,7 @@ parse_splitted([<<"S">>, CallId, FromTag]) ->
 	parse_splitted([<<"S">>, CallId, FromTag, null]);
 % Stop playback or record
 parse_splitted([<<"S">>, CallId, FromTag0, ToTag]) ->
-	[FromTag, MediaId] = binary_split(FromTag0, $;),
+	[FromTag, MediaId] = ensure_mediaid(binary_split(FromTag0, $;)),
 	#cmd{
 		type=?CMD_S,
 		callid=CallId,
@@ -332,7 +332,7 @@ parse_splitted([<<"R">>, CallId, FromTag, ToTag]) ->
 	Cmd#cmd{type = ?CMD_R};
 % Copy session (same as record, which is now obsolete)
 parse_splitted([<<"C">>, CallId, RecordName, FromTag0, ToTag]) ->
-	[FromTag, MediaId] = binary_split(FromTag0, $;),
+	[FromTag, MediaId] = ensure_mediaid(binary_split(FromTag0, $;)),
 	#cmd{
 		type=?CMD_C,
 		callid=CallId,
@@ -344,7 +344,7 @@ parse_splitted([<<"C">>, CallId, RecordName, FromTag0, ToTag]) ->
 
 % Query information about one particular session
 parse_splitted([<<"Q">>, CallId, FromTag0, ToTag0]) ->
-	[FromTag, MediaId] = binary_split(FromTag0, $;),
+	[FromTag, MediaId] = ensure_mediaid(binary_split(FromTag0, $;)),
 	[ToTag, _] = binary_split(ToTag0, $;),
 	#cmd{
 		type=?CMD_Q,
@@ -652,6 +652,9 @@ ensure_alone(Proplist, Param) ->
 	proplists:delete(Param, Proplist) ++ [Param].
 ensure_alone(Proplist, Param, Value) ->
 	proplists:delete(Param, Proplist) ++ [{Param, Value}].
+
+ensure_mediaid([Tag, MediaId]) -> [Tag, MediaId];
+ensure_mediaid([Tag]) -> [Tag, <<"0">>].
 
 % FIXME use more atoms instead of numbers where possible
 % grep "a=rtpmap:" /var/log/messages | sed -e 's,.*a=rtpmap:,,g' | sort | uniq | sort -n

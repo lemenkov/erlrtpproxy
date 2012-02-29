@@ -748,6 +748,23 @@ parse_cmd_u_18_notify_ipv4_and_port_test() ->
 %			]
 %		}, ser_proto:decode(<<"438_41061 Ut4p1c8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.0.43.4 16432 6b0a8f6cfc543db1o1;1 595f563;1 2001:500:88:200:0:0:0:10:4123 27124048">>)).
 
+parse_cmd_u_20_no_mediaids_test() ->
+	?assertEqual(
+		#cmd{
+			type = ?CMD_U,
+			cookie = <<"c3c1de658b0d36443a646cefedf16434">>,
+			origin = #origin{type = ser, pid = self()},
+			callid = <<"smaalefzrxxfrqw@localhost.localdomain-0">>,
+			mediaid = <<"0">>,
+			from = #party{tag = <<"qooxb">>},
+			to = #party{tag = <<"aa436b4e2d3bb3185841946c849a7ca7">>},
+			params = [
+				{direction, {external, external}},
+				{notify, [{addr, 4123}, {tag, <<"28221712">>}]},
+				{symmetric, true}
+			]
+		}, ser_proto:decode(<<"c3c1de658b0d36443a646cefedf16434 U smaalefzrxxfrqw@localhost.localdomain-0 192.168.0.1 8000 qooxb aa436b4e2d3bb3185841946c849a7ca7 4123 28221712">>)).
+
 cmd_l_test_() ->
 	Cmd1 = #cmd{
 			type = ?CMD_L,
