@@ -747,7 +747,7 @@ binary_to_upper(Result, <<C:8, Rest/binary>>) ->
 binary_split(Binary, Val) when is_binary(Binary) ->
 	binary_split(<<>>, Binary, Val, []).
 
-binary_split(Head, <<>>, Val, Result) ->
+binary_split(Head, <<>>, _Val, Result) ->
 	lists:reverse([Head | Result]);
 binary_split(Head, <<Val:8, Rest/binary>>, Val, Result) ->
 	binary_split(<<>>, Rest, Val, [Head | Result]);
