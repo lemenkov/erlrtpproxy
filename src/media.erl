@@ -31,9 +31,6 @@
 
 -include("../include/common.hrl").
 
-% Milliseconds - 105 seconds
--define(RTP_TIME_TO_LIVE, 105000).
-
 %-include("rtcp.hrl").
 
 % description of media:
@@ -68,7 +65,8 @@ init (
 	) ->
 	process_flag(trap_exit, true),
 
-	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE, ping),
+	{ok, Ttl} = application:get_env(rtpproxy, ttl),
+	{ok, TRef} = timer:send_interval(Ttl, ping),
 
 	{FromDir, ToDir} = proplists:get_value(direction, Params),
 
