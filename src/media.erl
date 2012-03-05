@@ -313,7 +313,7 @@ handle_info(ping, #state{callid = CallId, mediaid = MediaId} = State) ->
 %			{noreply, State}
 %	end
 	gen_server:cast(rtpproxy_notifier, {stop, CallId, MediaId}),
-	gen_server:cast({global, rtpproxy}, {'EXIT', self(), Reason}),
+	gen_server:cast({global, rtpproxy}, {'EXIT', self(), nortp}),
 	{stop, nortp, State};
 
 handle_info({'EXIT', Pid, Reason}, #state{callid = CallId, mediaid = MediaId, from = #media{pid = Pid}} = State) ->
