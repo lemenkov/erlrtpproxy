@@ -279,7 +279,7 @@ handle_info({udp, Fd, _Ip, _Port, _Msg}, #state{fd = Fd, started = true, weak = 
 	?ERR("Disallow data from strange source", []),
 	{noreply, State};
 
-handle_info({udp, Fd, Ip, Port, Msg}, #state{parent = Parent, started = false, neighbour = Neighbour} = State) ->
+handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, parent = Parent, started = false, neighbour = Neighbour} = State) ->
 	inet:setopts(Fd, [{active, once}]),
 	try
 		{ok, Pkts} = rtp:decode(Msg),
