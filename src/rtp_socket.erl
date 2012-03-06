@@ -245,7 +245,7 @@ terminate(Reason, #state{fd = Fd0, rtcp = Fd1, transport = Transport, tref = TRe
 		end, Codecs),
 	ok.
 
-handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, ssrc = SSRC, started = true, weak = true, symmetric = Symmetric, neighbour = Neighbour} = State) ->
+handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, ssrc = SSRC, started = true, weak = true, neighbour = Neighbour} = State) ->
 	inet:setopts(Fd, [{active, once}]),
 	try
 		{ok, Pkts} = rtp:decode(Msg),
@@ -316,7 +316,7 @@ handle_info(interim_update, #state{alive = false} = State) ->
 
 %-ifdef(ENABLE_RTCP).
 
-handle_info({udp, Fd, Ip, Port, Msg}, #state{rtcp = Fd, parent = Parent, started1 = true, weak = true, symmetric = Symmetric} = State) ->
+handle_info({udp, Fd, Ip, Port, Msg}, #state{rtcp = Fd, parent = Parent, started1 = true, weak = true} = State) ->
 	inet:setopts(Fd, [{active, once}]),
 	try
 		{ok, Pkts} = rtcp:decode(Msg),
