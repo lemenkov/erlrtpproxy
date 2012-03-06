@@ -84,7 +84,7 @@ init (
 	end,
 
 	% FIXME use start (w/o linking)
-	{ok, PidF} = rtp_socket:start_link([self(), udp, [{direction, ToDir}]]),
+	{ok, PidF} = rtp_socket:start_link([self(), TProto, [{direction, ToDir}]]),
 	{ok, PidT} = rtp_socket:start_link([self(), TProto, proplists:delete(direction, Params) ++ [{direction, FromDir}] ++ FRtpParamsAddon ++ FRtcpParamsAddon]),
 
 	{ok,
