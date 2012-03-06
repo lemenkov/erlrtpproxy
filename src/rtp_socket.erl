@@ -383,6 +383,8 @@ transcode(Pkts, _, _) ->
 
 ensure_ssrc(SSRC, []) ->
 	true;
+ensure_ssrc(SSRC, #rtp{ssrc = SSRC}) ->
+	true;
 ensure_ssrc(SSRC, [#rtp{ssrc = SSRC}|Rest]) ->
 	ensure_ssrc(SSRC, Rest);
 ensure_ssrc(SSRC, _) ->
