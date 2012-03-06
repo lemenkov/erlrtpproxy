@@ -241,7 +241,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, ssrc = SSRC, parent = Pare
 	inet:setopts(Fd, [{active, once}]),
 	try
 		{ok, Pkts} = rtp:decode(Msg),
-		process_data(rtp, Pkts, Parent, Neighbour),
+		gen_server:cast(Neighbour, {rtp, Pkts}),
 		{noreply, State#state{ipt = Ip, portt = Port, lastseen = now(), alive = true}}
 	catch
 		_:_ -> rtp_utils:dump_packet(node(), self(), Msg),
@@ -252,7 +252,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, ssrc = SSRC, parent = Pare
 	inet:setopts(Fd, [{active, once}]),
 	try
 		{ok, Pkts} = rtp:decode(Msg),
-		process_data(rtp, Pkts, Parent, Neighbour),
+		gen_server:cast(Neighbour, {rtp, Pkts}),
 		{noreply, State#state{lastseen = now(), alive = true}}
 	catch
 		_:_ -> rtp_utils:dump_packet(node(), self(), Msg),
@@ -262,7 +262,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, ssrc = SSRC, parent = Pare
 	inet:setopts(Fd, [{active, once}]),
 	try
 		{ok, Pkts} = rtp:decode(Msg),
-		process_data(rtp, Pkts, Parent, Neighbour),
+		gen_server:cast(Neighbour, {rtp, Pkts}),
 		case ensure_ssrc(SSRC, Pkts) of
 			true ->
 				?WARN("RTP addr changed, but known SSRC found. Updating addr.", []),
@@ -285,7 +285,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, parent = Parent, started =
 	try
 		{ok, Pkts} = rtp:decode(Msg),
 		gen_server:cast(Parent, {start, self()}),
-		process_data(rtp, Pkts, Parent, Neighbour),
+		gen_server:cast(Neighbour, {rtp, Pkts}),
 
 		% Initial SSRC setup
 		% Note - it could change during call w/o warning so beware
@@ -359,11 +359,6 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{rtcp = Fd, parent = Parent, started
 %%
 %% Private functions
 %%
-
-process_data(rtp, Pkts, Parent, Neighbour) ->
-	gen_server:cast(Neighbour, {rtp, Pkts});
-process_data(rtcp, Pkts, Parent, Neighbour) ->
-	gen_server:cast(Parent, {rtcp, Pkts, self(), Neighbour}).
 
 transcode(#rtp{payload_type = OldPayloadType, payload = Payload} = Rtp, {PayloadType, Encoder}, Codecs) ->
 	Decoder = proplists:get_value(OldPayloadType, Codecs),
