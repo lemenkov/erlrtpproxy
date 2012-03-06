@@ -42,6 +42,7 @@
 
 -include("../include/common.hrl").
 -include_lib("rtplib/include/rtp.hrl").
+-include_lib("rtplib/include/rtcp.hrl").
 
 % Milliseconds
 -define(RTP_TIME_TO_LIVE, 150000).
@@ -59,7 +60,12 @@
 		portf,
 		ipt,
 		portt,
+		ipf1,
+		portf1,
+		ipt1,
+		portt1,
 		started,
+		started1,
 		lastseen,
 		alive,
 		weak,
@@ -119,11 +125,10 @@ init ([Parent, Transport, Params] = InVals) ->
 			end
 	end,
 
-	% Get probable IP and port
+	% Get probable IP and port for RTP
 	{Ip, Port} = proplists:get_value(rtp, Params, {null, null}),
-
-	{ok, RtcpPid} = rtcp_socket:start_link([self(), Fd1, udp, Params]),
-	gen_udp:controlling_process(Fd1, RtcpPid),
+	% Get probable IP and port for RTCP
+	{Ip1, Port1} = proplists:get_value(rtcp, Params, {null, null}),
 
 	{ok, {I0, P0}} = inet:sockname(Fd0),
 	{ok, {I1, P1}} = inet:sockname(Fd1),
@@ -133,13 +138,18 @@ init ([Parent, Transport, Params] = InVals) ->
 	{ok, #state{
 			parent = Parent,
 			fd = Fd0,
-			rtcp = RtcpPid,
+			rtcp = Fd1,
 			transport = Transport,
 			ipf = null,
 			portf = null,
 			ipt = Ip,
 			portt = Port,
+			ipf1 = null,
+			portf1 = null,
+			ipt1 = Ip,
+			portt1 = Port,
 			started = false,
+			started1 = false,
 			lastseen = null,
 			alive = false,
 			weak = Weak,
@@ -167,26 +177,24 @@ handle_cast({rtp, Pkts}, #state{fd = Fd, ipt = Ip, portt = Port, transcode = Tra
 	gen_udp:send(Fd, Ip, Port, Msg),
 	{noreply, State};
 
-handle_cast({rtcp, Pkts, RtcpPid}, #state{parent = Parent, rtcp = RtcpPid} = State) ->
+handle_cast({rtcp, Pkts}, #state{ipt1 = null, portt1 = null} = State) ->
+	{noreply, State};
+handle_cast({rtcp, Pkts}, #state{rtcp = Fd, ipt1 = Ip, portt1 = Port} = State) ->
 	% FIXME Do something with RTCP before sending it further
-	gen_server:cast(Parent, {rtcp, Pkts, self()}),
+	Msg = rtcp:encode(Pkts),
+	% FIXME use Transport
+	gen_udp:send(Fd, Ip, Port, Msg),
 	{noreply, State};
 
-handle_cast({rtcp, Pkts, Parent}, #state{parent = Parent, rtcp = RtcpPid} = State) ->
-	% FIXME Do something with RTCP before sending it further
-	gen_server:cast(RtcpPid, {rtcp, Pkts}),
-	{noreply, State};
-
-handle_cast({update, Params}, #state{rtcp = RtcpPid} = State) ->
-	% Also update RTCP socket
-	gen_server:cast(RtcpPid, {update, Params}),
-
+handle_cast({update, Params}, State) ->
 	Weak = proplists:get_value(weak, Params, false),
 	Symmetric = proplists:get_value(symmetric, Params, true),
 	Transcode = proplists:get_value(transcode, Params, null),
 
-	% Get probable IP and port
+	% Get probable IP and port for RTP
 	{Ip, Port} = proplists:get_value(rtp, Params, {null, null}),
+	% Get probable IP and port for RTCP
+	{Ip1, Port1} = proplists:get_value(rtcp, Params, {null, null}),
 
 	case State#state.started of
 		true ->
@@ -199,6 +207,8 @@ handle_cast({update, Params}, #state{rtcp = RtcpPid} = State) ->
 			{noreply, State#state{
 					ipt = Ip,
 					portt = Port,
+					ipt1 = Ip1,
+					portt1 = Port1,
 					weak = Weak,
 					symmetric = Symmetric
 				}
@@ -211,14 +221,16 @@ handle_cast({neighbour, Pid}, State) when is_pid(Pid) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, #state{parent = Parent, fd = Fd, transport = Transport, tref = TRef, codecs = Codecs}) ->
+terminate(Reason, #state{parent = Parent, fd = Fd0, rtcp = Fd1, transport = Transport, tref = TRef, codecs = Codecs}) ->
 	timer:cancel(TRef),
 	Type = case Transport of
 		udp -> gen_udp;
 		tcp -> gen_tcp;
 		sctp -> gen_sctp
 	end,
-	Type:close(Fd),
+	Type:close(Fd0),
+	% We must send RTCP bye here
+	Type:close(Fd1),
 	lists:foreach(fun
 			({_, passthrough}) -> ok;
 			({_, Codec}) -> codec:close(Codec)
@@ -293,9 +305,55 @@ handle_info(interim_update, #state{parent = Parent, alive = true} = State) ->
 handle_info(interim_update, #state{alive = false} = State) ->
 	{stop, timeout, State};
 
-handle_info({'EXIT', Pid, Reason}, #state{rtcp = Pid} = State) ->
-	?ERR("RTCP socket died: ~p", [Reason]),
-	{noreply, State}.
+%-ifdef(ENABLE_RTCP).
+
+handle_info({udp, Fd, Ip, Port, Msg}, #state{rtcp = Fd, parent = Parent, started1 = true, weak = true, symmetric = Symmetric} = State) ->
+	inet:setopts(Fd, [{active, once}]),
+	try
+		{ok, Pkts} = rtcp:decode(Msg),
+		% FIXME Do something with RTCP before sending it further
+		gen_server:cast(Parent, {rtcp, Pkts, self()}),
+		{noreply, State#state{ipt1 = Ip, portt1 = Port}}
+	catch
+		_:_ -> rtp_utils:dump_packet(node(), self(), Msg),
+		{noreply, State}
+	end;
+
+handle_info({udp, Fd, Ip, Port, Msg}, #state{rtcp = Fd, parent = Parent, started1 = true, weak = false, ipf1 = Ip, portf1 = Port} = State) ->
+	inet:setopts(Fd, [{active, once}]),
+	try
+		{ok, Pkts} = rtcp:decode(Msg),
+		% FIXME Do something with RTCP before sending it further
+		gen_server:cast(Parent, {rtcp, Pkts, self()}),
+		{noreply, State}
+	catch
+		_:_ -> rtp_utils:dump_packet(node(), self(), Msg),
+		{noreply, State}
+	end;
+
+handle_info({udp, Fd, _Ip, _Port, _Msg}, #state{rtcp = Fd, started1 = true, weak = false} = State) ->
+	inet:setopts(Fd, [{active, once}]),
+	?ERR("Disallow data from strange source", []),
+	{noreply, State};
+
+handle_info({udp, Fd, Ip, Port, Msg}, #state{rtcp = Fd, parent = Parent, started1 = false} = State) ->
+	inet:setopts(Fd, [{active, once}]),
+	try
+		{ok, Pkts} = rtcp:decode(Msg),
+		% FIXME Do something with RTCP before sending it further
+		gen_server:cast(Parent, {rtcp, Pkts, self()}),
+		{noreply, State#state{started1 = true, ipf1 = Ip, portf1 = Port}}
+	catch
+		_:_ -> rtp_utils:dump_packet(node(), self(), Msg),
+		{noreply, State}
+	end.
+
+%-else.
+
+%handle_info(_Info, State) ->
+%	{noreply, State}.
+
+%-endif.
 
 %%
 %% Private functions
