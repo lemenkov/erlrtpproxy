@@ -31,9 +31,6 @@
 
 -include("../include/common.hrl").
 
-% Milliseconds - 105 seconds
--define(RTP_TIME_TO_LIVE, 105000).
-
 %-include("rtcp.hrl").
 
 % description of media:
@@ -41,6 +38,9 @@
 % * ip - real client's ip
 % * port - real client's port
 -record(media, {pid=null, ip=null, port=null, rtpstate=nortp}).
+
+-record(party, {tag, addr=null, rtcpaddr=null, proto=udp}).
+
 -record(state, {
 		callid,
 		mediaid,
@@ -68,7 +68,8 @@ init (
 	) ->
 	process_flag(trap_exit, true),
 
-	{ok, TRef} = timer:send_interval(?RTP_TIME_TO_LIVE, ping),
+	{ok, Ttl} = application:get_env(rtpproxy, ttl),
+	{ok, TRef} = timer:send_interval(Ttl, ping),
 
 	{FromDir, ToDir} = proplists:get_value(direction, Params),
 
@@ -83,7 +84,7 @@ init (
 	end,
 
 	% FIXME use start (w/o linking)
-	{ok, PidF} = rtp_socket:start_link([self(), udp, [{direction, ToDir}]]),
+	{ok, PidF} = rtp_socket:start_link([self(), TProto, [{direction, ToDir}]]),
 	{ok, PidT} = rtp_socket:start_link([self(), TProto, proplists:delete(direction, Params) ++ [{direction, FromDir}] ++ FRtpParamsAddon ++ FRtcpParamsAddon]),
 
 	{ok,
@@ -271,11 +272,11 @@ handle_cast({stop, Pid, Reason}, #state{
 
 handle_cast({rtcp, Rtcps, PidF}, #state{from = #media{pid=PidF}, to = #media{pid=PidT}} = State) ->
 	?INFO("RTCP from ~s: ~s", [State#state.callid, lists:map (fun rtp_utils:pp/1, Rtcps)]),
-	gen_server:cast(PidT, {rtcp, Rtcps, self()}),
+	gen_server:cast(PidT, {rtcp, Rtcps}),
 	{noreply, State};
 handle_cast({rtcp, Rtcps, PidT}, #state{from = #media{pid=PidF}, to = #media{pid=PidT}} = State) ->
 	?INFO("RTCP from ~s: ~s", [State#state.callid, lists:map (fun rtp_utils:pp/1, Rtcps)]),
-	gen_server:cast(PidF, {rtcp, Rtcps, self()}),
+	gen_server:cast(PidF, {rtcp, Rtcps}),
 	{noreply, State};
 
 handle_cast({started, Pid, {I0, P0}, {I1, P1}}, #state{from = #media{pid = Pid} = From, to = To, origcmd = Cmd} = State) ->
