@@ -51,6 +51,7 @@
 -record(state, {
 		parent,
 		fd,
+		ssrc,
 		rtcp,
 		transport,
 		proto,
@@ -224,7 +225,7 @@ terminate(Reason, #state{parent = Parent, fd = Fd, transport = Transport, tref =
 		end, Codecs),
 	ok.
 
-handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, parent = Parent, started = true, weak = true, symmetric = Symmetric, neighbour = Neighbour} = State) ->
+handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, ssrc = SSRC, parent = Parent, started = true, weak = true, symmetric = Symmetric, neighbour = Neighbour} = State) ->
 	inet:setopts(Fd, [{active, once}]),
 	try
 		{ok, Pkts} = rtp:decode(Msg),
@@ -235,12 +236,28 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, parent = Parent, started =
 		{noreply, State}
 	end;
 
-handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, parent = Parent, started = true, weak = false, ipf = Ip, portf = Port, neighbour = Neighbour} = State) ->
+handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, ssrc = SSRC, parent = Parent, started = true, weak = false, ipf = Ip, portf = Port, neighbour = Neighbour} = State) ->
 	inet:setopts(Fd, [{active, once}]),
 	try
 		{ok, Pkts} = rtp:decode(Msg),
 		process_data(rtp, Pkts, Parent, Neighbour),
 		{noreply, State#state{lastseen = now(), alive = true}}
+	catch
+		_:_ -> rtp_utils:dump_packet(node(), self(), Msg),
+		{noreply, State}
+	end;
+handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, ssrc = SSRC, parent = Parent, started = true, weak = false, neighbour = Neighbour} = State) ->
+	inet:setopts(Fd, [{active, once}]),
+	try
+		{ok, Pkts} = rtp:decode(Msg),
+		process_data(rtp, Pkts, Parent, Neighbour),
+		case ensure_ssrc(SSRC, Pkts) of
+			true ->
+				{noreply, State#state{ipf = Ip, portf = Port, lastseen = now(), alive = true}};
+			_ ->
+				?ERR("Disallow data from strange source with different SSRC", []),
+				{noreply, State}
+		end
 	catch
 		_:_ -> rtp_utils:dump_packet(node(), self(), Msg),
 		{noreply, State}
@@ -257,7 +274,11 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{parent = Parent, started = false, n
 		gen_server:cast(Parent, {start, self()}),
 		process_data(rtp, Pkts, Parent, Neighbour),
 
-		{noreply, State#state{started = true, ipf = Ip, portf = Port, lastseen = now(), alive = true}}
+		% Initial SSRC setup
+		% Note - it could change during call w/o warning so beware
+		[Rtp|_] = Pkts,
+
+		{noreply, State#state{ssrc = Rtp#rtp.ssrc, started = true, ipf = Ip, portf = Port, lastseen = now(), alive = true}}
 	catch
 		_:_ -> rtp_utils:dump_packet(node(), self(), Msg),
 		{noreply, State}
@@ -309,3 +330,10 @@ register_available_codecs([CodecDesc | Rest], Ret) ->
 		_ ->
 			register_available_codecs(Rest, Ret ++ [{rtp_utils:get_payload_from_codec(CodecDesc), passthrough}])
 	end.
+
+ensure_ssrc(SSRC, []) ->
+	true;
+ensure_ssrc(SSRC, [#rtp{ssrc = SSRC}|Rest]) ->
+	ensure_ssrc(SSRC, Rest);
+ensure_ssrc(SSRC, _) ->
+	false.
