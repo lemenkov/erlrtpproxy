@@ -82,7 +82,7 @@ start(Args) ->
 start_link(Args) ->
 	gen_server:start_link(?MODULE, Args, []).
 
-init ([Parent, Transport, Params] = InVals) ->
+init ([Parent, Transport, Params]) ->
 	process_flag(trap_exit, true),
 	% FIXME allow explicitly set address (IP and Port) for both RTP and RTCP sockets
 	SockParams = proplists:get_value(sockparams, Params, []),
