@@ -265,6 +265,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, ssrc = SSRC, parent = Pare
 		process_data(rtp, Pkts, Parent, Neighbour),
 		case ensure_ssrc(SSRC, Pkts) of
 			true ->
+				?WARN("RTP addr changed, but known SSRC found. Updating addr.", []),
 				{noreply, State#state{ipf = Ip, portf = Port, lastseen = now(), alive = true}};
 			_ ->
 				?ERR("Disallow data from strange source with different SSRC", []),
