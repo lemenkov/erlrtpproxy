@@ -100,7 +100,15 @@ init ([Parent, Transport, Params] = InVals) ->
 	{Codecs, Transcode} = case TryTranscode of
 		null -> {[], null};
 		_ ->
-			C1 = register_available_codecs(proplists:get_value(codecs, Params, [])),
+			C1 = lists:map(
+					fun(CodecDesc) ->
+						case codec:start_link(CodecDesc) of
+							{ok, Codec} ->{rtp_utils:get_payload_from_codec(CodecDesc), Codec};
+							_ -> {rtp_utils:get_payload_from_codec(CodecDesc), passthrough}
+						end
+					end,
+					proplists:get_value(codecs, Params, [])
+			),
 			T1 = case TryTranscode of
 				{'PCMU',8000,1} -> {?RTP_PAYLOAD_PCMU, proplists:get_value(?RTP_PAYLOAD_PCMU,C1)};
 				{'GSM',8000,1} -> {?RTP_PAYLOAD_GSM, proplists:get_value(?RTP_PAYLOAD_GSM,C1)};
@@ -372,18 +380,6 @@ transcode(#rtp{payload_type = OldPayloadType, payload = Payload} = Rtp, {Payload
 	end;
 transcode(Pkts, _, _) ->
 	{rtp, Pkts}.
-
-register_available_codecs(CodecsVals) ->
-	register_available_codecs(CodecsVals, []).
-register_available_codecs([], Ret) ->
-	Ret;
-register_available_codecs([CodecDesc | Rest], Ret) ->
-	case codec:start_link(CodecDesc) of
-		{ok, Codec} ->
-			register_available_codecs(Rest, Ret ++ [{rtp_utils:get_payload_from_codec(CodecDesc), Codec}]);
-		_ ->
-			register_available_codecs(Rest, Ret ++ [{rtp_utils:get_payload_from_codec(CodecDesc), passthrough}])
-	end.
 
 ensure_ssrc(SSRC, []) ->
 	true;
