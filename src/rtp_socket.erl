@@ -381,11 +381,11 @@ transcode(#rtp{payload_type = OldPayloadType, payload = Payload} = Rtp, {Payload
 transcode(Pkts, _, _) ->
 	{rtp, Pkts}.
 
-ensure_ssrc(SSRC, []) ->
+ensure_ssrc(_, []) ->
 	true;
 ensure_ssrc(SSRC, #rtp{ssrc = SSRC}) ->
 	true;
 ensure_ssrc(SSRC, [#rtp{ssrc = SSRC}|Rest]) ->
 	ensure_ssrc(SSRC, Rest);
-ensure_ssrc(SSRC, _) ->
+ensure_ssrc(_, _) ->
 	false.
