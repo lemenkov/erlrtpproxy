@@ -229,7 +229,7 @@ handle_cast({neighbour, Pid}, State) when is_pid(Pid) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, #state{parent = Parent, fd = Fd0, rtcp = Fd1, transport = Transport, tref = TRef, codecs = Codecs}) ->
+terminate(Reason, #state{fd = Fd0, rtcp = Fd1, transport = Transport, tref = TRef, codecs = Codecs}) ->
 	timer:cancel(TRef),
 	Type = case Transport of
 		udp -> gen_udp;
@@ -245,7 +245,7 @@ terminate(Reason, #state{parent = Parent, fd = Fd0, rtcp = Fd1, transport = Tran
 		end, Codecs),
 	ok.
 
-handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, ssrc = SSRC, parent = Parent, started = true, weak = true, symmetric = Symmetric, neighbour = Neighbour} = State) ->
+handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, ssrc = SSRC, started = true, weak = true, symmetric = Symmetric, neighbour = Neighbour} = State) ->
 	inet:setopts(Fd, [{active, once}]),
 	try
 		{ok, Pkts} = rtp:decode(Msg),
@@ -256,7 +256,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, ssrc = SSRC, parent = Pare
 		{noreply, State}
 	end;
 
-handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, ssrc = SSRC, parent = Parent, started = true, weak = false, ipf = Ip, portf = Port, neighbour = Neighbour} = State) ->
+handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, ssrc = SSRC, started = true, weak = false, ipf = Ip, portf = Port, neighbour = Neighbour} = State) ->
 	inet:setopts(Fd, [{active, once}]),
 	try
 		{ok, Pkts} = rtp:decode(Msg),
@@ -266,7 +266,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, ssrc = SSRC, parent = Pare
 		_:_ -> rtp_utils:dump_packet(node(), self(), Msg),
 		{noreply, State}
 	end;
-handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, ssrc = SSRC, parent = Parent, started = true, weak = false, neighbour = Neighbour} = State) ->
+handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, ssrc = SSRC, started = true, weak = false, neighbour = Neighbour} = State) ->
 	inet:setopts(Fd, [{active, once}]),
 	try
 		{ok, Pkts} = rtp:decode(Msg),
