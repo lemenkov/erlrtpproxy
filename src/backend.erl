@@ -99,6 +99,24 @@ handle_cast({msg, Msg, Ip, Port}, State) ->
 		#cmd{origin = Origin, type = ?CMD_L} = Cmd ->
 			error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
 			gen_server:cast({global, rtpproxy}, Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, type = ?CMD_U});
+		#cmd{origin = Origin, type = ?CMD_U} = Cmd ->
+			error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
+			NotifyParams = proplists:get_value(notify, Cmd#cmd.params),
+			case NotifyParams of
+				undefined ->
+					gen_server:cast({global, rtpproxy}, Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}});
+				_ ->
+					case proplists:get_value(addr, NotifyParams) of
+						{_,_} ->
+							gen_server:cast({global, rtpproxy}, Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}});
+						P when is_integer(P) ->
+							NotifyTag = proplists:get_value(tag, NotifyParams),
+							% Assume that the IP is the same as the origin of command
+							NewNotifyParams = [{notify, [{addr, {Ip, P}}, {tag, NotifyTag}]}],
+							NewParams = proplists:delete(notify, Cmd#cmd.params) ++ NewNotifyParams,
+							gen_server:cast({global, rtpproxy}, Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, params = NewParams})
+					end
+			end;
 		#cmd{origin = Origin} = Cmd ->
 			error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
 			gen_server:cast({global, rtpproxy}, Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}})
