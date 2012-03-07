@@ -66,6 +66,9 @@ encode({error, software, Msg}) when is_binary(Msg) ->
 	<<Cookie/binary, <<" E7\n">>/binary>>;
 encode(#response{cookie = Cookie, type = reply, data = ok}) ->
 	<<Cookie/binary, <<" 0\n">>/binary>>;
+encode(#response{cookie = Cookie, type = reply, data = {ok, {stats, Number}}}) when is_integer(Number) ->
+	N = list_to_binary(integer_to_list(Number)),
+	<<Cookie/binary, <<" active sessions:">>/binary, N/binary, <<"\n">>/binary>>;
 encode(#response{cookie = Cookie, type = reply, data = supported}) ->
 	<<Cookie/binary, <<" 1\n">>/binary>>;
 encode(#response{cookie = Cookie, type = reply, data = {version, Version}}) when is_binary(Version) ->

@@ -1084,6 +1084,9 @@ parse_reply_ipv6_test() ->
 encode_ok_test() ->
 	?assertEqual(<<"438_41067 0\n">>, ser_proto:encode(#response{cookie = <<"438_41067">>, type = reply, data = ok})).
 
+encode_stats_brief_test() ->
+	?assertEqual(<<"485cb8cd73c54462beace3d9ce7d52df5bac23ff active sessions:42\n">>, ser_proto:encode(#response{cookie = <<"485cb8cd73c54462beace3d9ce7d52df5bac23ff">>, type = reply, data = {ok, {stats, 42}}})).
+
 encode_ipv4_test() ->
 	?assertEqual(
 		<<"8411_41413 41212 192.168.100.4\n">>,
