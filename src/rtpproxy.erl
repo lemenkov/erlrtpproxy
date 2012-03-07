@@ -67,12 +67,15 @@ handle_cast(#cmd{type = ?CMD_X, origin = #origin{pid = Pid}} = Cmd, State) ->
 	gen_server:cast(Pid, {reply, Cmd, ok}),
 	{noreply, State};
 
+handle_cast(#cmd{type = ?CMD_I, origin = #origin{pid = Pid}, params = [brief]} = Cmd, State) ->
+	gen_server:cast(Pid, {reply, Cmd, {ok, {stats, length(State#state.calls)}}}),
+	{noreply, State};
 handle_cast(#cmd{type = ?CMD_I, origin = #origin{pid = Pid}} = Cmd, State) ->
 	% TODO show information about calls
 	Stats = lists:map(fun(X) -> gen_server:call(X#thread.pid, ?CMD_Q) end, State#state.calls),
 	% "sessions created: %llu\nactive sessions: %d\n active streams: %d\n"
 	% foreach session "%s/%s: caller = %s:%d/%s, callee = %s:%d/%s, stats = %lu/%lu/%lu/%lu, ttl = %d/%d\n"
-	gen_server:cast(Pid, {reply, Cmd, ok}),
+	gen_server:cast(Pid, {reply, Cmd, {ok, {stats, length(State#state.calls)}}}),
 	{noreply, State};
 
 % First try to find existing session
