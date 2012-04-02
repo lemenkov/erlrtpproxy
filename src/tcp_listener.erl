@@ -24,6 +24,8 @@
 -module(tcp_listener).
 
 -behaviour(gen_server).
+-compile({parse_transform, do}).
+
 -export([start/1]).
 -export([start_link/1]).
 -export([init/1]).
@@ -138,14 +140,12 @@ code_change(_OldVsn, State, _Extra) ->
 
 set_sockopt(ListSock, CliSocket) ->
 	true = inet_db:register_socket(CliSocket, inet_tcp),
-	case prim_inet:getopts(ListSock, [active, nodelay, keepalive, delay_send, priority, tos]) of
-		{ok, Opts} ->
-			case prim_inet:setopts(CliSocket, Opts) of
-				ok -> ok;
-				Error -> gen_tcp:close(CliSocket), Error
-			end;
-		Error ->
-			gen_tcp:close(CliSocket), Error
+	case do([error_m ||
+			Opts <- prim_inet:getopts(ListSock, [active, nodelay, keepalive, delay_send, priority, tos]),
+			prim_inet:setopts(CliSocket, Opts)])
+	of
+		ok -> ok;
+		Error -> gen_tcp:close(CliSocket), Error
 	end.
 
 get_socket([], _, _) ->
