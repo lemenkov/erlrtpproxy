@@ -129,6 +129,14 @@ run_proxy_test_() ->
 							},
 							ser_proto:decode(Answer)) end
 			},
+			{"Request brief statistics",
+				fun () ->
+						gen_udp:send(Fd, {127,0,0,1}, 33333, <<"6721_89367 Ib\n">>),
+						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0, 1000),
+						% Here is an error in rtpproxy - it should return cookie as well, e.g. prepend 6721_89367 to the beginning
+						% ?assertMatch(<<"6721_89367 sessions created: ", _/binary>>, Answer) end
+						?assertMatch(<<" active sessions: ", _/binary>>, Answer) end
+			},
 			{"Request overall statistics",
 				fun () ->
 						gen_udp:send(Fd, {127,0,0,1}, 33333, <<"6721_89367 I\n">>),
