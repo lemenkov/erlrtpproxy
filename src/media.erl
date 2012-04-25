@@ -97,7 +97,7 @@ init (
 			tref	= TRef,
 			from	= #media{pid=PidF, rtpstate=nortp},
 			to	= #media{pid=PidT, rtpstate=nortp},
-			notify_tag = proplists:get_value(tag, proplists:get_value(notify, Params, []), <<>>),
+			notify_tag = proplists:get_value(notify, Params, []),
 			origcmd = Cmd
 		}
 	}.
