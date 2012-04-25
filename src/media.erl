@@ -50,6 +50,7 @@
 		from,
 		to,
 		origcmd,
+		notify_tag,
 		started = false
 	}
 ).
@@ -96,6 +97,7 @@ init (
 			tref	= TRef,
 			from	= #media{pid=PidF, rtpstate=nortp},
 			to	= #media{pid=PidT, rtpstate=nortp},
+			notify_tag = proplists:get_value(tag, proplists:get_value(notify, Params, []), <<>>),
 			origcmd = Cmd
 		}
 	}.
@@ -121,6 +123,7 @@ handle_cast(
 			from = #media{pid = PidF, ip = IpF, port = PortF},
 			to = #media{pid = PidT, ip = IpT, port = PortT},
 			started = Started,
+			notify_tag = NotifyTag,
 			tag_f = TagF,
 			tag_t = TagT} = State
 	) ->
@@ -133,7 +136,7 @@ handle_cast(
 	end,
 	NewStarted = case proplists:get_value(acc, Params) of
 		start ->
-			gen_server:cast(rtpproxy_notifier, {start, CallId, MediaId}),
+			gen_server:cast(rtpproxy_notifier, {start, CallId, MediaId, NotifyTag}),
 			true;
 		_  -> Started
 	end,
@@ -174,11 +177,12 @@ handle_cast(
 		#state{
 			callid = CallId,
 			mediaid = MediaId,
+			notify_tag = NotifyTag,
 			started = Started } = State
 	) ->
 	NewStarted = case proplists:get_value(acc, Params) of
 		start ->
-			gen_server:cast(rtpproxy_notifier, {start, CallId, MediaId}),
+			gen_server:cast(rtpproxy_notifier, {start, CallId, MediaId, NotifyTag}),
 			true;
 		_  -> Started
 	end,
@@ -191,7 +195,7 @@ handle_cast(
 			mediaid = 0,
 			from = #party{tag = TagFrom},
 			to = To} = Cmd,
-		#state{callid = CallId, mediaid = MediaId, tag_f = TagF, tag_t = TagT, tref = TRef} = State
+		#state{callid = CallId, mediaid = MediaId, tag_f = TagF, tag_t = TagT, tref = TRef, notify_tag = NotifyTag} = State
 	) ->
 
 	% FIXME consider checking for direction (is TagFrom  equals to TagF or not?)
@@ -201,7 +205,7 @@ handle_cast(
 	end,
 
 	% Send stop message earlier
-	gen_server:cast(rtpproxy_notifier, {stop, CallId, MediaId}),
+	gen_server:cast(rtpproxy_notifier, {stop, CallId, MediaId, NotifyTag}),
 	gen_server:cast({global, rtpproxy}, {'EXIT', self(), Reason}),
 
 	% Run 30-sec timer for catching the remaining RTP/RTCP (w/o sending
@@ -217,14 +221,15 @@ handle_cast({start, Pid}, #state{
 		callid = CallID,
 		mediaid = MediaID,
 		from = #media{pid = PidF, rtpstate = SF} = From,
-		to = #media{pid = PidT, rtpstate = ST} = To
+		to = #media{pid = PidT, rtpstate = ST} = To,
+		notify_tag = NotifyTag
 	} = State)  when Pid == PidF; Pid == PidT ->
 	{SF1, ST1} = case Pid of
 		PidF -> {rtp, ST};
 		PidT -> {SF, rtp}
 	end,
 	case (SF1 == rtp) and (ST1 == rtp) of
-%		true -> gen_server:cast(rtpproxy_notifier, {start, CallID, MediaID});
+%		true -> gen_server:cast(rtpproxy_notifier, {start, CallID, MediaID, NotifyTag});
 		_ -> ok
 	end,
 	{noreply, State#state{
@@ -239,10 +244,11 @@ handle_cast({interim_update, Pid}, #state{
 		mediaid = MediaID,
 		from = #media{pid = PidF, rtpstate = SF} = From,
 		to = #media{pid = PidT, rtpstate = ST} = To,
+		notify_tag = NotifyTag,
 		started = true
 	} = State) when Pid == PidF; Pid == PidT ->
 	% Both sides are active, so we need to send interim update here
-	gen_server:cast(rtpproxy_notifier, {interim_update, CallID, MediaID}),
+	gen_server:cast(rtpproxy_notifier, {interim_update, CallID, MediaID, NotifyTag}),
 	{SF1, ST1} = case Pid of
 		PidF -> {rtp, ST};
 		PidT -> {SF, rtp}
@@ -303,7 +309,7 @@ handle_info(ping, #state{from = #media{rtpstate = rtp}, to = #media{rtpstate = r
 	% Both sides are active, so we just set state to 'nortp' and continue
 	{noreply, State#state{from=(State#state.from)#media{rtpstate=nortp}, to=(State#state.to)#media{rtpstate=nortp}}};
 
-handle_info(ping, #state{callid = CallId, mediaid = MediaId} = State) ->
+handle_info(ping, #state{callid = CallId, mediaid = MediaId, notify_tag = NotifyTag} = State) ->
 	?ERR("RTP timeout at ~p ~p.", [CallId, MediaId]),
 	% We didn't get new RTP messages since last ping - we should close this mediastream
 	% we should rely on rtcp
@@ -313,19 +319,19 @@ handle_info(ping, #state{callid = CallId, mediaid = MediaId} = State) ->
 %		false ->
 %			{noreply, State}
 %	end
-	gen_server:cast(rtpproxy_notifier, {stop, CallId, MediaId}),
+	gen_server:cast(rtpproxy_notifier, {stop, CallId, MediaId, NotifyTag}),
 	gen_server:cast({global, rtpproxy}, {'EXIT', self(), nortp}),
 	{stop, nortp, State};
 
-handle_info({'EXIT', Pid, Reason}, #state{callid = CallId, mediaid = MediaId, from = #media{pid = Pid}} = State) ->
+handle_info({'EXIT', Pid, Reason}, #state{callid = CallId, mediaid = MediaId, from = #media{pid = Pid}, notify_tag = NotifyTag} = State) ->
 	?ERR("RTP From socket died: ~p", [Reason]),
-	gen_server:cast(rtpproxy_notifier, {stop, CallId, MediaId}),
+	gen_server:cast(rtpproxy_notifier, {stop, CallId, MediaId, NotifyTag}),
 	gen_server:cast({global, rtpproxy}, {'EXIT', self(), Reason}),
 	{stop, Reason, State};
 
-handle_info({'EXIT', Pid, Reason}, #state{callid = CallId, mediaid = MediaId, to = #media{pid = Pid}} = State) ->
+handle_info({'EXIT', Pid, Reason}, #state{callid = CallId, mediaid = MediaId, to = #media{pid = Pid}, notify_tag = NotifyTag} = State) ->
 	?ERR("RTP To socket died: ~p", [Reason]),
-	gen_server:cast(rtpproxy_notifier, {stop, CallId, MediaId}),
+	gen_server:cast(rtpproxy_notifier, {stop, CallId, MediaId, NotifyTag}),
 	gen_server:cast({global, rtpproxy}, {'EXIT', self(), Reason}),
 	{stop, Reason, State};
 
