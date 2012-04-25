@@ -37,16 +37,16 @@ handle_call(Message, From, State) ->
 	error_logger:warning_msg("Bogus call: ~p from ~p at ~p~n", [Message, From, node()]),
 	{reply, {error, unknown_call}, State}.
 
-handle_cast({Type, CallId, MediaId}, #state{radius = RadiusBackend, notify = NotifyBackend} = State) when
+handle_cast({Type, CallId, MediaId, Addr}, #state{radius = RadiusBackend, notify = NotifyBackend} = State) when
 	Type == start;
 	Type == interim_update;
 	Type == stop ->
 	case RadiusBackend of
-		true -> gen_server:cast(rtpproxy_notifier_backend_radius, {Type, CallId, MediaId});
+		true -> gen_server:cast(rtpproxy_notifier_backend_radius, {Type, CallId, MediaId, Addr});
 		_ -> ok
 	end,
 	case NotifyBackend of
-		true -> gen_server:cast(rtpproxy_notifier_backend_notify, {Type, CallId, MediaId});
+		true -> gen_server:cast(rtpproxy_notifier_backend_notify, {Type, CallId, MediaId, Addr});
 		_ -> ok
 	end,
 	{noreply, State};
