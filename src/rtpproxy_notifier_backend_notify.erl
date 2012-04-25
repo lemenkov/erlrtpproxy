@@ -15,7 +15,7 @@ start_link(Args) ->
 
 init([[{tcp, IpStr, Port}|Rest]]) ->
 	{ok, Ip} = inet_parse:address(IpStr),
-	{ok, Fd} = gen_tcp:connect(Ip, Port, [list, {active, once}, {packet, raw}]),
+	{ok, Fd} = gen_udp:open(0, [binary, {active, true}, {packet, raw}]),
 	error_logger:info_msg("Started rtpproxy notify protocol backend at ~p~n", [node()]),
 	{ok, Fd}.
 
@@ -23,19 +23,8 @@ handle_call(Message, From, State) ->
 	error_logger:warning_msg("Bogus call: ~p from ~p at ~p~n", [Message, From, node()]),
 	{reply, {error, unknown_call}, State}.
 
-handle_cast({start, CallId, MediaId, Addr}, Fd) ->
-	Msg = io_lib:format("start:'~s'~b", [CallId, MediaId]),
-	gen_tcp:send(Fd, Msg),
-	{noreply, Fd};
-
-handle_cast({interim_update, CallId, MediaId, Addr}, Fd) ->
-	Msg = io_lib:format("interim_update'~s'~b", [CallId, MediaId]),
-	gen_tcp:send(Fd, Msg),
-	{noreply, Fd};
-
-handle_cast({stop, CallId, MediaId, Addr}, Fd) ->
-	Msg = io_lib:format("stop'~s'~b", [CallId, MediaId]),
-	gen_tcp:send(Fd, Msg),
+handle_cast({_, _, _, [{addr,{Ip,Port}},{tag,NotifyTag}]}, Fd) ->
+	gen_udp:send(Fd, Ip, Port, NotifyTag),
 	{noreply, Fd};
 
 handle_cast(Other, State) ->
@@ -50,6 +39,6 @@ code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 terminate(Reason, Fd) ->
-	gen_tcp:close(Fd),
+	gen_udp:close(Fd),
 	error_logger:error_msg("Terminated: ~p at ~p~n", [Reason, node()]),
 	ok.
