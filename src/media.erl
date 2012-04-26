@@ -277,11 +277,11 @@ handle_cast({stop, Pid, Reason}, #state{
 	end;
 
 handle_cast({rtcp, Rtcps, PidF}, #state{from = #media{pid=PidF}, to = #media{pid=PidT}} = State) ->
-	?INFO("RTCP from ~s: ~s", [State#state.callid, lists:map (fun rtp_utils:pp/1, Rtcps)]),
+	?INFO("RTCP from ~s: ~s", [State#state.callid, rtp_utils:pp(Rtcps)]),
 	gen_server:cast(PidT, {rtcp, Rtcps}),
 	{noreply, State};
 handle_cast({rtcp, Rtcps, PidT}, #state{from = #media{pid=PidF}, to = #media{pid=PidT}} = State) ->
-	?INFO("RTCP from ~s: ~s", [State#state.callid, lists:map (fun rtp_utils:pp/1, Rtcps)]),
+	?INFO("RTCP from ~s: ~s", [State#state.callid, rtp_utils:pp(Rtcps)]),
 	gen_server:cast(PidF, {rtcp, Rtcps}),
 	{noreply, State};
 
