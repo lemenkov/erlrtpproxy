@@ -1,7 +1,7 @@
 REBAR ?= $(shell which rebar 2>/dev/null || which ./rebar)
 REBAR_FLAGS ?=
 
-VSN := "0.4.13"
+VSN := "0.4.14"
 BUILD_DATE := `LANG=C date +"%a %b %d %Y"`
 NAME := rtpproxy
 UNAME := $(shell uname -s)
