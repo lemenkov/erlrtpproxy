@@ -1,7 +1,7 @@
 REBAR ?= $(shell which rebar 2>/dev/null || which ./rebar)
 REBAR_FLAGS ?=
 
-VSN := "0.0.11"
+VSN := "0.0.12"
 BUILD_DATE := `LANG=C date +"%a %b %d %Y"`
 NAME := rtpproxy_notifier
 
