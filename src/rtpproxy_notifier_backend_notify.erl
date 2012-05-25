@@ -13,9 +13,10 @@
 start_link(Args) ->
 	gen_server:start_link({local, ?MODULE}, ?MODULE, Args, []).
 
-init([[{tcp, IpStr, Port}|Rest]]) ->
-	{ok, Ip} = inet_parse:address(IpStr),
-	{ok, Fd} = gen_udp:open(0, [binary, {active, true}, {packet, raw}]),
+%init([[{tcp, IpStr, Port}|Rest]]) ->
+init(_) ->
+%	{ok, Ip} = inet_parse:address(IpStr),
+	{ok, Fd} = gen_udp:open(0, [binary, {active, true}]),
 	error_logger:info_msg("Started rtpproxy notify protocol backend at ~p~n", [node()]),
 	{ok, Fd}.
 
@@ -23,8 +24,9 @@ handle_call(Message, From, State) ->
 	error_logger:warning_msg("Bogus call: ~p from ~p at ~p~n", [Message, From, node()]),
 	{reply, {error, unknown_call}, State}.
 
-handle_cast({_, _, _, [{addr,{Ip,Port}},{tag,NotifyTag}]}, Fd) ->
+handle_cast({Type, _, _, [{addr,{Ip,Port}},{tag,NotifyTag}]}, Fd) ->
 	gen_udp:send(Fd, Ip, Port, NotifyTag),
+	error_logger:info_msg("Message (~p) delivered from ~p to ~s:~b~n", [Type, node(), inet_parse:ntoa(Ip), Port]),
 	{noreply, Fd};
 
 handle_cast(Other, State) ->
