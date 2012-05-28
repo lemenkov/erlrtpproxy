@@ -305,11 +305,14 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, parent = Parent, started =
 
 handle_info(interim_update, #state{started = false} = State) ->
 	% Discard - we didn't start yet
+	?WARN("RTP_SOCKET: discard interim_update (no other side)~n", []),
 	{noreply, State};
 handle_info(interim_update, #state{parent = Parent, alive = true} = State) ->
+	?INFO("RTP_SOCKET: send interim_update~n", []),
 	gen_server:cast(Parent, {interim_update, self()}),
 	{noreply, State#state{alive = false}};
 handle_info(interim_update, #state{alive = false} = State) ->
+	?WARN("RTP_SOCKET: discard interim_update (timeout)~n", []),
 	{stop, timeout, State};
 
 %-ifdef(ENABLE_RTCP).

@@ -248,6 +248,7 @@ handle_cast({interim_update, Pid}, #state{
 		started = true
 	} = State) when Pid == PidF; Pid == PidT ->
 	% Both sides are active, so we need to send interim update here
+	?INFO("MEDIA: send interim_update from ~p~n", [Pid]),
 	gen_server:cast(rtpproxy_notifier, {interim_update, CallID, MediaID, NotifyTag}),
 	{SF1, ST1} = case Pid of
 		PidF -> {rtp, ST};
@@ -258,6 +259,9 @@ handle_cast({interim_update, Pid}, #state{
 			to = To#media{rtpstate=ST1}
 		}
 	};
+handle_cast({interim_update, Pid}, State) ->
+	?WARN("MEDIA: discard interim_update from ~p~n", [Pid]),
+	{noreply, State};
 
 handle_cast({stop, Pid, Reason}, #state{
 		from = #media{pid = PidF, rtpstate = SF} = From,
