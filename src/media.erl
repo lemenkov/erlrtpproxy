@@ -51,7 +51,7 @@
 		to,
 		origcmd,
 		notify_tag,
-		started = false
+		started = true
 	}
 ).
 
@@ -215,7 +215,7 @@ handle_cast(
 
 	% FIXME suppress retransmitting of packets here
 
-	{noreply, State#state{tref = TRef2}};
+	{noreply, State#state{started = false, tref = TRef2}};
 
 handle_cast({start, Pid}, #state{
 		callid = CallID,
