@@ -5,7 +5,7 @@
 -export([init/1]).
 
 start_link() ->
-	supervisor:start_link({global, ?MODULE}, ?MODULE, []).
+	supervisor:start_link(?MODULE, []).
 
 init([]) ->
 	RestartStrategy = one_for_one,
