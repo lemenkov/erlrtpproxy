@@ -28,8 +28,5 @@ init([]) ->
 	{ok, Addr} = application:get_env(ser, backend),
 	BackendProcess = {backend, {backend, start_link, [Addr]}, permanent, 10000, worker, []},
 
-	% Load main module
-	RtpProxy = {rtpproxy,{rtpproxy,start_link,[ignored]},permanent,2000,worker,[rtpproxy]},
-
-	{ok,{SupFlags, [ListenerProcess, BackendProcess, RtpProxy]}}.
+	{ok,{SupFlags, [ListenerProcess, BackendProcess]}}.
 
