@@ -69,6 +69,7 @@ init (
 	) ->
 	process_flag(trap_exit, true),
 
+
 	{ok, Ttl} = application:get_env(rtpproxy, ttl),
 	{ok, TRef} = timer:send_interval(Ttl, ping),
 
@@ -87,6 +88,8 @@ init (
 	% FIXME use start (w/o linking)
 	{ok, PidF} = rtp_socket:start_link([self(), TProto, [{direction, ToDir}]]),
 	{ok, PidT} = rtp_socket:start_link([self(), TProto, proplists:delete(direction, Params) ++ [{direction, FromDir}] ++ FRtpParamsAddon ++ FRtcpParamsAddon]),
+	% Register itself only after running deferred init
+	gproc:add_global_name({id, CallId, MediaId}),
 
 	{ok,
 		#state{
@@ -305,6 +308,7 @@ code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 terminate(Reason, #state{callid = CallId, mediaid = MediaId, tref = TimerRef, from = From, to = To}) ->
+	% No need to explicitly unregister from gproc - it does so automatically
 	timer:cancel(TimerRef),
 	?ERR("terminated due to reason [~p]", [Reason]).
 
