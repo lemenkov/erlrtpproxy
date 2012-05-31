@@ -20,6 +20,7 @@ BuildRequires:	erlang-erlsyslog
 BuildRequires:	erlang-rtplib
 Requires:	erlang
 Requires:	erlang-erlsyslog
+Requires:	erlang-gproc
 Requires:	erlang-rtplib
 Requires(post): /sbin/chkconfig
 Requires(preun): /sbin/chkconfig
@@ -79,7 +80,6 @@ rm -rf $RPM_BUILD_ROOT
 %config(noreplace) %{_sysconfdir}/%{name}.config
 %config(noreplace) %{_sysconfdir}/sysconfig/%{name}
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}.app
-%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_app.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_ctl.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_sup.beam
