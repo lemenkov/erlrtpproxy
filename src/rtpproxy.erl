@@ -20,28 +20,10 @@
 -module(rtpproxy).
 -author('lemenkov@gmail.com').
 
--behaviour(gen_server).
 -export([status/0]).
--export([start_link/1]).
--export([init/1]).
--export([handle_call/3]).
--export([handle_cast/2]).
--export([handle_info/2]).
--export([code_change/3]).
--export([terminate/2]).
+-export([command/1]).
 
 -include("../include/common.hrl").
-
-% description of call thread
--record(thread, {pid=null, id=null}).
--record(state, {calls=[]}).
-
-start_link(Args) ->
-	gen_server:start_link({global, ?MODULE}, ?MODULE, Args, []).
-
-init(_Unused) ->
-	?INFO("rtpproxy started at ~p", [node()]),
-	{ok, #state{}}.
 
 % FIXME this must be reworked (no preformatted strings - just plain stats)
 status() ->
@@ -49,8 +31,7 @@ status() ->
 	Header = io_lib:format("Current state - ~p media stream(s):~n", [length(Calls)]),
 	?INFO(Header, []),
 	MediaInfos = lists:map(fun({Pid, CallId, MediaId}) ->
-			% TODO fix this strange situation
-			{ok, Reply} = try gen_server:call(Pid, ?CMD_Q) catch _:_ -> {ok, [["died (shouldn't happend)"]]} end,
+			{ok, Reply} = gen_server:call(Pid, ?CMD_Q),
 			MediaInfo = io_lib:format("* CallID: ~s, MediaId: ~p, ~s~n", [CallId, MediaId, Reply]),
 			?INFO(MediaInfo, []),
 			MediaInfo
@@ -58,83 +39,45 @@ status() ->
 	Calls),
 	lists:flatten([Header] ++ MediaInfos).
 
-handle_call(Other, _From, State) ->
-	?WARN("Other call [~p], State [~p]", [Other, State]),
-	{reply, error, State}.
+% Simply stop all active sessions
+command(#cmd{type = ?CMD_X}) ->
+	lists:foreach(fun(Pid) -> gen_server:cast(Pid, stop) end, ets:match(gproc, {{'$1', {'_', '_', {id, '_', '_'}}},'_'}));
 
-handle_cast(#cmd{type = ?CMD_X, origin = #origin{pid = Pid}} = Cmd, State) ->
-	% stop all active sessions
-	lists:foreach(fun(X) -> gen_server:cast(X#thread.pid, stop) end, State#state.calls),
-	gen_server:cast(Pid, {reply, Cmd, ok}),
-	{noreply, State};
+command(#cmd{type = ?CMD_I, params = [brief]}) ->
+	Length = length(ets:match(gproc, {{'$1', {'_', '_', {id, '_', '_'}}},'_'})),
+	{ok, {stats, Length}};
 
-handle_cast(#cmd{type = ?CMD_I, origin = #origin{pid = Pid}, params = [brief]} = Cmd, State) ->
-	gen_server:cast(Pid, {reply, Cmd, {ok, {stats, length(State#state.calls)}}}),
-	{noreply, State};
-handle_cast(#cmd{type = ?CMD_I, origin = #origin{pid = Pid}} = Cmd, State) ->
-	% TODO show information about calls
-	Stats = lists:map(fun(X) -> gen_server:call(X#thread.pid, ?CMD_Q) end, State#state.calls),
+% TODO show information about calls
+command(#cmd{type = ?CMD_I}) ->
+	% Calls = ets:match(gproc, {{'$1', {'_', '_', {id, '_', '_'}}},'_'}),
+	% Stats = lists:map(fun(Pid) -> gen_server:call(Pid, ?CMD_Q) end, Calls),
 	% "sessions created: %llu\nactive sessions: %d\n active streams: %d\n"
 	% foreach session "%s/%s: caller = %s:%d/%s, callee = %s:%d/%s, stats = %lu/%lu/%lu/%lu, ttl = %d/%d\n"
-	gen_server:cast(Pid, {reply, Cmd, {ok, {stats, length(State#state.calls)}}}),
-	{noreply, State};
+	Length = length(ets:match(gproc, {{'$1', {'_', '_', {id, '_', '_'}}},'_'})),
+	{ok, {stats, Length}};
 
-% First try to find existing session
-handle_cast(#cmd{origin = #origin{pid = Pid}, callid = CallId, mediaid = MediaId} = Cmd, #state{calls = Calls} = State) ->
-	case get_media(CallId, MediaId, Calls) of
-		{value, MediaThread} ->
-			% Operate on existing media thread
-			gen_server:cast(MediaThread#thread.pid, Cmd);
-		{list, MediaThreads} ->
-			lists:foreach(fun(X) -> gen_server:cast(X#thread.pid, Cmd) end, MediaThreads),
-			% FIXME is it a correct behaviour?
-			gen_server:cast(Pid, {reply, Cmd, ok});
-		false when Cmd#cmd.type == ?CMD_U ->
+command(#cmd{callid = CallId, mediaid = MediaId} = Cmd) ->
+	% First try to find existing session(s)
+	case get_media(CallId, MediaId) of
+		[] when Cmd#cmd.type == ?CMD_U ->
 			% Create new media thread
 			?INFO("Media stream does not exist. Creating new.", []),
 			pool:pspawn(media, start, [Cmd]);
-		false ->
+		[] ->
 			?WARN("Media stream does not exist. Do nothing.", []),
-			gen_server:cast(Pid, {reply, Cmd, {error, notfound}})
-	end,
-	{noreply, State};
-
-handle_cast({created, CallPid, {CallId, MediaId}}, #state{calls = Calls} = State) ->
-	{noreply, State#state{calls=lists:append(Calls, [#thread{pid=CallPid, id={CallId, MediaId}}])}};
-
-% Call died (due to timeout)
-handle_cast({'EXIT', Pid, Reason}, #state{calls = Calls} = State) ->
-	case lists:keysearch(Pid, #thread.pid, Calls) of
-		{value, CallThread} ->
-			?INFO("received 'EXIT' from ~p due to [~p]", [Pid, Reason]),
-			{noreply, State#state{calls=lists:delete(CallThread, Calls)}};
-		false ->
-			{noreply, State}
-	end;
-
-handle_cast(Other, State) ->
-	?WARN("Other cast [~p], State [~p]", [Other, State]),
-	{noreply, State}.
-
-handle_info(Other, State) ->
-	?WARN("Other Info [~p], State [~p]", [Other, State]),
-	{noreply, State}.
-
-code_change(_OldVsn, State, _Extra) ->
-	{ok, State}.
-
-terminate({ErrorClass, {Module,Function, [Pid, Message]}}, _State) ->
-	?ERR("RTPPROXY terminated due to Error [~p] in ~p:~p(...) with Msg[~p] from Pid ~p", [ErrorClass, Module, Function, Message, Pid]);
-
-terminate(Reason, _State) ->
-	?ERR("RTPPROXY terminated due to reason [~w]", [Reason]).
+			{error, notfound};
+		MediaThreads when is_list(MediaThreads) ->
+			lists:foreach(fun(Pid) -> gen_server:cast(Pid, Cmd) end, MediaThreads);
+		MediaThread ->
+			% Operate on existing media thread
+			gen_server:cast(MediaThread, Cmd)
+	end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 %% Internal functions %%
 %%%%%%%%%%%%%%%%%%%%%%%%
 
-get_media(CallId, 0, Calls) ->
-	List = lists:filter(fun(X) -> {C, _} = X#thread.id, C == CallId  end, Calls),
-	{list, List};
-get_media(CallId, MediaId, Calls) ->
-	lists:keysearch({CallId, MediaId}, #thread.id, Calls).
+get_media(CallId, 0) ->
+	ets:match(gproc, {{'$1', {'_', '_', {id, CallId, '_'}}},'_'});
+get_media(CallId, MediaId) ->
+	ets:match(gproc, {{'$1', {'_', '_', {id, CallId, MediaId}}},'_'}).
