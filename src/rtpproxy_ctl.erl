@@ -34,19 +34,16 @@ start() ->
 	Nodes = pool:start(rtpproxy, " -config " ++ ConfigPath ++ " "),
 
 	% Replace logger with erlsyslog
-	error_logger:add_report_handler(erlsyslog),
-	rpc:multicall(Nodes, error_logger, add_report_handler, [erlsyslog]),
+	run_everywhere(Nodes, error_logger, add_report_handler, erlsyslog),
 
 	% Run Notifier on each node
-	application:start(rtpproxy_notifier),
-	rpc:multicall(Nodes, application, start, [rtpproxy_notifier]),
+	run_everywhere(Nodes, application, start, rtpproxy_notifier),
 
 	% Run gproc on each node
-	application:start(gproc),
-	rpc:multicall(Nodes, application, start, [gproc]),
+	run_everywhere(Nodes, application, start, gproc),
 
 	% Load necessary config files
-	rpc:multicall(Nodes, application, load, [rtpproxy]),
+	run_everywhere(Nodes, application, load, rtpproxy),
 
 	% Load main module
 	pool:pspawn(application, start, [rtpproxy]).
@@ -154,3 +151,7 @@ get_media(CallId, 0) ->
 get_media(CallId, MediaId) ->
 	ets:match(gproc, {{'$1', {'_', '_', {id, CallId, MediaId}}},'_'}).
 
+run_everywhere(N,M,F,A) ->
+	ok = M:F(A),
+	ok = rpc:multicall(N, M, F, [A]),
+	ok.
