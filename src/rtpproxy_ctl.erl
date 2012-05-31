@@ -48,7 +48,6 @@ start() ->
 	% Load main module
 	pool:pspawn(application, start, [rtpproxy]).
 
-
 stop() ->
 	Status = case init:get_plain_arguments() of
 		[NodeStr] ->
