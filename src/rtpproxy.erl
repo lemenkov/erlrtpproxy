@@ -21,6 +21,7 @@
 -author('lemenkov@gmail.com').
 
 -behaviour(gen_server).
+-export([status/0]).
 -export([start_link/1]).
 -export([init/1]).
 -export([handle_call/3]).
@@ -43,19 +44,19 @@ init(_Unused) ->
 	{ok, #state{}}.
 
 % FIXME this must be reworked (no preformatted strings - just plain stats)
-handle_call(status, _From, #state{calls = Calls} = State) ->
+status() ->
+	Calls = ets:match(gproc, {{'$1', {'_', '_', {id, '$2', '$3'}}},'_'}),
 	Header = io_lib:format("Current state - ~p media stream(s):~n", [length(Calls)]),
 	?INFO(Header, []),
-	MediaInfos = lists:map(fun(X) ->
+	MediaInfos = lists:map(fun({Pid, CallId, MediaId}) ->
 			% TODO fix this strange situation
-			{CallId, MediaId} = X#thread.id,
-			{ok, Reply} = try gen_server:call(X#thread.pid, ?CMD_Q) catch _:_ -> {ok, [["died (shouldn't happend)"]]} end,
+			{ok, Reply} = try gen_server:call(Pid, ?CMD_Q) catch _:_ -> {ok, [["died (shouldn't happend)"]]} end,
 			MediaInfo = io_lib:format("* CallID: ~s, MediaId: ~p, ~s~n", [CallId, MediaId, Reply]),
 			?INFO(MediaInfo, []),
 			MediaInfo
 		end,
 	Calls),
-	{reply, [Header] ++ MediaInfos, State};
+	lists:flatten([Header] ++ MediaInfos).
 
 handle_call(Other, _From, State) ->
 	?WARN("Other call [~p], State [~p]", [Other, State]),
