@@ -33,18 +33,17 @@ start() ->
 	{ok,[[ConfigPath]]} = init:get_argument(config),
 	Nodes = pool:start(rtpproxy, " -config " ++ ConfigPath ++ " "),
 
-	application:start(erlsyslog),
-	% Load erlsyslog parameters
-	{ok, {SyslogHost, SyslogPort}} = application:get_env(erlsyslog, syslog_address),
 	% Replace logger with erlsyslog
-	error_logger:add_report_handler(erlsyslog, {0, SyslogHost, SyslogPort}),
-	rpc:multicall(Nodes, error_logger, add_report_handler, [erlsyslog, {0, SyslogHost, SyslogPort}]),
+	error_logger:add_report_handler(erlsyslog),
+	rpc:multicall(Nodes, error_logger, add_report_handler, [erlsyslog]),
 
 	% Run Notifier on each node
 	application:start(rtpproxy_notifier),
 	rpc:multicall(Nodes, application, start, [rtpproxy_notifier]),
 
+	% Run gproc on each node
 	application:start(gproc),
+	rpc:multicall(Nodes, application, start, [gproc]),
 
 	% Load necessary config files
 	rpc:multicall(Nodes, application, load, [rtpproxy]),
