@@ -78,7 +78,7 @@ force_reload() {
 }
 
 rh_status_verbose() {
-	/sbin/runuser -s /bin/bash $USER -c "erl -noinput $ERL_PARAMETERS -name status@$ERL_NODE -s rtpproxy_ctl status -extra $prog@$ERL_NODE"
+	/sbin/runuser -s /bin/bash $USER -c "erl -noinput $ERL_PARAMETERS -name status@$ERL_NODE -s rtpproxy_ctl status_pp -extra $prog@$ERL_NODE"
 	return $?
 }
 

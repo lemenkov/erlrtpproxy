@@ -22,7 +22,7 @@
 
 -export([start/0]).
 -export([stop/0]).
--export([status/0]).
+-export([status_pp/0]).
 
 start() ->
 	% Start our pool
@@ -71,7 +71,7 @@ stop() ->
 	end,
 	halt(Status).
 
-status() ->
+status_pp() ->
 	Status = case init:get_plain_arguments() of
 		[NodeStr] ->
 			Node = list_to_atom(NodeStr),
