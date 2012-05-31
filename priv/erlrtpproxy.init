@@ -34,6 +34,9 @@ lockfile=/var/lock/subsys/$prog
 
 start() {
 	echo -n $"Starting $prog: "
+	if [ "$ULIMIT_MAX_FILES" ]; then
+		ulimit -n $ULIMIT_MAX_FILES
+	fi
 	daemon --user $USER \
 		"erl"  "$ERL_PARAMETERS \
 		-name $prog@$ERL_NODE \
@@ -75,7 +78,7 @@ force_reload() {
 }
 
 rh_status_verbose() {
-	/sbin/runuser -s /bin/bash $USER -c "erl -noinput $ERL_PARAMETERS -name status@$ERL_NODE -s rtpproxy_ctl status -extra $prog@$ERL_NODE"
+	/sbin/runuser -s /bin/bash $USER -c "erl -noinput $ERL_PARAMETERS -name status@$ERL_NODE -s rtpproxy_ctl status_pp -extra $prog@$ERL_NODE"
 	return $?
 }
 

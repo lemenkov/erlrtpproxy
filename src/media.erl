@@ -59,48 +59,16 @@ start(Cmd) ->
 	% TODO run under supervisor maybe?
 	gen_server:start(?MODULE, Cmd, []).
 
-init (
-	#cmd{
-		type = ?CMD_U,
-		callid = CallId,
-		mediaid = MediaId,
-		from = #party{tag = TagFrom, addr = FAddr, rtcpaddr = FRtcpAddr, proto = TProto},
-		params = Params} = Cmd
-	) ->
+init(#cmd{type = ?CMD_U, callid = CallId, mediaid = MediaId} = Cmd) ->
 	process_flag(trap_exit, true),
 
-	{ok, Ttl} = application:get_env(rtpproxy, ttl),
-	{ok, TRef} = timer:send_interval(Ttl, ping),
+	% Deferred init
+	self() ! {init, Cmd},
 
-	{FromDir, ToDir} = proplists:get_value(direction, Params),
+	% Register itself only after running deferred init
+	gproc:add_global_name({id, CallId, MediaId}),
 
-	FRtpParamsAddon = case FAddr of
-		null -> [];
-		{GuessIp0, GuessPort0} -> [{rtp, {GuessIp0, GuessPort0}}]
-	end,
-
-	FRtcpParamsAddon = case FRtcpAddr of
-		null -> [];
-		{GuessIp1, GuessPort1} -> [{rtcp, {GuessIp1, GuessPort1}}]
-	end,
-
-	% FIXME use start (w/o linking)
-	{ok, PidF} = rtp_socket:start_link([self(), TProto, [{direction, ToDir}]]),
-	{ok, PidT} = rtp_socket:start_link([self(), TProto, proplists:delete(direction, Params) ++ [{direction, FromDir}] ++ FRtpParamsAddon ++ FRtcpParamsAddon]),
-
-	{ok,
-		#state{
-			callid	= CallId,
-			mediaid = MediaId,
-			tag_f	= TagFrom,
-			tag_t	= null,
-			tref	= TRef,
-			from	= #media{pid=PidF, rtpstate=nortp},
-			to	= #media{pid=PidT, rtpstate=nortp},
-			notify_tag = proplists:get_value(notify, Params, []),
-			origcmd = Cmd
-		}
-	}.
+	{ok, #state{}}.
 
 handle_call(?CMD_Q, _From, #state{started = Started} = State) ->
 	% TODO (acquire information about call state)
@@ -305,6 +273,7 @@ code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 terminate(Reason, #state{callid = CallId, mediaid = MediaId, tref = TimerRef, from = From, to = To}) ->
+	% No need to explicitly unregister from gproc - it does so automatically
 	timer:cancel(TimerRef),
 	?ERR("terminated due to reason [~p]", [Reason]).
 
@@ -343,6 +312,47 @@ handle_info(bye, State) ->
 	{stop, bye, State};
 handle_info(cancel, State) ->
 	{stop, cancel, State};
+
+handle_info({init,
+	#cmd{
+		type = ?CMD_U,
+		callid = CallId,
+		mediaid = MediaId,
+		from = #party{tag = TagFrom, addr = FAddr, rtcpaddr = FRtcpAddr, proto = TProto},
+		params = Params} = Cmd
+}, _) ->
+	{ok, Ttl} = application:get_env(rtpproxy, ttl),
+	{ok, TRef} = timer:send_interval(Ttl, ping),
+
+	{FromDir, ToDir} = proplists:get_value(direction, Params),
+
+	FRtpParamsAddon = case FAddr of
+		null -> [];
+		{GuessIp0, GuessPort0} -> [{rtp, {GuessIp0, GuessPort0}}]
+	end,
+
+	FRtcpParamsAddon = case FRtcpAddr of
+		null -> [];
+		{GuessIp1, GuessPort1} -> [{rtcp, {GuessIp1, GuessPort1}}]
+	end,
+
+	% FIXME use start (w/o linking)
+	{ok, PidF} = rtp_socket:start_link([self(), TProto, [{direction, ToDir}]]),
+	{ok, PidT} = rtp_socket:start_link([self(), TProto, proplists:delete(direction, Params) ++ [{direction, FromDir}] ++ FRtpParamsAddon ++ FRtcpParamsAddon]),
+
+	{ok,
+		#state{
+			callid	= CallId,
+			mediaid = MediaId,
+			tag_f	= TagFrom,
+			tag_t	= null,
+			tref	= TRef,
+			from	= #media{pid=PidF, rtpstate=nortp},
+			to	= #media{pid=PidT, rtpstate=nortp},
+			notify_tag = proplists:get_value(notify, Params, []),
+			origcmd = Cmd
+		}
+	};
 
 handle_info(Other, State) ->
 	?WARN("Other Info [~p], State [~p]", [Other, State]),
