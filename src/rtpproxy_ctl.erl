@@ -135,11 +135,11 @@ command(#cmd{callid = CallId, mediaid = MediaId} = Cmd) ->
 		[] ->
 			?WARN("Media stream does not exist. Do nothing.", []),
 			{error, notfound};
-		MediaThreads when is_list(MediaThreads) ->
-			lists:foreach(fun(Pid) -> gen_server:cast(Pid, Cmd) end, MediaThreads);
-		MediaThread ->
+		[MediaThread] when is_pid(MediaThread) ->
 			% Operate on existing media thread
-			gen_server:cast(MediaThread, Cmd)
+			gen_server:cast(MediaThread, Cmd);
+		MediaThreads when is_list(MediaThreads) ->
+			lists:foreach(fun(Pid) -> gen_server:cast(Pid, Cmd) end, MediaThreads)
 	end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%
