@@ -151,6 +151,5 @@ get_media(CallId, MediaId) ->
 	ets:match(gproc, {{'$1', {'_', '_', {id, CallId, MediaId}}},'_'}).
 
 run_everywhere(N,M,F,A) ->
-	ok = M:F(A),
-	ok = rpc:multicall(N, M, F, [A]),
-	ok.
+	M:F(A),
+	rpc:multicall(N, M, F, [A]).
