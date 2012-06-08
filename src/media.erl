@@ -66,12 +66,7 @@ init(#cmd{type = ?CMD_U, callid = CallId, mediaid = MediaId} = Cmd) ->
 	self() ! {init, Cmd},
 
 	% Register itself only after running deferred init
-	case whereis(gproc_dist) of
-		undefined ->
-			gproc:add_local_name({id, CallId, MediaId});
-		_ ->
-			gproc:add_global_name({id, CallId, MediaId})
-	end,
+	gproc:add_global_name({id, CallId, MediaId}),
 
 	{ok, #state{}}.
 
