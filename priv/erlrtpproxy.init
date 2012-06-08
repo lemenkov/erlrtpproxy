@@ -37,6 +37,10 @@ start() {
 	if [ "$ULIMIT_MAX_FILES" ]; then
 		ulimit -n $ULIMIT_MAX_FILES
 	fi
+
+	# cd to a writable directory to allow gproc store its global data
+	cd /var/run/erlrtpproxy
+
 	daemon --user $USER \
 		"erl"  "$ERL_PARAMETERS \
 		-name $prog@$ERL_NODE \
