@@ -53,7 +53,7 @@ stop() ->
 	Status = case init:get_plain_arguments() of
 		[NodeStr] ->
 			Node = list_to_atom(NodeStr),
-			try rpc:call(Node, application, stop, [rtpproxy], 5000) of
+			try rpc:call(Node, rtpproxy_ctl, command, [#cmd{type = ?CMD_X}], 5000) of
 				{badrpc, _} ->
 					2;
 				_ ->
