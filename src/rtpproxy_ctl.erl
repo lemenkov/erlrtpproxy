@@ -47,7 +47,7 @@ start() ->
 	run_everywhere(Nodes, application, load, rtpproxy),
 
 	% Load main module
-	pool:pspawn(application, start, [rtpproxy]).
+	application:start(rtpproxy).
 
 stop() ->
 	Status = case init:get_plain_arguments() of
