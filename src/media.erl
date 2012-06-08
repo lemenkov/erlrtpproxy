@@ -345,7 +345,7 @@ handle_info({init,
 	{ok, PidF} = rtp_socket:start_link([self(), TProto, [{direction, ToDir}]]),
 	{ok, PidT} = rtp_socket:start_link([self(), TProto, proplists:delete(direction, Params) ++ [{direction, FromDir}] ++ FRtpParamsAddon ++ FRtcpParamsAddon]),
 
-	{ok,
+	{noreply,
 		#state{
 			callid	= CallId,
 			mediaid = MediaId,
