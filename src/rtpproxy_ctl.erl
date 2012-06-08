@@ -75,11 +75,12 @@ status_pp() ->
 	Status = case init:get_plain_arguments() of
 		[NodeStr] ->
 			Node = list_to_atom(NodeStr),
-			try rpc:call(Node, application, get_application, [rtpproxy], 5000) of
+			try rpc:call(Node, rtpproxy_ctl, command, [#cmd{type = ?CMD_I, params = [brief]}], 5000) of
+%			try rpc:call(Node, rtpproxy_ctl, status, [], 5000) of
 				{badrpc, _} ->
 					4;
-				{ok, rtpproxy} ->
-					io:format("~s", [status()]),
+				{ok, {stats, Number}} ->
+					io:format("active calls: ~p~n", [Number]),
 					0;
 				undefined ->
 					ok = io:format("~n"),
