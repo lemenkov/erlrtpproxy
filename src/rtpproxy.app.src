@@ -5,7 +5,7 @@
 		{vsn, "%VSN%"},
 		{modules, []},
 		{registered, [rtpproxy_sup]},
-		{applications, [kernel, stdlib]},
+		{applications, [kernel, stdlib, gproc]},
 		{mod, {rtpproxy_app, []}}
 	    ]
 }.
