@@ -148,9 +148,9 @@ command(#cmd{callid = CallId, mediaid = MediaId} = Cmd) ->
 %%%%%%%%%%%%%%%%%%%%%%%%
 
 get_media(CallId, 0) ->
-	ets:match(gproc, {{'$1', {'_', '_', {id, CallId, '_'}}},'_'});
+	[ X || [X] <- ets:match(gproc, {{'$1', {'_', '_', {id, CallId, '_'}}},'_'})];
 get_media(CallId, MediaId) ->
-	ets:match(gproc, {{'$1', {'_', '_', {id, CallId, MediaId}}},'_'}).
+	[ X || [X] <-  ets:match(gproc, {{'$1', {'_', '_', {id, CallId, MediaId}}},'_'})].
 
 run_everywhere(N,M,F,A) ->
 	M:F(A),
