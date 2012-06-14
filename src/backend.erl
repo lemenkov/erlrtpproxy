@@ -114,7 +114,10 @@ handle_cast({msg, Msg, Ip, Port}, State) ->
 			end;
 		#cmd{origin = Origin} = Cmd ->
 			error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
-			rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}})
+			rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}}),
+			error_logger:info_msg("SER reply ok~n"),
+			Data = ser_proto:encode(#response{cookie = Cmd#cmd.cookie, origin = Cmd#cmd.origin, type = reply, data = ok}),
+			gen_server:cast(listener, {msg, Data, Ip, Port})
 	catch
 		throw:{error_syntax, Error} ->
 			error_logger:error_msg("Bad syntax. [~s -> ~s]~n", [Msg, Error]),
