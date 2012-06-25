@@ -765,6 +765,11 @@ parse_cmd_u_20_no_mediaids_test() ->
 			]
 		}, ser_proto:decode(<<"c3c1de658b0d36443a646cefedf16434 U smaalefzrxxfrqw@localhost.localdomain-0 192.168.0.1 8000 qooxb aa436b4e2d3bb3185841946c849a7ca7 4123 28221712">>)).
 
+parse_cmd_u_21_wrong_ipv6_test() ->
+	?assertThrow(
+		{error_syntax,{"Wrong IP","fe80::ff:ff:ff:ff%eth0"}},
+		ser_proto:decode(<<"3898_5 USc0 2-1649@fe80::ff:ff:ff:ff%eth0 fe80::ff:ff:ff:ff%eth0 6000 1649SIPpTag002;1">>)).
+
 cmd_l_test_() ->
 	Cmd1 = #cmd{
 			type = ?CMD_L,

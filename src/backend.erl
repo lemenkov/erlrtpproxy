@@ -119,8 +119,12 @@ handle_cast({msg, Msg, Ip, Port}, State) ->
 			Data = ser_proto:encode(#response{cookie = Cmd#cmd.cookie, origin = Cmd#cmd.origin, type = reply, data = ok}),
 			gen_server:cast(listener, {msg, Data, Ip, Port})
 	catch
-		throw:{error_syntax, Error} ->
-			error_logger:error_msg("Bad syntax. [~s -> ~s]~n", [Msg, Error]),
+		throw:{error_syntax, ErrorMsg} when is_list(ErrorMsg) ->
+			error_logger:error_msg("Bad syntax. [~s -> ~s]~n", [Msg, ErrorMsg]),
+			Data = ser_proto:encode({error, syntax, Msg}),
+			gen_server:cast(listener, {msg, Data, Ip, Port});
+		throw:{error_syntax, {ErrorMsg, ErrorData}} when is_list(ErrorMsg) ->
+			error_logger:error_msg("Bad syntax. [~s -> ~s==~p]~n", [Msg, ErrorMsg, ErrorData]),
 			Data = ser_proto:encode({error, syntax, Msg}),
 			gen_server:cast(listener, {msg, Data, Ip, Port});
 		E:C ->
