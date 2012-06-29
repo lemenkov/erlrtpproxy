@@ -39,7 +39,7 @@ start() {
 	fi
 
 	# cd to a writable directory to allow gproc store its global data
-	cd /var/run/erlrtpproxy
+	cd /var/lib/erlrtpproxy
 
 	daemon --user $USER \
 		"erl"  "$ERL_PARAMETERS \
