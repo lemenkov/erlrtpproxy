@@ -87,7 +87,6 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_utils.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/media.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/rtp_socket.beam
-%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/y.beam
 
 %dir %attr(0755,%{name},%{name}) %{_localstatedir}/lib/%{name}
 %config(noreplace) %attr(0600,%{name},%{name}) %{_localstatedir}/lib/%{name}/.erlang.cookie
