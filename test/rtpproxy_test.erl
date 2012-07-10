@@ -133,17 +133,15 @@ run_proxy_test_() ->
 				fun () ->
 						gen_udp:send(Fd, {127,0,0,1}, ?RTPPROXY_PORT, <<"356289 Ib\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
-						% Here is an error in rtpproxy - it should return cookie as well, e.g. prepend 356289 to the beginning
-						% ?assertMatch(<<"356289 sessions created: ", _/binary>>, Answer) end
-						?assertMatch(<<" active sessions: ", _/binary>>, Answer) end
+						% Here is an error in the generic rtpproxy - it doesn't return cookie, e.g. does not prepend 356289 to the beginning
+						?assertMatch(<<"356289 active sessions: ", _/binary>>, Answer) end
 			},
 			{"Request overall statistics",
 				fun () ->
 						gen_udp:send(Fd, {127,0,0,1}, ?RTPPROXY_PORT, <<"451309 I\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
-						% Here is an error in rtpproxy - it should return cookie as well, e.g. prepend 451309 to the beginning
-						% ?assertMatch(<<"451309 sessions created: ", _/binary>>, Answer) end
-						?assertMatch(<<" sessions created: ", _/binary>>, Answer) end
+						% Here is an error in the generic rtpproxy - it doesn't return cookie, e.g. does not prepend 451309 to the beginning
+						?assertMatch(<<"451309 sessions created: ", _/binary>>, Answer) end
 			},
 			{"Try to close existing session",
 				fun () ->
