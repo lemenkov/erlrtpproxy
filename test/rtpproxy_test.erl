@@ -84,26 +84,24 @@ run_proxy_test_() ->
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						?assertEqual(<<"456987 1\n">>, Answer) end
 			},
-			% FIXME
-			{"Request support for session timeout notifications (ver. 20081224 - not supported by this proxy)",
+			{"Request support for session timeout notifications (ver. 20081224)",
 				fun () ->
 						gen_udp:send(Fd, {127,0,0,1}, ?RTPPROXY_PORT, <<"145698 VF 20081224\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
-						?assertEqual(<<"145698 0\n">>, Answer) end
+						?assertEqual(<<"145698 1\n">>, Answer) end
 			},
-			% FIXME
-			{"Request support for automatic bridging (ver. 20090810 - not supported by this proxy)",
+			{"Request support for automatic bridging (ver. 20090810)",
 				fun () ->
 						gen_udp:send(Fd, {127,0,0,1}, ?RTPPROXY_PORT, <<"352743 VF 20090810\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
-						?assertEqual(<<"352743 0\n">>, Answer) end
+						?assertEqual(<<"352743 1\n">>, Answer) end
 			},
-			% FIXME should be E1
 			{"Request for unsupported extensions",
 				fun () ->
 						gen_udp:send(Fd, {127,0,0,1}, ?RTPPROXY_PORT, <<"809210 VF 20111109\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
-						?assertEqual(<<"809210 0\n">>, Answer) end
+						% A generic rtpproxy returns 0 here which looks wrong. Should be E1 really.
+						?assertEqual(<<"809210 E1\n">>, Answer) end
 			},
 			{"Try to create new session",
 				fun () ->
