@@ -19,10 +19,6 @@
 
 -module(rtpproxy_test).
 
-%%
-%% Please, start generic rtpproxy at the 127.0.0.1:33333 first
-%%
-
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
@@ -31,10 +27,71 @@
 -define(RTPPROXY_PORT, 33333).
 
 run_proxy_test_() ->
+	% This is a Fd which will be used for sending messages
 	{ok, Fd} = gen_udp:open(0, [{active, false}, binary]),
+
 	{setup,
-		fun() -> true end,
-		fun (_) -> gen_udp:close(Fd) end,
+		fun() ->
+				% Set node name
+				net_kernel:start(['erlrtpproxy_test@localhost', shortnames]),
+
+				% Load fake rtpproxy_ctl module
+				meck:new(rtpproxy_ctl),
+				meck:expect(rtpproxy_ctl,
+					command,
+					fun
+						(#cmd{
+								origin=#origin{pid = Pid},
+								type = message_u,
+								callid = <<"0003e30c-callid01@192.168.0.100">>
+							} = Cmd) ->
+							gen_server:cast(Pid, {reply, Cmd, {{{192,168,0,1}, 12000}, {{192,168,0,1}, 12001}}});
+						(#cmd{
+								origin=#origin{pid = Pid},
+								type = message_u,
+								callid = <<"0003e30c-callid02@192.168.0.100">>
+							} = Cmd) ->
+							gen_server:cast(Pid, {reply, Cmd, {{{192,168,0,1}, 12000}, {{192,168,0,1}, 12001}}});
+						(#cmd{
+								origin=#origin{pid = Pid},
+								type = message_i,
+								params = [brief]
+							} = Cmd) ->
+							gen_server:cast(Pid, {reply, Cmd, {stats, 0}});
+						(#cmd{
+								origin=#origin{pid = Pid},
+								type = message_i,
+								params = []
+							} = Cmd) ->
+							gen_server:cast(Pid, {reply, Cmd, {stats, 100, 0}});
+						(#cmd{
+								origin=#origin{pid = Pid},
+								type = message_d,
+								callid = <<"0003e30c-callid02@192.168.0.100">>
+							} = Cmd) ->
+							gen_server:cast(Pid, {reply, Cmd, ok});
+						(#cmd{
+								origin=#origin{pid = Pid},
+								type = message_x
+							} = Cmd) ->
+							gen_server:cast(Pid, {reply, Cmd, ok});
+						(#cmd{origin=#origin{pid = Pid}} = Cmd) ->
+							error_logger:info_msg("UNKNOWN for meck: ~p~n", [Cmd]),
+							exit(1)
+					end
+				),
+
+				udp_listener:start_link([{127,0,0,1}, ?RTPPROXY_PORT]),
+				backend:start_link('erlrtpproxy_test@localhost'),
+
+				% Give backend time to ping a server - this will be removed completely
+				timer:sleep(2000)
+		end,
+		fun (_) ->
+				gen_udp:close(Fd),
+				meck:unload(rtpproxy_ctl),
+				net_kernel:stop()
+		end,
 		[
 			{"Try to handshake (get magic number back -20040107)",
 				fun () ->
