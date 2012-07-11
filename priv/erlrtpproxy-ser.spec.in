@@ -16,6 +16,7 @@ Source0:	lemenkov-erlrtpproxy-%{realname}-%{version}-%{patchnumber}-g%{git_tag}.
 BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 BuildRequires:	erlang
+BuildRequires:	erlang-meck
 Requires:	erlang
 Requires:	erlang-erlsyslog
 Requires(post): /sbin/chkconfig
