@@ -9,14 +9,24 @@ UNAME := $(shell uname -s)
 ERLANG_ROOT := $(shell erl -eval 'io:format("~s", [code:root_dir()])' -s init stop -noshell)
 ERLDIR=$(ERLANG_ROOT)/lib/$(NAME)-$(VSN)
 
+
+EBIN_DIR := ebin
 ERL_SOURCES  := $(wildcard src/*.erl)
-ERL_OBJECTS  := $(ERL_SOURCES:src/%.erl=ebin/%.beam)
-APP_FILE := ebin/$(NAME).app
+ERL_OBJECTS  := $(ERL_SOURCES:src/%.erl=$(EBIN_DIR)/%.beam)
+APP_FILE := $(EBIN_DIR)/$(NAME).app
 
 all: compile
 
 compile:
 	@VSN=$(VSN) BUILD_DATE=$(BUILD_DATE) $(REBAR) compile $(REBAR_FLAGS)
+
+rel: compile
+	rm -rf rel/ser
+	$(REBAR) generate $(REBAR_FLAGS)
+
+check: test
+test: all
+	$(REBAR) eunit $(REBAR_FLAGS)
 
 install: all
 	@test -d $(DESTDIR)$(ERLDIR)/ebin || mkdir -p $(DESTDIR)$(ERLDIR)/ebin

@@ -1,0 +1,135 @@
+#!/bin/sh
+#
+# This is the init script for starting up the openser-erlrtpproxy interface
+#
+# chkconfig: - 25 75
+# description: Starts and stops openser-erlrtpproxy interface.
+
+### BEGIN INIT INFO
+# Provides: erlrtpproxy-ser
+# Required-Start: $local_fs $network
+# Required-Stop: $local_fs $network
+# Should-Start: $remote_fs
+# Should-Stop: $remote_fs
+# Default-Start:
+# Default-Stop: 0 1 2 3 4 5 6
+# Short-Description: start and stop openser-interface
+# Description: tbd
+### END INIT INFO
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+prog="ser"
+user="ser"
+
+CONFIG_FILE=/etc/$prog.config
+ERL_PARAMETERS="+K true +W w"
+ERL_NODE="127.0.0.1"
+
+[ -f /etc/sysconfig/$prog ] && . /etc/sysconfig/$prog
+
+lockfile=/var/lock/subsys/$prog
+
+retval=0
+
+start() {
+	echo -n $"Starting $prog: "
+
+	# check whether $prog was already started
+	if rh_status_q ; then
+		echo -n "already running" && warning && echo
+		return 0
+	fi
+
+	daemon --user $user "erl $ERL_PARAMETERS -name $prog@$ERL_NODE -config $CONFIG_FILE -detached -s ser_ctl"
+	retval=$?
+	echo
+	[ $retval -eq 0 ] && touch $lockfile
+	return $retval
+}
+
+stop() {
+	echo -n $"Stopping $prog: "
+
+	# check whether $prog was already started
+	if ! rh_status_q ; then
+		echo -n "already stopped" && warning && echo
+		return 0
+	fi
+
+	daemon --user $user "erl -noinput $ERL_PARAMETERS -name close@$ERL_NODE -s ser_ctl stop -extra $prog@$ERL_NODE"
+	retval=$?
+	echo
+	[ $retval -eq 0 ] && rm -f $lockfile
+	return $retval
+}
+
+restart() {
+	stop
+	sleep 10
+	start
+}
+
+reload() {
+	echo -n $"Reloading $prog beam-files: "
+
+	# check whether $prog was started
+	if ! rh_status_q ; then
+		echo -n " stopped" && failure && echo
+		return 7
+	fi
+
+	/sbin/runuser -s /bin/bash $user -c "erl -noinput $ERL_PARAMETERS -name status@$ERL_NODE -s ser_ctl reload -extra $prog@$ERL_NODE" 2>&1
+	retval=$?
+	echo
+	return $retval
+}
+
+force_reload() {
+	reload
+}
+
+rh_status() {
+	echo -n $"Getting $prog status: "
+	/sbin/runuser -s /bin/bash $user -c "erl -noinput $ERL_PARAMETERS -name status@$ERL_NODE -s ser_ctl status -extra $prog@$ERL_NODE" 2>&1
+	retval=$?
+	echo
+	return $retval
+}
+
+rh_status_q() {
+    rh_status >/dev/null 2>&1
+}
+
+# To prevent "File operation error: eacces" issues
+cd /
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+	stop
+        ;;
+    restart)
+        restart
+        ;;
+    reload)
+        reload
+        ;;
+    force-reload)
+        force_reload
+        ;;
+    status)
+        rh_status
+        ;;
+    condrestart|try-restart)
+        rh_status_q || exit 0
+        restart
+        ;;
+    *)
+        echo $"Usage: $0 {start|stop|status|restart|condrestart|try-restart|reload|force-reload}"
+        retval=2
+esac
+exit $retval
