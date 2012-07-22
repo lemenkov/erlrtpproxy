@@ -40,8 +40,7 @@ start() ->
 	run_everywhere(Nodes, application, start, rtpproxy_notifier),
 
 	% Run gproc on each node
-	rpc:multicall(Nodes, application, set_env, [gproc, gproc_dist, all]),
-	application:set_env(gproc, gproc_dist, all),
+	run_everywhere(Nodes, application, set_env, [gproc, gproc_dist, all]),
 	run_everywhere(Nodes, application, start, gproc),
 
 	% Load necessary config files
