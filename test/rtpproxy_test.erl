@@ -82,7 +82,7 @@ run_proxy_test_() ->
 				),
 
 				udp_listener:start_link([backend, {127,0,0,1}, ?RTPPROXY_PORT]),
-				backend:start_link('erlrtpproxy_test@localhost')
+				backend:start_link(ser)
 		end,
 		fun (_) ->
 				gen_udp:close(Fd),

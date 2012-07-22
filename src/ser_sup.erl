@@ -23,9 +23,9 @@ init([]) ->
 			{udp_listener, {udp_listener, start_link, [[backend, Ip, Port]]}, permanent, 10000, worker, []}
 	end,
 
-	% Load protocol backend (ser for now)
-	{ok, Addr} = application:get_env(rtpproxy, backend),
-	BackendProcess = {backend, {backend, start_link, [Addr]}, permanent, 10000, worker, []},
+	% Load protocol backend (only ser for now - FIXME)
+	{ok, Type} = application:get_env(rtpproxy, backend),
+	BackendProcess = {backend, {backend, start_link, [Type]}, permanent, 10000, worker, []},
 
 	{ok,{SupFlags, [ListenerProcess, BackendProcess]}}.
 
