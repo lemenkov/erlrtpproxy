@@ -4,7 +4,7 @@
 		{description, "ipPort rtpproxy application"},
 		{vsn, "%VSN%"},
 		{modules, []},
-		{registered, [rtpproxy_sup]},
+		{registered, [rtpproxy_sup, backend, ser_sup, listener]},
 		{applications, [kernel, stdlib, gproc]},
 		{mod, {rtpproxy_app, []}}
 	    ]
