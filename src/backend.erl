@@ -35,7 +35,7 @@
 -export([code_change/3]).
 -export([terminate/2]).
 
--include("common.hrl").
+-include("../include/common.hrl").
 
 -record(state, {timer, mode, node}).
 

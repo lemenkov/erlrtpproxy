@@ -22,7 +22,7 @@
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
--include("../src/common.hrl").
+-include("../include/common.hrl").
 
 -define(RTPPROXY_PORT, 33333).
 

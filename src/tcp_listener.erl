@@ -41,7 +41,7 @@
 	clients = []
 }).
 
--include("common.hrl").
+-include("../include/common.hrl").
 
 start(Args) ->
 	gen_server:start({local, listener}, ?MODULE, Args, []).

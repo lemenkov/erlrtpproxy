@@ -39,8 +39,6 @@
 % * port - real client's port
 -record(media, {pid=null, ip=null, port=null, rtpstate=nortp}).
 
--record(party, {tag, addr=null, rtcpaddr=null, proto=udp}).
-
 -record(state, {
 		callid,
 		mediaid,
