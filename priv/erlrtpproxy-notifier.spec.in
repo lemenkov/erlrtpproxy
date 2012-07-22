@@ -1,0 +1,64 @@
+%global realname rtpproxy_notifier
+%global debug_package %{nil}
+%global git_tag 1234567
+%global patchnumber 0
+
+
+Name:		erlrtpproxy-notifier
+Version:	%VSN%
+Release:	1%{?dist}
+Summary:	Notification add-on for RTP proxying daemon
+Group:		Applications/Internet
+License:	GPLv3+
+URL:		https://github.com/lemenkov/erlrtpproxy-notifier
+# wget --no-check-certificate https://github.com/lemenkov/erlrtpproxy-notifier/tarball/%VSN%
+Source0:	lemenkov-%{name}-%{version}-%{patchnumber}-g%{git_tag}.tar.gz
+BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
+
+BuildRequires:	erlang
+BuildRequires:	erlang-eradius
+Requires:	erlang
+Requires:	erlang-eradius
+Obsoletes:	erlrtpproxy-radius
+
+
+%description
+Notification add-on for RTP proxying daemon. It supports RADIUS
+and rtpproxy's own simple notification extension.
+
+
+%prep
+%setup -q -n lemenkov-%{name}-%{git_tag}
+
+
+%build
+make %{?_smp_mflags}
+
+
+%install
+rm -rf $RPM_BUILD_ROOT
+make install DESTDIR=$RPM_BUILD_ROOT
+
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+
+%files
+%defattr(-,root,root,-)
+%config(noreplace) %{_sysconfdir}/erl%{realname}.config
+%dir %{_libdir}/erlang/lib/%{realname}-%{version}
+%dir %{_libdir}/erlang/lib/%{realname}-%{version}/ebin
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/backend_sup.beam
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}.app
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}.beam
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_app.beam
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_backend_notify.beam
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_backend_radius.beam
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_sup.beam
+
+
+%changelog
+* %DATE% Peter Lemenkov <lemenkov@gmail.com> - %VSN%-1
+- Ver. %VSN%
+

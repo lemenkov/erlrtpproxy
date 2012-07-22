@@ -1,14 +1,12 @@
 REBAR ?= $(shell which rebar 2>/dev/null || which ./rebar)
 REBAR_FLAGS ?=
 
-VSN := "0.4.18"
+VSN := "0.0.12"
 BUILD_DATE := `LANG=C date +"%a %b %d %Y"`
-NAME := rtpproxy
-UNAME := $(shell uname -s)
+NAME := rtpproxy_notifier
 
 ERLANG_ROOT := $(shell erl -eval 'io:format("~s", [code:root_dir()])' -s init stop -noshell)
 ERLDIR=$(ERLANG_ROOT)/lib/$(NAME)-$(VSN)
-
 
 EBIN_DIR := ebin
 ERL_SOURCES  := $(wildcard src/*.erl)
@@ -47,9 +45,6 @@ else
 	@install -p -m 0644 priv/erlrtpproxy.sysconfig $(DESTDIR)$(prefix)/etc/sysconfig/erl$(NAME)
 	@install -p -m 0755 priv/erlrtpproxy.init $(DESTDIR)$(prefix)/etc/rc.d/init.d/erl$(NAME)
 endif
-
-test:
-	$(REBAR) eunit $(REBAR_FLAGS)
 
 clean:
 	@$(REBAR) clean $(REBAR_FLAGS)
