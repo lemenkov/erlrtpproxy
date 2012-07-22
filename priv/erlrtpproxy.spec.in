@@ -16,10 +16,13 @@ Source0:	lemenkov-%{name}-%{version}-%{patchnumber}-g%{git_tag}.tar.gz
 BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 BuildRequires:	erlang
+BuildRequires:	erlang-eradius
 BuildRequires:	erlang-erlsyslog
+BuildRequires:	erlang-meck
 BuildRequires:	erlang-rebar
 BuildRequires:	erlang-rtplib
 Requires:	erlang
+Requires:	erlang-eradius
 Requires:	erlang-erlsyslog
 Requires:	erlang-gproc
 Requires:	erlang-rtplib
@@ -27,6 +30,9 @@ Requires(post): /sbin/chkconfig
 Requires(preun): /sbin/chkconfig
 Requires(preun): /sbin/service
 Requires(postun): /sbin/service
+Obsoletes:	erlrtpproxy-notifier
+Obsoletes:	erlrtpproxy-ser
+Obsoletes:	erlrtpproxy-radius
 
 
 %description
@@ -73,8 +79,11 @@ fi
 rm -rf $RPM_BUILD_ROOT
 
 
+%check
+make test
+
+
 %files
-%defattr(-,root,root,-)
 %dir %{_libdir}/erlang/lib/%{realname}-%{version}
 %dir %{_libdir}/erlang/lib/%{realname}-%{version}/ebin
 %{_initrddir}/%{name}
@@ -87,6 +96,25 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_utils.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/media.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/rtp_socket.beam
+
+# OpenSER/OpenSIPS/Kamailio/Sippy interface
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/backend.beam
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/ser_app.beam
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/ser_ctl.beam
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/ser_proto.beam
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/ser_sup.beam
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/ser_utils.beam
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/tcp_listener.beam
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/udp_listener.beam
+
+# Notification plug-in
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/backend_sup.beam
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/rtpproxy_notifier.beam
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/rtpproxy_notifier_app.beam
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/rtpproxy_notifier_backend_notify.beam
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/rtpproxy_notifier_backend_radius.beam
+%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/rtpproxy_notifier_sup.beam
+
 
 %dir %attr(0755,%{name},%{name}) %{_localstatedir}/lib/%{name}
 %config(noreplace) %attr(0600,%{name},%{name}) %{_localstatedir}/lib/%{name}/.erlang.cookie
