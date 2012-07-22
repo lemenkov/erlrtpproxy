@@ -14,8 +14,7 @@ init([]) ->
 	SupFlags = {RestartStrategy, MaxRestarts, MaxTimeBetweenRestarts},
 
 	% Load generic erlrtpproxy controlling interface listener
-	application:load(ser),
-	{ok, {Proto, IpStr, Port}} = application:get_env(ser, listen),
+	{ok, {Proto, IpStr, Port}} = application:get_env(rtpproxy, listen),
 	{ok, Ip} = inet_parse:address(IpStr),
 	ListenerProcess = case Proto of
 		tcp ->
@@ -25,7 +24,7 @@ init([]) ->
 	end,
 
 	% Load protocol backend (ser for now)
-	{ok, Addr} = application:get_env(ser, backend),
+	{ok, Addr} = application:get_env(rtpproxy, backend),
 	BackendProcess = {backend, {backend, start_link, [Addr]}, permanent, 10000, worker, []},
 
 	{ok,{SupFlags, [ListenerProcess, BackendProcess]}}.

@@ -16,22 +16,22 @@ start_link() ->
 	gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init(_) ->
-	RadiusBackend = case application:get_env(?MODULE, radacct_servers) of
+	RadiusBackend = case application:get_env(rtpproxy, radacct_servers) of
 		{ok, RadAcctServers} ->
 			backend_sup:start_link(radius, RadAcctServers),
 			true;
 		_ ->
 			false
 	end,
-	NotifyBackend = case application:get_env(?MODULE, notify_servers) of
+	NotifyBackend = case application:get_env(rtpproxy, notify_servers) of
 		{ok, NotifyServers} ->
 			backend_sup:start_link(notify, NotifyServers),
 			true;
 		_ ->
 			false
 	end,
-	{ok, IgnoreStart} = application:get_env(?MODULE, ignore_start),
-	{ok, IgnoreStop} = application:get_env(?MODULE, ignore_stop),
+	{ok, IgnoreStart} = application:get_env(rtpproxy, ignore_start),
+	{ok, IgnoreStop} = application:get_env(rtpproxy, ignore_stop),
 	error_logger:info_msg("Started Notifier at ~p~n", [node()]),
 	{ok, #state{
 			radius = RadiusBackend,
