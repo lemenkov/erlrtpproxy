@@ -26,7 +26,6 @@
 
 -behaviour(gen_server).
 
--export([start/1]).
 -export([start_link/1]).
 -export([init/1]).
 -export([handle_call/3]).
@@ -37,19 +36,12 @@
 
 -include("../include/common.hrl").
 
--record(state, {timer, mode, node}).
-
-start(Args) ->
-	gen_server:start({local, backend}, ?MODULE, Args, []).
 start_link(Args) ->
 	gen_server:start_link({local, backend}, ?MODULE, Args, []).
 
-init (RtpproxyNode) ->
-	% Ping every second
-	{ok, TRef} = timer:send_interval(1000, ping),
-
+init (_) ->
 	error_logger:info_msg("Erlrtpproxy backend started at ~p~n", [node()]),
-	{ok, #state{timer = TRef, mode = offline, node = RtpproxyNode}}.
+	{ok, []}.
 
 handle_call(Other, _From, State) ->
 	error_logger:warning_msg("Erlrtpproxy backend: strange call: ~p~n", [Other]),
@@ -79,12 +71,6 @@ handle_cast({reply, Cmd = #cmd{origin = #origin{type = ser, ip = Ip, port = Port
 handle_cast({reply, Cmd = #cmd{origin = #origin{type = ser, ip = Ip, port = Port}}, {Addr1, Addr2}}, State) ->
 	error_logger:info_msg("SER reply ~p~n", [{Addr1, Addr2}]),
 	Data = ser_proto:encode(#response{cookie = Cmd#cmd.cookie, origin = Cmd#cmd.origin, type = reply, data = {Addr1, Addr2}}),
-	gen_server:cast(listener, {msg, Data, Ip, Port}),
-	{noreply, State};
-
-handle_cast({msg, Msg, Ip, Port}, #state{mode = offline} = State) ->
-	error_logger:info_msg("SER cmd (OFFLINE): ~p~n", [Msg]),
-	Data = ser_proto:encode({error, software, Msg}),
 	gen_server:cast(listener, {msg, Data, Ip, Port}),
 	{noreply, State};
 
@@ -147,20 +133,6 @@ handle_cast(Other, State) ->
 	error_logger:warning_msg("Erlrtpproxy backend: strange cast: ~p~n", [Other]),
 	{noreply, State}.
 
-handle_info(ping, #state{node = undefined} = State) ->
-	{noreply, State#state{mode = offline}};
-handle_info(ping, #state{mode = Online, node = RtpproxyNode} = State) ->
-	case net_adm:ping(RtpproxyNode) of
-		pong when Online == offline ->
-			error_logger:warning_msg("Connection to erlrtpproxy restored.~n"),
-			{noreply, State#state{mode = online}};
-		pong ->
-			{noreply, State#state{mode = online}};
-		pang ->
-			error_logger:error_msg("No connection to erlrtpproxy.~n"),
-			{noreply, State#state{mode = offline}}
-	end;
-
 handle_info(Info, State) ->
 	error_logger:warning_msg("Erlrtpproxy backend: strange info: ~p~n", [Info]),
 	{noreply, State}.
@@ -168,6 +140,5 @@ handle_info(Info, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, #state{timer = TRef}) ->
-	timer:cancel(TRef),
+terminate(Reason, _) ->
 	error_logger:error_msg("Erlang backend stopped: ~p~n", [Reason]).
