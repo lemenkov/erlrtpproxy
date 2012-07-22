@@ -18,14 +18,14 @@ start_link() ->
 init(_) ->
 	RadiusBackend = case application:get_env(rtpproxy, radacct_servers) of
 		{ok, RadAcctServers} ->
-			backend_sup:start_link(radius, RadAcctServers),
+			rtpproxy_notifier_backend_sup:start_link(radius, RadAcctServers),
 			true;
 		_ ->
 			false
 	end,
 	NotifyBackend = case application:get_env(rtpproxy, notify_servers) of
 		{ok, NotifyServers} ->
-			backend_sup:start_link(notify, NotifyServers),
+			rtpproxy_notifier_backend_sup:start_link(notify, NotifyServers),
 			true;
 		_ ->
 			false

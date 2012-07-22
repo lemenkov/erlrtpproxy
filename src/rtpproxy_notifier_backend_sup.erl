@@ -1,4 +1,4 @@
--module(backend_sup).
+-module(rtpproxy_notifier_backend_sup).
 
 -behaviour(supervisor).
 

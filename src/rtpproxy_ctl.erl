@@ -36,9 +36,6 @@ start() ->
 	% Replace logger with erlsyslog
 	run_everywhere(Nodes, error_logger, add_report_handler, erlsyslog),
 
-	% Run Notifier on each node
-	run_everywhere(Nodes, application, start, rtpproxy_notifier),
-
 	% Run gproc on each node
 	run_everywhere(Nodes, application, set_env, [gproc, gproc_dist, all]),
 	run_everywhere(Nodes, application, start, gproc),
