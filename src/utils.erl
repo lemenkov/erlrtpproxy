@@ -17,12 +17,10 @@
 %%%
 %%%----------------------------------------------------------------------
 
--module(rtpproxy_utils).
--author('lemenkov@gmail.com').
-
--include("../include/common.hrl").
+-module(utils).
 
 -export([get_fd_pair/1]).
+-export([is_rfc1918/1]).
 
 %% Open a pair of UDP ports - N and N+1 (for RTP and RTCP consequently)
 get_fd_pair({_, true, SockParams}) ->
@@ -35,12 +33,8 @@ get_fd_pair({external, false, SockParams}) ->
 	{ok, Ip} = application:get_env(rtpproxy, external),
 	get_fd_pair(Ip, SockParams, 10).
 
-%%
-%% Private functions
-%%
-
 get_fd_pair(Ip, SockParams, 0) ->
-	?ERR("Create new socket at ~p FAILED (~p)", [Ip, SockParams]),
+	error_logger:error_msg("Create new socket at ~p FAILED (~p)", [Ip, SockParams]),
 	error;
 get_fd_pair(Ip, SockParams, NTry) ->
 	case gen_udp:open(0, [binary, {ip, Ip}, {active, once}, {raw,1,11,<<1:32/native>>}] ++ SockParams) of
@@ -63,3 +57,38 @@ get_fd_pair(Ip, SockParams, NTry) ->
 		{error, _} ->
 			get_fd_pair(Ip, SockParams, NTry - 1)
 	end.
+
+% TODO only IPv4 for now
+is_rfc1918({I0,I1,I2,I3} = IPv4) when
+	is_integer(I0), I0 >= 0, I0 < 256,
+	is_integer(I1), I1 >= 0, I1 < 256,
+	is_integer(I2), I2 >= 0, I2 < 256,
+	is_integer(I3), I3 >= 0, I3 < 256 ->
+	is_rfc1918_guarded(IPv4);
+is_rfc1918({I0, I1, I2, I3, I4, I5, I6, I7} = _IPv6) when
+	is_integer(I0), I0 >= 0, I0 < 65535,
+	is_integer(I1), I1 >= 0, I1 < 65535,
+	is_integer(I2), I2 >= 0, I2 < 65535,
+	is_integer(I3), I3 >= 0, I3 < 65535,
+	is_integer(I4), I4 >= 0, I4 < 65535,
+	is_integer(I5), I5 >= 0, I5 < 65535,
+	is_integer(I6), I6 >= 0, I6 < 65535,
+	is_integer(I7), I7 >= 0, I7 < 65535 ->
+		ipv6;
+is_rfc1918(_) ->
+	throw({error, "Not a valid IP address"}).
+
+% Loopback (actually, it's not a RFC1918 network)
+is_rfc1918_guarded({127,_,_,_}) ->
+	true;
+% RFC 1918, 10.0.0.0 - 10.255.255.255
+is_rfc1918_guarded({10,_,_,_}) ->
+	true;
+% RFC 1918, 172.16.0.0 - 172.31.255.255
+is_rfc1918_guarded({172,I1,_,_}) when I1 > 15, I1 < 32 ->
+	true;
+% RFC 1918, 192.168.0.0 - 192.168.255.255
+is_rfc1918_guarded({192,168,_,_}) ->
+	true;
+is_rfc1918_guarded(_) ->
+	false.

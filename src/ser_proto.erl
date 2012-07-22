@@ -235,7 +235,7 @@ parse_splitted([<<$U:8,Args/binary>>, CallId, ProbableIp, ProbablePort, FromTag0
 	end,
 
 	% Discard address if it's not consistent with direction
-	Addr = case {proplists:get_value(direction, Params0), ser_utils:is_rfc1918(GuessIp)} of
+	Addr = case {proplists:get_value(direction, Params0), utils:is_rfc1918(GuessIp)} of
 		{{external, _}, true} -> null;
 		{{internal, _}, true} -> {GuessIp, GuessPort};
 		{{internal, _}, false} -> null;
@@ -243,7 +243,7 @@ parse_splitted([<<$U:8,Args/binary>>, CallId, ProbableIp, ProbablePort, FromTag0
 		{_, ipv6} -> {GuessIp, GuessPort}
 	end,
 
-	Params1 = case ser_utils:is_rfc1918(GuessIp) of
+	Params1 = case utils:is_rfc1918(GuessIp) of
 		ipv6 -> ensure_alone(Params0, ipv6);
 		_ -> Params0
 	end,

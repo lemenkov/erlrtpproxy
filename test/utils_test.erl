@@ -17,7 +17,7 @@
 %%%
 %%%----------------------------------------------------------------------
 
--module(ser_utils_test).
+-module(utils_test).
 
 %%
 %% Tests
@@ -30,28 +30,28 @@
 is_rfc1918_test_() ->
 	[
 		{"test for localhost",
-			fun() -> ?assertEqual(true, ser_utils:is_rfc1918({127,1,2,3})) end
+			fun() -> ?assertEqual(true, utils:is_rfc1918({127,1,2,3})) end
 		},
 		{"test for 10.x.x.x subnet",
-			fun() -> ?assertEqual(true, ser_utils:is_rfc1918({10,0,127,3})) end
+			fun() -> ?assertEqual(true, utils:is_rfc1918({10,0,127,3})) end
 		},
 		{"test for 172.x.x.x subnet",
-			fun() -> ?assertEqual(true, ser_utils:is_rfc1918({172,16,127,3})) end
+			fun() -> ?assertEqual(true, utils:is_rfc1918({172,16,127,3})) end
 		},
 		{"test for 192.168.x.x subnet",
-			fun() -> ?assertEqual(true, ser_utils:is_rfc1918({192,168,127,3})) end
+			fun() -> ?assertEqual(true, utils:is_rfc1918({192,168,127,3})) end
 		},
 		{"test #1 for non-RFC1918 subnet",
-			fun() -> ?assertEqual(false, ser_utils:is_rfc1918({172,168,127,3})) end
+			fun() -> ?assertEqual(false, utils:is_rfc1918({172,168,127,3})) end
 		},
 		{"test #2 for non-RFC1918 subnet",
-			fun() -> ?assertEqual(false, ser_utils:is_rfc1918({192,169,127,3})) end
+			fun() -> ?assertEqual(false, utils:is_rfc1918({192,169,127,3})) end
 		},
 		{"test for IPv6 subnet",
-			fun() -> ?assertEqual(ipv6, ser_utils:is_rfc1918({0,0,0,0,0,0,0,1})) end
+			fun() -> ?assertEqual(ipv6, utils:is_rfc1918({0,0,0,0,0,0,0,1})) end
 		},
 		{"test for invalid IP address",
-			fun() -> ?assertThrow({error, "Not a valid IP address"}, ser_utils:is_rfc1918({1001,1001,1001,1001})) end
+			fun() -> ?assertThrow({error, "Not a valid IP address"}, utils:is_rfc1918({1001,1001,1001,1001})) end
 		}
 	].
 
