@@ -81,7 +81,7 @@ run_proxy_test_() ->
 					end
 				),
 
-				udp_listener:start_link([{127,0,0,1}, ?RTPPROXY_PORT]),
+				udp_listener:start_link([backend, {127,0,0,1}, ?RTPPROXY_PORT]),
 				backend:start_link('erlrtpproxy_test@localhost'),
 
 				% Give backend time to ping a server - this will be removed completely

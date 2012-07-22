@@ -36,6 +36,7 @@
 -export([code_change/3]).
 
 -record(state, {
+	parent,
 	listener,
 	acceptor,
 	clients = []
@@ -48,7 +49,7 @@ start(Args) ->
 start_link(Args) ->
 	gen_server:start_link({local, listener}, ?MODULE, Args, []).
 
-init ([{I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
+init ([Parent, {I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
 	is_integer(I0), I0 >= 0, I0 < 65535,
 	is_integer(I1), I1 >= 0, I1 < 65535,
 	is_integer(I2), I2 >= 0, I2 < 65535,
@@ -62,9 +63,9 @@ init ([{I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
 	{ok, Socket} = gen_tcp:listen(Port, Opts),
 	{ok, Ref} = prim_inet:async_accept(Socket, -1),
 	error_logger:info_msg("TCP listener started at [~s:~w]~n", [inet_parse:ntoa(IPv6), Port]),
-	{ok, #state{listener = Socket, acceptor = Ref}};
+	{ok, #state{parent = Parent, listener = Socket, acceptor = Ref}};
 
-init ([{I0, I1, I2, I3} = IPv4, Port]) when
+init ([Parent, {I0, I1, I2, I3} = IPv4, Port]) when
 	is_integer(I0), I0 >= 0, I0 < 256,
 	is_integer(I1), I1 >= 0, I1 < 256,
 	is_integer(I2), I2 >= 0, I2 < 256,
@@ -74,7 +75,7 @@ init ([{I0, I1, I2, I3} = IPv4, Port]) when
 	{ok, Socket} = gen_tcp:listen(Port, Opts),
 	{ok, Ref} = prim_inet:async_accept(Socket, -1),
 	error_logger:info_msg("TCP listener started at [~s:~w]~n", [inet_parse:ntoa(IPv4), Port]),
-	{ok, #state{listener = Socket, acceptor = Ref}}.
+	{ok, #state{parent = Parent, listener = Socket, acceptor = Ref}}.
 
 handle_call(Other, _From, State) ->
 	error_logger:warning_msg("TCP listener: strange call: ~p~n", [Other]),
@@ -95,10 +96,10 @@ handle_cast(Other, State) ->
 	error_logger:warning_msg("TCP listener: strange cast: ~p~n", [Other]),
 	{noreply, State}.
 
-handle_info({tcp, Client, Msg}, State) ->
+handle_info({tcp, Client, Msg}, #state{parent = Parent} = State) ->
 	inet:setopts(Client, [{active, once}, {packet, raw}, binary]),
 	{ok, {Ip, Port}} = inet:peername(Client),
-	gen_server:cast(backend, {msg, Msg, Ip, Port}),
+	gen_server:cast(Parent, {msg, Msg, Ip, Port}),
 	{noreply, State};
 
 handle_info({tcp_closed, Client}, State = #state{clients=Clients}) ->
