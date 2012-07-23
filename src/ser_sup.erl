@@ -1,4 +1,4 @@
--module(rtpproxy_sup).
+-module(ser_sup).
 -behaviour(supervisor).
 
 -export([start_link/0]).
@@ -14,19 +14,18 @@ init([]) ->
 	SupFlags = {RestartStrategy, MaxRestarts, MaxTimeBetweenRestarts},
 
 	% Load generic erlrtpproxy controlling interface listener
-	application:load(ser),
-	{ok, {Proto, IpStr, Port}} = application:get_env(ser, listen),
+	{ok, {Proto, IpStr, Port}} = application:get_env(rtpproxy, listen),
 	{ok, Ip} = inet_parse:address(IpStr),
 	ListenerProcess = case Proto of
 		tcp ->
-			{tcp_listener, {tcp_listener, start_link, [[Ip, Port]]}, permanent, 10000, worker, []};
+			{tcp_listener, {tcp_listener, start_link, [[backend, Ip, Port]]}, permanent, 10000, worker, []};
 		udp ->
-			{udp_listener, {udp_listener, start_link, [[Ip, Port]]}, permanent, 10000, worker, []}
+			{udp_listener, {udp_listener, start_link, [[backend, Ip, Port]]}, permanent, 10000, worker, []}
 	end,
 
-	% Load protocol backend (ser for now)
-	{ok, Addr} = application:get_env(ser, backend),
-	BackendProcess = {backend, {backend, start_link, [Addr]}, permanent, 10000, worker, []},
+	% Load protocol backend (only ser for now - FIXME)
+	{ok, Type} = application:get_env(rtpproxy, backend),
+	BackendProcess = {backend, {backend, start_link, [Type]}, permanent, 10000, worker, []},
 
 	{ok,{SupFlags, [ListenerProcess, BackendProcess]}}.
 

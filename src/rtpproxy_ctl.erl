@@ -31,21 +31,17 @@
 start() ->
 	% Start our pool
 	{ok,[[ConfigPath]]} = init:get_argument(config),
-	Nodes = pool:start(rtpproxy, " -config " ++ ConfigPath ++ " "),
+	Nodes = [node()|pool:start(rtpproxy, " -config " ++ ConfigPath ++ " ")],
 
 	% Replace logger with erlsyslog
-	run_everywhere(Nodes, error_logger, add_report_handler, erlsyslog),
-
-	% Run Notifier on each node
-	run_everywhere(Nodes, application, start, rtpproxy_notifier),
+	rpc:multicall(Nodes, error_logger, add_report_handler, erlsyslog),
 
 	% Run gproc on each node
 	rpc:multicall(Nodes, application, set_env, [gproc, gproc_dist, all]),
-	application:set_env(gproc, gproc_dist, all),
-	run_everywhere(Nodes, application, start, gproc),
+	rpc:multicall(Nodes, application, start, gproc),
 
 	% Load necessary config files
-	run_everywhere(Nodes, application, load, rtpproxy),
+	rpc:multicall(Nodes, application, load, rtpproxy),
 
 	% Load main module
 	application:start(rtpproxy).
@@ -112,7 +108,11 @@ status() ->
 
 % Simply stop all active sessions
 command(#cmd{type = ?CMD_X}) ->
-	lists:foreach(fun(Pid) -> gen_server:cast(Pid, stop) end, ets:match(gproc, {{'$1', {'_', '_', {id, '_', '_'}}},'_'}));
+	Pids = case ets:match(gproc, {{'$1', {'_', '_', {id, '_', '_'}}},'_'}) of
+		[] -> [];
+		Ret -> [ X || [X] <- Ret ]
+	end,
+	lists:foreach(fun(Pid) -> gen_server:cast(Pid, stop) end, Pids);
 
 command(#cmd{type = ?CMD_I, params = [brief]}) ->
 	Length = length(ets:match(gproc, {{'$1', {'_', '_', {id, '_', '_'}}},'_'})),
@@ -125,22 +125,26 @@ command(#cmd{type = ?CMD_I}) ->
 	% "sessions created: %llu\nactive sessions: %d\n active streams: %d\n"
 	% foreach session "%s/%s: caller = %s:%d/%s, callee = %s:%d/%s, stats = %lu/%lu/%lu/%lu, ttl = %d/%d\n"
 	Length = length(ets:match(gproc, {{'$1', {'_', '_', {id, '_', '_'}}},'_'})),
-	{ok, {stats, Length}};
+	% FIXME - provide real stats here
+	{ok, {stats, Length, Length}};
 
 command(#cmd{callid = CallId, mediaid = MediaId} = Cmd) ->
 	% First try to find existing session(s)
 	case get_media(CallId, MediaId) of
 		[] when Cmd#cmd.type == ?CMD_U ->
 			% Create new media thread
-			?INFO("Media stream does not exist. Creating new.", []),
-			pool:pspawn(media, start, [Cmd]);
+			error_logger:warning_msg("Media stream does not exist. Creating new."),
+			pool:pspawn(media, start, [Cmd]),
+			{ok, sent};
 		[] ->
-			?WARN("Media stream does not exist. Do nothing.", []),
+			error_logger:warning_msg("Media stream does not exist. Do nothing."),
 			{error, notfound};
-		[MediaThread] when is_pid(MediaThread) ->
-			% Operate on existing media thread
-			gen_server:cast(MediaThread, Cmd);
+		MediaThread when is_pid(MediaThread) ->
+			% Operate on existing media thread - wait for answer
+			gen_server:cast(MediaThread, Cmd),
+			{ok, sent};
 		MediaThreads when is_list(MediaThreads) ->
+			% Group command - return immediately
 			lists:foreach(fun(Pid) -> gen_server:cast(Pid, Cmd) end, MediaThreads)
 	end.
 
@@ -149,10 +153,12 @@ command(#cmd{callid = CallId, mediaid = MediaId} = Cmd) ->
 %%%%%%%%%%%%%%%%%%%%%%%%
 
 get_media(CallId, 0) ->
-	[ X || [X] <- ets:match(gproc, {{'$1', {'_', '_', {id, CallId, '_'}}},'_'})];
+	case ets:match(gproc, {{'$1', {'_', '_', {id, CallId, '_'}}},'_'}) of
+		[] -> [];
+		Ret -> [ X || [X] <- Ret ]
+	end;
 get_media(CallId, MediaId) ->
-	[ X || [X] <-  ets:match(gproc, {{'$1', {'_', '_', {id, CallId, MediaId}}},'_'})].
-
-run_everywhere(N,M,F,A) ->
-	M:F(A),
-	rpc:multicall(N, M, F, [A]).
+	case ets:match(gproc, {{'$1', {'_', '_', {id, CallId, MediaId}}},'_'}) of
+		[[Pid]] -> Pid;
+		[] -> []
+	end.
