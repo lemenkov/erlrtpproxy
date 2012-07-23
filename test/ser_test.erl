@@ -30,7 +30,6 @@
 
 -module(ser_test).
 
--ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
 -include("../include/common.hrl").
@@ -250,5 +249,3 @@ ser_test_() ->
 			}
 		]
 	}.
-
--endif.

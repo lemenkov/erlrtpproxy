@@ -34,7 +34,6 @@
 %% Tests
 %%
 
--ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
 -include("../include/common.hrl").
@@ -1127,6 +1126,3 @@ encode_error_software_test() ->
 
 encode_error_notfound_test() ->
 	?assertEqual(<<"24393_4 E8\n">>, ser_proto:encode(#response{cookie = <<"24393_4">>, type = error, data = notfound})).
-
--endif.
-

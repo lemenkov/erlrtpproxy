@@ -34,9 +34,7 @@
 %% Tests
 %%
 
--ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
-
 
 is_rfc1918_test_() ->
 	[
@@ -65,5 +63,3 @@ is_rfc1918_test_() ->
 			fun() -> ?assertThrow({error, "Not a valid IP address"}, utils:is_rfc1918({1001,1001,1001,1001})) end
 		}
 	].
-
--endif.
