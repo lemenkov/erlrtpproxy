@@ -50,7 +50,7 @@ ser_test_() ->
 				%% Set node name
 				%%
 
-				net_kernel:start(['erlrtpproxy_test@localhost', shortnames]),
+				net_kernel:start(['erlrtpproxy_test@localhost', longnames]),
 
 				%%
 				%% Load fake rtpproxy_ctl module - we'll test it later
