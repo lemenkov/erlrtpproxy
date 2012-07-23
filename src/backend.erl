@@ -56,18 +56,6 @@ handle_cast({reply, Cmd = #cmd{origin = #origin{type = ser, ip = Ip, port = Port
 	gen_server:cast(listener, {msg, Data, Ip, Port}),
 	{noreply, State};
 
-handle_cast({reply, Cmd = #cmd{origin = #origin{type = ser, ip = Ip, port = Port}}, {stats, Number}}, State) ->
-	error_logger:info_msg("SER reply stats (short)~n"),
-	Data = ser_proto:encode(#response{cookie = Cmd#cmd.cookie, origin = Cmd#cmd.origin, type = reply, data = {ok, {stats, Number}}}),
-	gen_server:cast(listener, {msg, Data, Ip, Port}),
-	{noreply, State};
-
-handle_cast({reply, Cmd = #cmd{origin = #origin{type = ser, ip = Ip, port = Port}}, {stats, NumberTotal, NumberActive}}, State) ->
-	error_logger:info_msg("SER reply stats (full)~n"),
-	Data = ser_proto:encode(#response{cookie = Cmd#cmd.cookie, origin = Cmd#cmd.origin, type = reply, data = {ok, {stats, NumberTotal, NumberActive}}}),
-	gen_server:cast(listener, {msg, Data, Ip, Port}),
-	{noreply, State};
-
 handle_cast({reply, Cmd = #cmd{origin = #origin{type = ser, ip = Ip, port = Port}}, {Addr1, Addr2}}, State) ->
 	error_logger:info_msg("SER reply ~p~n", [{Addr1, Addr2}]),
 	Data = ser_proto:encode(#response{cookie = Cmd#cmd.cookie, origin = Cmd#cmd.origin, type = reply, data = {Addr1, Addr2}}),
@@ -110,9 +98,21 @@ handle_cast({msg, Msg, Ip, Port}, State) ->
 							rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, params = NewParams})
 					end
 			end;
-		#cmd{origin = Origin} = Cmd ->
+		#cmd{cookie = Cookie, origin = Origin} = Cmd ->
 			error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
-			rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}})
+			Ret =  rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}}),
+			case Ret of
+				{ok, {stats, Number}} ->
+					error_logger:info_msg("SER reply stats (short)~n"),
+					Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = Ret}),
+					gen_server:cast(listener, {msg, Data, Ip, Port});
+				{ok, {stats, NumberTotal, NumberActive}} ->
+					error_logger:info_msg("SER reply stats (full)~n"),
+					Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = {ok, {stats, NumberTotal, NumberActive}}}),
+					gen_server:cast(listener, {msg, Data, Ip, Port});
+				_ ->
+					error_logger:info_msg("SER cmd RET: ~p~n", [Ret])
+			end
 	catch
 		throw:{error_syntax, ErrorMsg} when is_list(ErrorMsg) ->
 			error_logger:error_msg("Bad syntax. [~s -> ~s]~n", [Msg, ErrorMsg]),

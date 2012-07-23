@@ -77,13 +77,13 @@ ser_test_() ->
 								type = message_i,
 								params = [brief]
 							} = Cmd) ->
-							gen_server:cast(Pid, {reply, Cmd, {stats, 0}});
+							{ok, {stats, 0}};
 						(#cmd{
 								origin=#origin{pid = Pid},
 								type = message_i,
 								params = []
 							} = Cmd) ->
-							gen_server:cast(Pid, {reply, Cmd, {stats, 100, 0}});
+							{ok, {stats, 100, 0}};
 						(#cmd{
 								origin=#origin{pid = Pid},
 								type = message_d,
