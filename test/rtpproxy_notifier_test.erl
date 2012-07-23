@@ -36,7 +36,7 @@
 
 -define(RTPPROXY_PORT, 33333).
 
-rtpproxy_notifier_test_() ->
+rtpproxy_notifier_backend_notify_test_() ->
 
 	%%
 	%% This is the socket which will be used for receiving notifications messages
