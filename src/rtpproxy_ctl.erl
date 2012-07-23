@@ -31,17 +31,17 @@
 start() ->
 	% Start our pool
 	{ok,[[ConfigPath]]} = init:get_argument(config),
-	Nodes = pool:start(rtpproxy, " -config " ++ ConfigPath ++ " "),
+	Nodes = [node()|pool:start(rtpproxy, " -config " ++ ConfigPath ++ " ")],
 
 	% Replace logger with erlsyslog
-	run_everywhere(Nodes, error_logger, add_report_handler, erlsyslog),
+	rpc:multicall(Nodes, error_logger, add_report_handler, erlsyslog),
 
 	% Run gproc on each node
-	run_everywhere(Nodes, application, set_env, [gproc, gproc_dist, all]),
-	run_everywhere(Nodes, application, start, gproc),
+	rpc:multicall(Nodes, application, set_env, [gproc, gproc_dist, all]),
+	rpc:multicall(Nodes, application, start, gproc),
 
 	% Load necessary config files
-	run_everywhere(Nodes, application, load, rtpproxy),
+	rpc:multicall(Nodes, application, load, rtpproxy),
 
 	% Load main module
 	application:start(rtpproxy).
@@ -148,7 +148,3 @@ get_media(CallId, 0) ->
 	[ X || [X] <- ets:match(gproc, {{'$1', {'_', '_', {id, CallId, '_'}}},'_'})];
 get_media(CallId, MediaId) ->
 	[ X || [X] <-  ets:match(gproc, {{'$1', {'_', '_', {id, CallId, MediaId}}},'_'})].
-
-run_everywhere(N,M,F,A) ->
-	M:F(A),
-	rpc:multicall(N, M, F, [A]).
