@@ -108,6 +108,10 @@ handle_cast({msg, Msg, Ip, Port}, State) ->
 					error_logger:info_msg("SER reply ok (~p)~n", [Cmd]),
 					Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = ok}),
 					gen_server:cast(listener, {msg, Data, Ip, Port});
+				{error, notfound} ->
+					error_logger:info_msg("SER reply {error, notfound) (~p)~n", [Cmd]),
+					Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = error, data = notfound}),
+					gen_server:cast(listener, {msg, Data, Ip, Port});
 				_ ->
 					error_logger:info_msg("SER cmd RET: ~p~n", [Ret])
 			end
