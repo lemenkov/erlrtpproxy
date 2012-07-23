@@ -108,7 +108,11 @@ status() ->
 
 % Simply stop all active sessions
 command(#cmd{type = ?CMD_X}) ->
-	lists:foreach(fun(Pid) -> gen_server:cast(Pid, stop) end, ets:match(gproc, {{'$1', {'_', '_', {id, '_', '_'}}},'_'}));
+	Pids = case ets:match(gproc, {{'$1', {'_', '_', {id, '_', '_'}}},'_'}) of
+		[] -> [];
+		Ret -> [ X || [X] <- Ret ]
+	end,
+	lists:foreach(fun(Pid) -> gen_server:cast(Pid, stop) end, Pids);
 
 command(#cmd{type = ?CMD_I, params = [brief]}) ->
 	Length = length(ets:match(gproc, {{'$1', {'_', '_', {id, '_', '_'}}},'_'})),
@@ -128,15 +132,18 @@ command(#cmd{callid = CallId, mediaid = MediaId} = Cmd) ->
 	case get_media(CallId, MediaId) of
 		[] when Cmd#cmd.type == ?CMD_U ->
 			% Create new media thread
-			?INFO("Media stream does not exist. Creating new.", []),
-			pool:pspawn(media, start, [Cmd]);
+			error_logger:warning_msg("Media stream does not exist. Creating new."),
+			pool:pspawn(media, start, [Cmd]),
+			{ok, sent};
 		[] ->
-			?WARN("Media stream does not exist. Do nothing.", []),
+			error_logger:warning_msg("Media stream does not exist. Do nothing."),
 			{error, notfound};
-		[MediaThread] when is_pid(MediaThread) ->
-			% Operate on existing media thread
-			gen_server:cast(MediaThread, Cmd);
+		MediaThread when is_pid(MediaThread) ->
+			% Operate on existing media thread - wait for answer
+			gen_server:cast(MediaThread, Cmd),
+			{ok, sent};
 		MediaThreads when is_list(MediaThreads) ->
+			% Group command - return immediately
 			lists:foreach(fun(Pid) -> gen_server:cast(Pid, Cmd) end, MediaThreads)
 	end.
 
@@ -145,6 +152,12 @@ command(#cmd{callid = CallId, mediaid = MediaId} = Cmd) ->
 %%%%%%%%%%%%%%%%%%%%%%%%
 
 get_media(CallId, 0) ->
-	[ X || [X] <- ets:match(gproc, {{'$1', {'_', '_', {id, CallId, '_'}}},'_'})];
+	case ets:match(gproc, {{'$1', {'_', '_', {id, CallId, '_'}}},'_'}) of
+		[] -> [];
+		Ret -> [ X || [X] <- Ret ]
+	end;
 get_media(CallId, MediaId) ->
-	[ X || [X] <-  ets:match(gproc, {{'$1', {'_', '_', {id, CallId, MediaId}}},'_'})].
+	case ets:match(gproc, {{'$1', {'_', '_', {id, CallId, MediaId}}},'_'}) of
+		[[Pid]] -> Pid;
+		[] -> []
+	end.

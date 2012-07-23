@@ -50,12 +50,6 @@ handle_call(Other, _From, State) ->
 handle_cast(stop, State) ->
 	{stop, stop, State};
 
-handle_cast({reply, Cmd = #cmd{origin = #origin{type = ser, ip = Ip, port = Port}}, ok}, State) ->
-	error_logger:info_msg("SER reply ok~n"),
-	Data = ser_proto:encode(#response{cookie = Cmd#cmd.cookie, origin = Cmd#cmd.origin, type = reply, data = ok}),
-	gen_server:cast(listener, {msg, Data, Ip, Port}),
-	{noreply, State};
-
 handle_cast({reply, Cmd = #cmd{origin = #origin{type = ser, ip = Ip, port = Port}}, {Addr1, Addr2}}, State) ->
 	error_logger:info_msg("SER reply ~p~n", [{Addr1, Addr2}]),
 	Data = ser_proto:encode(#response{cookie = Cmd#cmd.cookie, origin = Cmd#cmd.origin, type = reply, data = {Addr1, Addr2}}),
@@ -109,6 +103,10 @@ handle_cast({msg, Msg, Ip, Port}, State) ->
 				{ok, {stats, NumberTotal, NumberActive}} ->
 					error_logger:info_msg("SER reply stats (full)~n"),
 					Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = {ok, {stats, NumberTotal, NumberActive}}}),
+					gen_server:cast(listener, {msg, Data, Ip, Port});
+				ok ->
+					error_logger:info_msg("SER reply ok (~p)~n", [Cmd]),
+					Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = ok}),
 					gen_server:cast(listener, {msg, Data, Ip, Port});
 				_ ->
 					error_logger:info_msg("SER cmd RET: ~p~n", [Ret])

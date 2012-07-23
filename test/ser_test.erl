@@ -89,12 +89,12 @@ ser_test_() ->
 								type = message_d,
 								callid = <<"0003e30c-callid02@192.168.0.100">>
 							} = Cmd) ->
-							gen_server:cast(Pid, {reply, Cmd, ok});
+							ok;
 						(#cmd{
 								origin=#origin{pid = Pid},
 								type = message_x
 							} = Cmd) ->
-							gen_server:cast(Pid, {reply, Cmd, ok});
+							ok;
 						(#cmd{origin=#origin{pid = Pid}} = Cmd) ->
 							error_logger:info_msg("UNKNOWN for meck: ~p~n", [Cmd]),
 							exit(1)
