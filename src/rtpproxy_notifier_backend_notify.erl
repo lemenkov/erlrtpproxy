@@ -13,11 +13,10 @@
 start_link(Args) ->
 	gen_server:start_link({local, ?MODULE}, ?MODULE, Args, []).
 
-%init([[{tcp, IpStr, Port}|Rest]]) ->
-init(_) ->
-%	{ok, Ip} = inet_parse:address(IpStr),
+% FIXME add more types than udp
+init([udp]) ->
 	{ok, Fd} = gen_udp:open(0, [binary, {active, true}]),
-	error_logger:info_msg("Started rtpproxy notify protocol backend at ~p~n", [node()]),
+	error_logger:info_msg("Started rtpproxy notify protocol backend (UDP) at ~p~n", [node()]),
 	{ok, Fd}.
 
 handle_call(Message, From, State) ->

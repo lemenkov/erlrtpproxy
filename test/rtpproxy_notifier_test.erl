@@ -65,7 +65,7 @@ rtpproxy_notifier_test_() ->
 				%%
 
 				%application:set_env(rtpproxy, radacct_servers, [[{127,0,0,1},1813,"testradacctpass"]]),
-				application:set_env(rtpproxy, notify_servers, [[{tcp, "127.0.0.1", 44444}]]),
+				application:set_env(rtpproxy, notify_servers, udp),
 				application:set_env(rtpproxy, ignore_start, true),
 				application:set_env(rtpproxy, ignore_stop, true),
 
