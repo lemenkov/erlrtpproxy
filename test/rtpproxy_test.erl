@@ -81,8 +81,19 @@ run_proxy_test_() ->
 					end
 				),
 
-				udp_listener:start_link([backend, {127,0,0,1}, ?RTPPROXY_PORT]),
-				backend:start_link(ser)
+				%%
+				%% Set necessary options
+				%% (normally we'll set them in the /etc/erlrtpproxy.config
+				%%
+
+				application:set_env(rtpproxy, listen, {udp, "127.0.0.1", ?RTPPROXY_PORT}),
+				application:set_env(rtpproxy, backend, ser),
+
+				%%
+				%% Start real SER frontend
+				%%
+
+				ser_sup:start_link()
 		end,
 		fun (_) ->
 				gen_udp:close(Fd),
