@@ -172,7 +172,6 @@ handle_cast(
 
 	% Send stop message earlier
 	gen_server:cast({global, rtpproxy_notifier}, {stop, CallId, MediaId, NotifyInfo}),
-	gen_server:cast({global, rtpproxy}, {'EXIT', self(), Reason}),
 
 	% Run 30-sec timer for catching the remaining RTP/RTCP (w/o sending
 	% them to the other party)
@@ -291,19 +290,16 @@ handle_info(ping, #state{callid = CallId, mediaid = MediaId, notify_info = Notif
 %			{noreply, State}
 %	end
 	gen_server:cast({global, rtpproxy_notifier}, {stop, CallId, MediaId, NotifyInfo}),
-	gen_server:cast({global, rtpproxy}, {'EXIT', self(), nortp}),
 	{stop, nortp, State};
 
 handle_info({'EXIT', Pid, Reason}, #state{callid = CallId, mediaid = MediaId, from = #media{pid = Pid}, notify_info = NotifyInfo} = State) ->
 	?ERR("RTP From socket died: ~p", [Reason]),
 	gen_server:cast({global, rtpproxy_notifier}, {stop, CallId, MediaId, NotifyInfo}),
-	gen_server:cast({global, rtpproxy}, {'EXIT', self(), Reason}),
 	{stop, Reason, State};
 
 handle_info({'EXIT', Pid, Reason}, #state{callid = CallId, mediaid = MediaId, to = #media{pid = Pid}, notify_info = NotifyInfo} = State) ->
 	?ERR("RTP To socket died: ~p", [Reason]),
 	gen_server:cast({global, rtpproxy_notifier}, {stop, CallId, MediaId, NotifyInfo}),
-	gen_server:cast({global, rtpproxy}, {'EXIT', self(), Reason}),
 	{stop, Reason, State};
 
 handle_info(bye, State) ->
@@ -368,5 +364,4 @@ try_notify_parent(#cmd{origin = #origin{type = ser, pid = Pid}, callid = CallId,
 	gen_server:cast(Pid0, {neighbour, Pid1}),
 	gen_server:cast(Pid1, {neighbour, Pid0}),
 	gen_server:cast(Pid, {reply, Cmd, {{I0, P0}, {I1, P1}}}),
-	gen_server:cast({global, rtpproxy}, {created, self(), {CallId, MediaId}}),
 	ok.
