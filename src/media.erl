@@ -163,24 +163,14 @@ handle_cast(
 			to = To} = Cmd,
 		#state{callid = CallId, mediaid = MediaId, tag_f = TagF, tag_t = TagT, tref = TRef, notify_info = NotifyInfo} = State
 	) ->
-
-	% FIXME consider checking for direction (is TagFrom  equals to TagF or not?)
-	Reason = case To of
-		null -> cancel;
-		_ -> bye
-	end,
-
 	% Send stop message earlier
 	gen_server:cast({global, rtpproxy_notifier}, {stop, CallId, MediaId, NotifyInfo}),
 
-	% Run 30-sec timer for catching the remaining RTP/RTCP (w/o sending
-	% them to the other party)
-	timer:cancel(TRef),
-	{ok, TRef2} = timer:send_interval(30000, Reason),
-
-	% FIXME suppress retransmitting of packets here
-
-	{noreply, State#state{started = false, tref = TRef2}};
+	% FIXME consider checking for direction (is TagFrom  equals to TagF or not?)
+	Reason = case To of
+		null -> {stop, cancel, State};
+		_ -> {stop, bye, State}
+	end;
 
 handle_cast({start, Pid}, #state{
 		callid = CallID,
@@ -301,11 +291,6 @@ handle_info({'EXIT', Pid, Reason}, #state{callid = CallId, mediaid = MediaId, to
 	?ERR("RTP To socket died: ~p", [Reason]),
 	gen_server:cast({global, rtpproxy_notifier}, {stop, CallId, MediaId, NotifyInfo}),
 	{stop, Reason, State};
-
-handle_info(bye, State) ->
-	{stop, bye, State};
-handle_info(cancel, State) ->
-	{stop, cancel, State};
 
 handle_info({init,
 	#cmd{
