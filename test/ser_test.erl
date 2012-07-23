@@ -17,7 +17,7 @@
 %%%
 %%%----------------------------------------------------------------------
 
--module(rtpproxy_test).
+-module(ser_test).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -26,7 +26,7 @@
 
 -define(RTPPROXY_PORT, 33333).
 
-run_proxy_test_() ->
+ser_test_() ->
 
 	%%
 	%% This is the socket which will be used for sending messages
