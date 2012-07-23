@@ -154,22 +154,12 @@ handle_cast(
 	end,
 	{noreply, State#state{started = NewStarted}};
 
-handle_cast(
-		#cmd{
-			type = ?CMD_D,
-			callid = CallId,
-			mediaid = 0,
-			from = #party{tag = TagFrom},
-			to = To} = Cmd,
-		#state{callid = CallId, mediaid = MediaId, tag_f = TagF, tag_t = TagT, tref = TRef, notify_info = NotifyInfo} = State
-	) ->
-	% Send stop message earlier
-
-	% FIXME consider checking for direction (is TagFrom  equals to TagF or not?)
-	Reason = case To of
-		null -> {stop, cancel, State};
-		_ -> {stop, bye, State}
-	end;
+handle_cast(stop, #state{callid = CallId} = State) ->
+	handle_cast(#cmd{type = ?CMD_D,	callid = CallId, mediaid = 0}, State);
+handle_cast(#cmd{type = ?CMD_D, callid = CallId, mediaid = 0, to = null} = Cmd, #state{callid = CallId} = State) ->
+	{stop, cancel, State};
+handle_cast(#cmd{type = ?CMD_D, callid = CallId, mediaid = 0} = Cmd, #state{callid = CallId} = State) ->
+	{stop, bye, State};
 
 handle_cast({start, Pid}, #state{
 		callid = CallID,
