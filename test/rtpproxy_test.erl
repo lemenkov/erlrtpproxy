@@ -27,15 +27,25 @@
 -define(RTPPROXY_PORT, 33333).
 
 run_proxy_test_() ->
-	% This is a Fd which will be used for sending messages
+
+	%%
+	%% This is the socket which will be used for sending messages
+	%%
+
 	{ok, Fd} = gen_udp:open(0, [{active, false}, binary]),
 
 	{setup,
 		fun() ->
-				% Set node name
+				%%
+				%% Set node name
+				%%
+
 				net_kernel:start(['erlrtpproxy_test@localhost', shortnames]),
 
-				% Load fake rtpproxy_ctl module
+				%%
+				%% Load fake rtpproxy_ctl module - we'll test it later
+				%%
+
 				meck:new(rtpproxy_ctl),
 				meck:expect(rtpproxy_ctl,
 					command,
