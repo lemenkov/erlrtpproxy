@@ -125,7 +125,8 @@ command(#cmd{type = ?CMD_I}) ->
 	% "sessions created: %llu\nactive sessions: %d\n active streams: %d\n"
 	% foreach session "%s/%s: caller = %s:%d/%s, callee = %s:%d/%s, stats = %lu/%lu/%lu/%lu, ttl = %d/%d\n"
 	Length = length(ets:match(gproc, {{'$1', {'_', '_', {id, '_', '_'}}},'_'})),
-	{ok, {stats, Length}};
+	% FIXME - provide real stats here
+	{ok, {stats, Length, Length}};
 
 command(#cmd{callid = CallId, mediaid = MediaId} = Cmd) ->
 	% First try to find existing session(s)
