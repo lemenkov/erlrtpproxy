@@ -164,7 +164,6 @@ handle_cast(
 		#state{callid = CallId, mediaid = MediaId, tag_f = TagF, tag_t = TagT, tref = TRef, notify_info = NotifyInfo} = State
 	) ->
 	% Send stop message earlier
-	gen_server:cast({global, rtpproxy_notifier}, {stop, CallId, MediaId, NotifyInfo}),
 
 	% FIXME consider checking for direction (is TagFrom  equals to TagF or not?)
 	Reason = case To of
@@ -259,7 +258,8 @@ handle_cast(Other, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, #state{callid = CallId, mediaid = MediaId, tref = TimerRef, from = From, to = To}) ->
+terminate(Reason, #state{callid = CallId, mediaid = MediaId, tref = TimerRef, notify_info = NotifyInfo}) ->
+	gen_server:cast({global, rtpproxy_notifier}, {stop, CallId, MediaId, NotifyInfo}),
 	% No need to explicitly unregister from gproc - it does so automatically
 	timer:cancel(TimerRef),
 	?ERR("terminated due to reason [~p]", [Reason]).
@@ -279,17 +279,14 @@ handle_info(ping, #state{callid = CallId, mediaid = MediaId, notify_info = Notif
 %		false ->
 %			{noreply, State}
 %	end
-	gen_server:cast({global, rtpproxy_notifier}, {stop, CallId, MediaId, NotifyInfo}),
 	{stop, nortp, State};
 
-handle_info({'EXIT', Pid, Reason}, #state{callid = CallId, mediaid = MediaId, from = #media{pid = Pid}, notify_info = NotifyInfo} = State) ->
+handle_info({'EXIT', Pid, Reason}, #state{from = #media{pid = Pid}} =State) ->
 	?ERR("RTP From socket died: ~p", [Reason]),
-	gen_server:cast({global, rtpproxy_notifier}, {stop, CallId, MediaId, NotifyInfo}),
 	{stop, Reason, State};
 
-handle_info({'EXIT', Pid, Reason}, #state{callid = CallId, mediaid = MediaId, to = #media{pid = Pid}, notify_info = NotifyInfo} = State) ->
+handle_info({'EXIT', Pid, Reason}, #state{to = #media{pid = Pid}} = State) ->
 	?ERR("RTP To socket died: ~p", [Reason]),
-	gen_server:cast({global, rtpproxy_notifier}, {stop, CallId, MediaId, NotifyInfo}),
 	{stop, Reason, State};
 
 handle_info({init,
