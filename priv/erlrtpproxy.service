@@ -1,0 +1,15 @@
+[Unit]
+Description=Erlang RTP Proxy Server
+After=network.target
+
+[Service]
+User=erlrtpproxy
+Group=erlrtpproxy
+Type=simple
+EnvironmentFile=-/etc/sysconfig/erlrtpproxy
+LimitNOFILE=32000
+WorkingDirectory=/var/lib/erlrtpproxy
+ExecStart=/usr/bin/erl $ERL_PARAMETERS -name erlrtpproxy@$ERL_NODE -rsh $RSH -config $CONFIG_FILE -detached -s rtpproxy_ctl
+
+[Install]
+WantedBy=multi-user.target
