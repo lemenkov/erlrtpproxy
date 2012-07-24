@@ -59,9 +59,11 @@ rtpproxy_test_() ->
 				%% (normally we'll set them in the /etc/erlrtpproxy.config
 				%%
 
+				%% Set up backend's type (SER for now)
+				application:set_env(rtpproxy, backend, ser),
+
 				%% Options for SER backend
 				application:set_env(rtpproxy, listen, {udp, "127.0.0.1", ?RTPPROXY_PORT}),
-				application:set_env(rtpproxy, backend, ser),
 
 				%% Options for notification backend
 				%application:set_env(rtpproxy, radacct_servers, [[?RTPPROXY_IP,1813,"testradacctpass"]]),

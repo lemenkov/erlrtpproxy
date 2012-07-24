@@ -21,7 +21,7 @@
 %% THE SOFTWARE.
 %%
 
--module(backend).
+-module(backend_ser).
 -author('lemenkov@gmail.com').
 
 -behaviour(gen_server).
@@ -37,14 +37,14 @@
 -include("../include/common.hrl").
 
 start_link(Args) ->
-	gen_server:start_link({local, backend}, ?MODULE, Args, []).
+	gen_server:start_link({local, backend_ser}, ?MODULE, Args, []).
 
 init (_) ->
-	error_logger:info_msg("Erlrtpproxy backend started at ~p~n", [node()]),
+	error_logger:info_msg("Erlrtpproxy SER backend started at ~p~n", [node()]),
 	{ok, []}.
 
 handle_call(Other, _From, State) ->
-	error_logger:warning_msg("Erlrtpproxy backend: strange call: ~p~n", [Other]),
+	error_logger:warning_msg("Erlrtpproxy SER backend: strange call: ~p~n", [Other]),
 	{noreply, State}.
 
 handle_cast(stop, State) ->
@@ -132,15 +132,15 @@ handle_cast({msg, Msg, Ip, Port}, State) ->
 	{noreply, State};
 
 handle_cast(Other, State) ->
-	error_logger:warning_msg("Erlrtpproxy backend: strange cast: ~p~n", [Other]),
+	error_logger:warning_msg("Erlrtpproxy SER backend: strange cast: ~p~n", [Other]),
 	{noreply, State}.
 
 handle_info(Info, State) ->
-	error_logger:warning_msg("Erlrtpproxy backend: strange info: ~p~n", [Info]),
+	error_logger:warning_msg("Erlrtpproxy SER backend: strange info: ~p~n", [Info]),
 	{noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 terminate(Reason, _) ->
-	error_logger:error_msg("Erlang backend stopped: ~p~n", [Reason]).
+	error_logger:error_msg("Erlrtpproxy SER backend stopped: ~p~n", [Reason]).

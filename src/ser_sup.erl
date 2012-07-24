@@ -18,14 +18,13 @@ init([]) ->
 	{ok, Ip} = inet_parse:address(IpStr),
 	ListenerProcess = case Proto of
 		tcp ->
-			{tcp_listener, {tcp_listener, start_link, [[backend, Ip, Port]]}, permanent, 10000, worker, []};
+			{tcp_listener, {tcp_listener, start_link, [[backend_ser, Ip, Port]]}, permanent, 10000, worker, []};
 		udp ->
-			{udp_listener, {udp_listener, start_link, [[backend, Ip, Port]]}, permanent, 10000, worker, []}
+			{udp_listener, {udp_listener, start_link, [[backend_ser, Ip, Port]]}, permanent, 10000, worker, []}
 	end,
 
-	% Load protocol backend (only ser for now - FIXME)
-	{ok, Type} = application:get_env(rtpproxy, backend),
-	BackendProcess = {backend, {backend, start_link, [Type]}, permanent, 10000, worker, []},
+	% Load SER protocol backend
+	BackendProcess = {backend_ser, {backend_ser, start_link, [ser]}, permanent, 10000, worker, []},
 
 	{ok,{SupFlags, [ListenerProcess, BackendProcess]}}.
 
