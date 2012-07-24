@@ -34,6 +34,7 @@
 
 -include("../include/common.hrl").
 
+-define(RTPPROXY_IP, {127,0,0,1}).
 -define(RTPPROXY_PORT, 33333).
 
 rtpproxy_notifier_backend_notify_test_() ->
@@ -49,7 +50,7 @@ rtpproxy_notifier_backend_notify_test_() ->
 	CallId = <<"smaalefzrxxfrqw@localhost.localdomain-0">>,
 	MediaId = <<"0">>,
 	NotifyTag = <<"27124048">>,
-	NotifyInfo = [{addr, {{127,0,0,1},Port}}, {tag, NotifyTag}],
+	NotifyInfo = [{addr, {?RTPPROXY_IP, Port}}, {tag, NotifyTag}],
 
 	{setup,
 		fun() ->
