@@ -37,7 +37,7 @@
 -define(RTPPROXY_IP, {127,0,0,1}).
 -define(RTPPROXY_PORT, 33333).
 
-ser_test_() ->
+ser_udp_test_() ->
 
 	%%
 	%% This is the socket which will be used for sending messages
