@@ -67,7 +67,7 @@ handle_cast({msg, Msg, Ip, Port}, {Parent, Fd}) ->
 	{noreply, {Parent, Fd}};
 
 handle_cast(stop, State) ->
-	{stop, stop, State};
+	{stop, normal, State};
 
 handle_cast(Other, State) ->
 	error_logger:warning_msg("UDP listener: strange cast: ~p~n", [Other]),

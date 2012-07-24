@@ -48,7 +48,7 @@ handle_call(Other, _From, State) ->
 	{noreply, State}.
 
 handle_cast(stop, State) ->
-	{stop, stop, State};
+	{stop, normal, State};
 
 handle_cast({reply, Cmd = #cmd{origin = #origin{type = ser, ip = Ip, port = Port}}, {Addr1, Addr2}}, State) ->
 	error_logger:info_msg("SER reply ~p~n", [{Addr1, Addr2}]),
