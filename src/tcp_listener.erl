@@ -103,7 +103,7 @@ handle_info({tcp, Client, Msg}, #state{parent = Parent} = State) ->
 handle_info({tcp_closed, Client}, State = #state{clients=Clients}) ->
 	gen_tcp:close(Client),
 	error_logger:warning_msg("Client ~p closed connection~n", [Client]),
-	{noreply, State#state{clients = proplists:delete(Client, Clients)}};
+	{noreply, State#state{clients = lists:delete(Client, Clients)}};
 
 handle_info({inet_async, ListSock, Ref, {ok, CliSocket}}, #state{listener=ListSock, acceptor=Ref, clients = Clients} = State) ->
 	case set_sockopt(ListSock, CliSocket) of
