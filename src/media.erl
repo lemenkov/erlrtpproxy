@@ -65,6 +65,10 @@ init(#cmd{type = ?CMD_U, callid = CallId, mediaid = MediaId} = Cmd) ->
 
 	% Register itself only after running deferred init
 	gproc:add_global_name({id, CallId, MediaId}),
+	% for group call
+	gproc:add_global_name({id, CallId, 0}),
+	% For broadcast command
+	gproc:add_global_property(media, {id, CallId, MediaId}),
 
 	{ok, #state{}}.
 

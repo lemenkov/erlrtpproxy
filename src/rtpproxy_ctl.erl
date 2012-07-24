@@ -108,14 +108,11 @@ status() ->
 
 % Simply stop all active sessions
 command(#cmd{type = ?CMD_X}) ->
-	Pids = case ets:match(gproc, {{'$1', {'_', '_', {id, '_', '_'}}},'_'}) of
-		[] -> [];
-		Ret -> [ X || [X] <- Ret ]
-	end,
-	lists:foreach(fun(Pid) -> gen_server:cast(Pid, stop) end, Pids);
+	Pids = gproc:lookup_global_properties(media),
+	lists:foreach(fun({Pid,{id,_CallId,_MediaId}}) -> gen_server:cast(Pid, stop) end, Pids);
 
 command(#cmd{type = ?CMD_I, params = [brief]}) ->
-	Length = length(ets:match(gproc, {{'$1', {'_', '_', {id, '_', '_'}}},'_'})),
+	Length = length(gproc:lookup_global_properties(media)),
 	{ok, {stats, Length}};
 
 % TODO show information about calls
@@ -124,41 +121,32 @@ command(#cmd{type = ?CMD_I}) ->
 	% Stats = lists:map(fun(Pid) -> gen_server:call(Pid, ?CMD_Q) end, Calls),
 	% "sessions created: %llu\nactive sessions: %d\n active streams: %d\n"
 	% foreach session "%s/%s: caller = %s:%d/%s, callee = %s:%d/%s, stats = %lu/%lu/%lu/%lu, ttl = %d/%d\n"
-	Length = length(ets:match(gproc, {{'$1', {'_', '_', {id, '_', '_'}}},'_'})),
+	Length = length(gproc:lookup_global_properties(media)),
 	% FIXME - provide real stats here
 	{ok, {stats, Length, Length}};
 
 command(#cmd{callid = CallId, mediaid = MediaId} = Cmd) ->
 	% First try to find existing session(s)
-	case get_media(CallId, MediaId) of
-		[] when Cmd#cmd.type == ?CMD_U ->
+	case gproc:lookup_global_name({id, CallId, MediaId}) of
+		undefined when Cmd#cmd.type == ?CMD_U ->
 			% Create new media thread
 			error_logger:warning_msg("Media stream does not exist. Creating new."),
 			pool:pspawn(media, start, [Cmd]),
 			{ok, sent};
+		undefined ->
+			error_logger:warning_msg("Media stream does not exist. Do nothing."),
+			{error, notfound};
 		[] ->
 			error_logger:warning_msg("Media stream does not exist. Do nothing."),
 			{error, notfound};
 		MediaThread when is_pid(MediaThread) ->
 			% Operate on existing media thread - wait for answer
 			gen_server:cast(MediaThread, Cmd),
-			{ok, sent};
+			case MediaId of
+				0 -> ok;
+				_ -> {ok, sent}
+			end;
 		MediaThreads when is_list(MediaThreads) ->
 			% Group command - return immediately
 			lists:foreach(fun(Pid) -> gen_server:cast(Pid, Cmd) end, MediaThreads)
-	end.
-
-%%%%%%%%%%%%%%%%%%%%%%%%
-%% Internal functions %%
-%%%%%%%%%%%%%%%%%%%%%%%%
-
-get_media(CallId, 0) ->
-	case ets:match(gproc, {{'$1', {'_', '_', {id, CallId, '_'}}},'_'}) of
-		[] -> [];
-		Ret -> [ X || [X] <- Ret ]
-	end;
-get_media(CallId, MediaId) ->
-	case ets:match(gproc, {{'$1', {'_', '_', {id, CallId, MediaId}}},'_'}) of
-		[[Pid]] -> Pid;
-		[] -> []
 	end.
