@@ -58,7 +58,7 @@ rtpproxy_notifier_backend_notify_test_() ->
 				%% Set node name
 				%%
 
-				net_kernel:start(['erlrtpproxy_test@localhost', longnames]),
+				net_kernel:start(['rtpproxy_notifier_test@localhost', longnames]),
 
 				%%
 				%% Set necessary options
