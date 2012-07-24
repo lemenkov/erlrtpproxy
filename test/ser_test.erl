@@ -34,6 +34,7 @@
 
 -include("../include/common.hrl").
 
+-define(RTPPROXY_IP, {127,0,0,1}).
 -define(RTPPROXY_PORT, 33333).
 
 ser_test_() ->
@@ -123,74 +124,74 @@ ser_test_() ->
 		[
 			{"Try to handshake (get magic number back -20040107)",
 				fun () ->
-						gen_udp:send(Fd, {127,0,0,1}, ?RTPPROXY_PORT, <<"592_36821 V\n">>),
+						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<"592_36821 V\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						?assertEqual(<<"592_36821 20040107\n">>, Answer) end
 			},
 			{"Request basic RTP proxy functionality (ver. 20040107)",
 				fun () ->
-						gen_udp:send(Fd, {127,0,0,1}, ?RTPPROXY_PORT, <<"6721_50320 VF 20040107\n">>),
+						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<"6721_50320 VF 20040107\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						?assertEqual(<<"6721_50320 1\n">>, Answer) end
 			},
 			{"Request support for multiple RTP streams and MOH (ver. 20050322)",
 				fun () ->
-						gen_udp:send(Fd, {127,0,0,1}, ?RTPPROXY_PORT, <<"6721_09219 VF 20050322\n">>),
+						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<"6721_09219 VF 20050322\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						?assertEqual(<<"6721_09219 1\n">>, Answer) end
 			},
 			{"Request support for extra parameter in the V command (ver. 20060704)",
 				fun () ->
-						gen_udp:send(Fd, {127,0,0,1}, ?RTPPROXY_PORT, <<"6721_86921 VF 20060704\n">>),
+						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<"6721_86921 VF 20060704\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						?assertEqual(<<"6721_86921 1\n">>, Answer) end
 			},
 			{"Request support for RTP re-packetization (ver. 20071116)",
 				fun () ->
-						gen_udp:send(Fd, {127,0,0,1}, ?RTPPROXY_PORT, <<"6721_19382 VF 20071116\n">>),
+						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<"6721_19382 VF 20071116\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						?assertEqual(<<"6721_19382 1\n">>, Answer) end
 			},
 			{"Request support for forking (copying) RTP stream (ver. 20071218)",
 				fun () ->
-						gen_udp:send(Fd, {127,0,0,1}, ?RTPPROXY_PORT, <<"195345 VF 20071218\n">>),
+						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<"195345 VF 20071218\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						?assertEqual(<<"195345 1\n">>, Answer) end
 			},
 			{"Request support for RTP statistics querying (ver. 20080403)",
 				fun () ->
-						gen_udp:send(Fd, {127,0,0,1}, ?RTPPROXY_PORT, <<"782361 VF 20080403\n">>),
+						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<"782361 VF 20080403\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						?assertEqual(<<"782361 1\n">>, Answer) end
 			},
 			{"Request support for setting codecs in the update/lookup command (ver. 20081102)",
 				fun () ->
-						gen_udp:send(Fd, {127,0,0,1}, ?RTPPROXY_PORT, <<"456987 VF 20081102\n">>),
+						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<"456987 VF 20081102\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						?assertEqual(<<"456987 1\n">>, Answer) end
 			},
 			{"Request support for session timeout notifications (ver. 20081224)",
 				fun () ->
-						gen_udp:send(Fd, {127,0,0,1}, ?RTPPROXY_PORT, <<"145698 VF 20081224\n">>),
+						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<"145698 VF 20081224\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						?assertEqual(<<"145698 1\n">>, Answer) end
 			},
 			{"Request support for automatic bridging (ver. 20090810)",
 				fun () ->
-						gen_udp:send(Fd, {127,0,0,1}, ?RTPPROXY_PORT, <<"352743 VF 20090810\n">>),
+						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<"352743 VF 20090810\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						?assertEqual(<<"352743 1\n">>, Answer) end
 			},
 			{"Request for unsupported extensions",
 				fun () ->
-						gen_udp:send(Fd, {127,0,0,1}, ?RTPPROXY_PORT, <<"809210 VF 20111109\n">>),
+						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<"809210 VF 20111109\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						% A generic rtpproxy returns 0 here which looks wrong. Should be E1 really.
 						?assertEqual(<<"809210 E1\n">>, Answer) end
 			},
 			{"Try to create new session",
 				fun () ->
-						gen_udp:send(Fd, {127,0,0,1}, ?RTPPROXY_PORT, <<"24393_4 Uc0,8,18,101 0003e30c-callid01@192.168.0.100 192.0.43.10 27686 0003e30cc50cd69210b8c36b-0ecf0120;1\n">>),
+						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<"24393_4 Uc0,8,18,101 0003e30c-callid01@192.168.0.100 192.0.43.10 27686 0003e30cc50cd69210b8c36b-0ecf0120;1\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						?assertMatch(
 							#response{
@@ -203,7 +204,7 @@ ser_test_() ->
 			},
 			{"Try to lookup existing session",
 				fun () ->
-						gen_udp:send(Fd, {127,0,0,1}, ?RTPPROXY_PORT, <<"24393_4 Lc0,8,18,101 0003e30c-callid01@192.168.0.100 192.0.43.11 19686 0003e30cc50cd69210b8c36b-0ecf0120;1 1372466422;1\n">>),
+						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<"24393_4 Lc0,8,18,101 0003e30c-callid01@192.168.0.100 192.0.43.11 19686 0003e30cc50cd69210b8c36b-0ecf0120;1 1372466422;1\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						?assertMatch(
 							#response{
@@ -216,21 +217,21 @@ ser_test_() ->
 			},
 			{"Request brief statistics",
 				fun () ->
-						gen_udp:send(Fd, {127,0,0,1}, ?RTPPROXY_PORT, <<"356289 Ib\n">>),
+						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<"356289 Ib\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						% Here is an error in the generic rtpproxy - it doesn't return cookie, e.g. does not prepend 356289 to the beginning
 						?assertMatch(<<"356289 active sessions: ", _/binary>>, Answer) end
 			},
 			{"Request overall statistics",
 				fun () ->
-						gen_udp:send(Fd, {127,0,0,1}, ?RTPPROXY_PORT, <<"451309 I\n">>),
+						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<"451309 I\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						% Here is an error in the generic rtpproxy - it doesn't return cookie, e.g. does not prepend 451309 to the beginning
 						?assertMatch(<<"451309 sessions created: ", _/binary>>, Answer) end
 			},
 			{"Try to close existing session",
 				fun () ->
-						gen_udp:send(Fd, {127,0,0,1}, ?RTPPROXY_PORT, <<"24393_4 D 0003e30c-callid02@192.168.0.100 0003e30cc50cd69210b8c36b-0ecf0120 1372466422\n">>),
+						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<"24393_4 D 0003e30c-callid02@192.168.0.100 0003e30cc50cd69210b8c36b-0ecf0120 1372466422\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						?assertEqual(
 							#response{
@@ -243,7 +244,7 @@ ser_test_() ->
 			},
 			{"Close all active sessions",
 				fun () ->
-						gen_udp:send(Fd, {127,0,0,1}, ?RTPPROXY_PORT, <<"198230 X\n">>),
+						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<"198230 X\n">>),
 						{ok, {Ip, Port, Answer}} = gen_udp:recv(Fd, 0),
 						?assertEqual(<<"198230 0\n">>, Answer) end
 			}
