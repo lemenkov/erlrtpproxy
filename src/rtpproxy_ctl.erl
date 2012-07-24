@@ -94,10 +94,10 @@ status_pp() ->
 
 % FIXME this must be reworked (no preformatted strings - just plain stats)
 status() ->
-	Calls = ets:match(gproc, {{'$1', {'_', '_', {id, '$2', '$3'}}},'_'}),
+	Calls = gproc:lookup_global_properties(media),
 	Header = io_lib:format("Current state - ~p media stream(s):~n", [length(Calls)]),
 	?INFO(Header, []),
-	MediaInfos = lists:map(fun({Pid, CallId, MediaId}) ->
+	MediaInfos = lists:map(fun({Pid,{id,CallId,MediaId}}) ->
 			{ok, Reply} = gen_server:call(Pid, ?CMD_Q),
 			MediaInfo = io_lib:format("* CallID: ~s, MediaId: ~p, ~s~n", [CallId, MediaId, Reply]),
 			?INFO(MediaInfo, []),
@@ -117,7 +117,7 @@ command(#cmd{type = ?CMD_I, params = [brief]}) ->
 
 % TODO show information about calls
 command(#cmd{type = ?CMD_I}) ->
-	% Calls = ets:match(gproc, {{'$1', {'_', '_', {id, '_', '_'}}},'_'}),
+	% Calls = gproc:lookup_global_properties(media),
 	% Stats = lists:map(fun(Pid) -> gen_server:call(Pid, ?CMD_Q) end, Calls),
 	% "sessions created: %llu\nactive sessions: %d\n active streams: %d\n"
 	% foreach session "%s/%s: caller = %s:%d/%s, callee = %s:%d/%s, stats = %lu/%lu/%lu/%lu, ttl = %d/%d\n"
