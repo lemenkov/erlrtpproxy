@@ -51,7 +51,7 @@ ser_udp_test_() ->
 				%% Set node name
 				%%
 
-				net_kernel:start(['erlrtpproxy_test@localhost', longnames]),
+				net_kernel:start(['ser_udp_test@localhost', longnames]),
 
 				%%
 				%% Load fake rtpproxy_ctl module - we'll test it later
@@ -119,6 +119,8 @@ ser_udp_test_() ->
 		fun (_) ->
 				gen_udp:close(Fd),
 				meck:unload(rtpproxy_ctl),
+				gen_server:cast(listener, stop),
+				gen_server:cast(backend_ser, stop),
 				net_kernel:stop()
 		end,
 		[
@@ -251,36 +253,29 @@ ser_udp_test_() ->
 		]
 	}.
 
-ser_tcp_test_DISABLED() ->
-
-	%%
-	%% Set node name
-	%%
-
-	net_kernel:start(['erlrtpproxy_test@localhost', longnames]),
-
-	%%
-	%% Set necessary options
-	%% (normally we'll set them in the /etc/erlrtpproxy.config
-	%%
-
-	application:set_env(rtpproxy, listen, {tcp, "127.0.0.1", ?RTPPROXY_PORT}),
-	application:set_env(rtpproxy, backend, ser),
-
-	%%
-	%% Start real SER frontend
-	%%
-
-	ser_sup:start_link(),
-
-	%%
-	%% This is the socket which will be used for sending messages
-	%%
-
-	{ok, Fd} = gen_tcp:connect(?RTPPROXY_IP, ?RTPPROXY_PORT, [{active, false}, binary]),
-
+ser_tcp_test_() ->
 	{setup,
 		fun() ->
+				%%
+				%% Set node name
+				%%
+
+				net_kernel:start(['ser_tcp_test@localhost', longnames]),
+
+				%%
+				%% Set necessary options
+				%% (normally we'll set them in the /etc/erlrtpproxy.config
+				%%
+
+				application:set_env(rtpproxy, listen, {tcp, "127.0.0.1", ?RTPPROXY_PORT}),
+				application:set_env(rtpproxy, backend, ser),
+
+				%%
+				%% Start real SER frontend
+				%%
+
+				ser_sup:start_link(),
+
 				%%
 				%% Load fake rtpproxy_ctl module - we'll test it later
 				%%
@@ -332,81 +327,106 @@ ser_tcp_test_DISABLED() ->
 		end,
 		fun (_) ->
 				meck:unload(rtpproxy_ctl),
-				gen_tcp:close(Fd),
+				gen_server:cast(listener, stop),
+				gen_server:cast(backend_ser, stop),
 				net_kernel:stop()
 		end,
 		[
 			{"Try to handshake (get magic number back -20040107)",
 				fun () ->
+						{ok, Fd} = gen_tcp:connect(?RTPPROXY_IP, ?RTPPROXY_PORT, [{active, false}, binary]),
 						gen_tcp:send(Fd, <<"592_36821 V\n">>),
 						{ok, Answer} = gen_tcp:recv(Fd, 0),
+						gen_tcp:close(Fd),
 						?assertEqual(<<"592_36821 20040107\n">>, Answer) end
 			},
 			{"Request basic RTP proxy functionality (ver. 20040107)",
 				fun () ->
+						{ok, Fd} = gen_tcp:connect(?RTPPROXY_IP, ?RTPPROXY_PORT, [{active, false}, binary]),
 						gen_tcp:send(Fd, <<"6721_50320 VF 20040107\n">>),
 						{ok, Answer} = gen_tcp:recv(Fd, 0),
+						gen_tcp:close(Fd),
 						?assertEqual(<<"6721_50320 1\n">>, Answer) end
 			},
 			{"Request support for multiple RTP streams and MOH (ver. 20050322)",
 				fun () ->
+						{ok, Fd} = gen_tcp:connect(?RTPPROXY_IP, ?RTPPROXY_PORT, [{active, false}, binary]),
 						gen_tcp:send(Fd, <<"6721_09219 VF 20050322\n">>),
 						{ok, Answer} = gen_tcp:recv(Fd, 0),
+						gen_tcp:close(Fd),
 						?assertEqual(<<"6721_09219 1\n">>, Answer) end
 			},
 			{"Request support for extra parameter in the V command (ver. 20060704)",
 				fun () ->
+						{ok, Fd} = gen_tcp:connect(?RTPPROXY_IP, ?RTPPROXY_PORT, [{active, false}, binary]),
 						gen_tcp:send(Fd, <<"6721_86921 VF 20060704\n">>),
 						{ok, Answer} = gen_tcp:recv(Fd, 0),
+						gen_tcp:close(Fd),
 						?assertEqual(<<"6721_86921 1\n">>, Answer) end
 			},
 			{"Request support for RTP re-packetization (ver. 20071116)",
 				fun () ->
+						{ok, Fd} = gen_tcp:connect(?RTPPROXY_IP, ?RTPPROXY_PORT, [{active, false}, binary]),
 						gen_tcp:send(Fd, <<"6721_19382 VF 20071116\n">>),
 						{ok, Answer} = gen_tcp:recv(Fd, 0),
+						gen_tcp:close(Fd),
 						?assertEqual(<<"6721_19382 1\n">>, Answer) end
 			},
 			{"Request support for forking (copying) RTP stream (ver. 20071218)",
 				fun () ->
+						{ok, Fd} = gen_tcp:connect(?RTPPROXY_IP, ?RTPPROXY_PORT, [{active, false}, binary]),
 						gen_tcp:send(Fd, <<"195345 VF 20071218\n">>),
 						{ok, Answer} = gen_tcp:recv(Fd, 0),
+						gen_tcp:close(Fd),
 						?assertEqual(<<"195345 1\n">>, Answer) end
 			},
 			{"Request support for RTP statistics querying (ver. 20080403)",
 				fun () ->
+						{ok, Fd} = gen_tcp:connect(?RTPPROXY_IP, ?RTPPROXY_PORT, [{active, false}, binary]),
 						gen_tcp:send(Fd, <<"782361 VF 20080403\n">>),
 						{ok, Answer} = gen_tcp:recv(Fd, 0),
+						gen_tcp:close(Fd),
 						?assertEqual(<<"782361 1\n">>, Answer) end
 			},
 			{"Request support for setting codecs in the update/lookup command (ver. 20081102)",
 				fun () ->
+						{ok, Fd} = gen_tcp:connect(?RTPPROXY_IP, ?RTPPROXY_PORT, [{active, false}, binary]),
 						gen_tcp:send(Fd, <<"456987 VF 20081102\n">>),
 						{ok, Answer} = gen_tcp:recv(Fd, 0),
+						gen_tcp:close(Fd),
 						?assertEqual(<<"456987 1\n">>, Answer) end
 			},
 			{"Request support for session timeout notifications (ver. 20081224)",
 				fun () ->
+						{ok, Fd} = gen_tcp:connect(?RTPPROXY_IP, ?RTPPROXY_PORT, [{active, false}, binary]),
 						gen_tcp:send(Fd, <<"145698 VF 20081224\n">>),
 						{ok, Answer} = gen_tcp:recv(Fd, 0),
+						gen_tcp:close(Fd),
 						?assertEqual(<<"145698 1\n">>, Answer) end
 			},
 			{"Request support for automatic bridging (ver. 20090810)",
 				fun () ->
+						{ok, Fd} = gen_tcp:connect(?RTPPROXY_IP, ?RTPPROXY_PORT, [{active, false}, binary]),
 						gen_tcp:send(Fd, <<"352743 VF 20090810\n">>),
 						{ok, Answer} = gen_tcp:recv(Fd, 0),
+						gen_tcp:close(Fd),
 						?assertEqual(<<"352743 1\n">>, Answer) end
 			},
 			{"Request for unsupported extensions",
 				fun () ->
+						{ok, Fd} = gen_tcp:connect(?RTPPROXY_IP, ?RTPPROXY_PORT, [{active, false}, binary]),
 						gen_tcp:send(Fd, <<"809210 VF 20111109\n">>),
 						{ok, Answer} = gen_tcp:recv(Fd, 0),
+						gen_tcp:close(Fd),
 						% A generic rtpproxy returns 0 here which looks wrong. Should be E1 really.
 						?assertEqual(<<"809210 E1\n">>, Answer) end
 			},
 			{"Try to create new session",
 				fun () ->
+						{ok, Fd} = gen_tcp:connect(?RTPPROXY_IP, ?RTPPROXY_PORT, [{active, false}, binary]),
 						gen_tcp:send(Fd, <<"24393_4 Uc0,8,18,101 0003e30c-callid01@192.168.0.100 192.0.43.10 27686 0003e30cc50cd69210b8c36b-0ecf0120;1\n">>),
 						{ok, Answer} = gen_tcp:recv(Fd, 0),
+						gen_tcp:close(Fd),
 						?assertMatch(
 							#response{
 								cookie = <<"24393_4">>,
@@ -418,8 +438,10 @@ ser_tcp_test_DISABLED() ->
 			},
 			{"Try to lookup existing session",
 				fun () ->
+						{ok, Fd} = gen_tcp:connect(?RTPPROXY_IP, ?RTPPROXY_PORT, [{active, false}, binary]),
 						gen_tcp:send(Fd, <<"24393_4 Lc0,8,18,101 0003e30c-callid01@192.168.0.100 192.0.43.11 19686 0003e30cc50cd69210b8c36b-0ecf0120;1 1372466422;1\n">>),
 						{ok, Answer} = gen_tcp:recv(Fd, 0),
+						gen_tcp:close(Fd),
 						?assertMatch(
 							#response{
 								cookie = <<"24393_4">>,
@@ -431,22 +453,28 @@ ser_tcp_test_DISABLED() ->
 			},
 			{"Request brief statistics",
 				fun () ->
+						{ok, Fd} = gen_tcp:connect(?RTPPROXY_IP, ?RTPPROXY_PORT, [{active, false}, binary]),
 						gen_tcp:send(Fd, <<"356289 Ib\n">>),
 						{ok, Answer} = gen_tcp:recv(Fd, 0),
+						gen_tcp:close(Fd),
 						% Here is an error in the generic rtpproxy - it doesn't return cookie, e.g. does not prepend 356289 to the beginning
 						?assertMatch(<<"356289 active sessions: ", _/binary>>, Answer) end
 			},
 			{"Request overall statistics",
 				fun () ->
+						{ok, Fd} = gen_tcp:connect(?RTPPROXY_IP, ?RTPPROXY_PORT, [{active, false}, binary]),
 						gen_tcp:send(Fd, <<"451309 I\n">>),
 						{ok, Answer} = gen_tcp:recv(Fd, 0),
+						gen_tcp:close(Fd),
 						% Here is an error in the generic rtpproxy - it doesn't return cookie, e.g. does not prepend 451309 to the beginning
 						?assertMatch(<<"451309 sessions created: ", _/binary>>, Answer) end
 			},
 			{"Try to close existing session",
 				fun () ->
+						{ok, Fd} = gen_tcp:connect(?RTPPROXY_IP, ?RTPPROXY_PORT, [{active, false}, binary]),
 						gen_tcp:send(Fd, <<"24393_4 D 0003e30c-callid02@192.168.0.100 0003e30cc50cd69210b8c36b-0ecf0120 1372466422\n">>),
 						{ok, Answer} = gen_tcp:recv(Fd, 0),
+						gen_tcp:close(Fd),
 						?assertEqual(
 							#response{
 								cookie = <<"24393_4">>,
@@ -458,8 +486,10 @@ ser_tcp_test_DISABLED() ->
 			},
 			{"Close all active sessions",
 				fun () ->
+						{ok, Fd} = gen_tcp:connect(?RTPPROXY_IP, ?RTPPROXY_PORT, [{active, false}, binary]),
 						gen_tcp:send(Fd, <<"198230 X\n">>),
 						{ok, Answer} = gen_tcp:recv(Fd, 0),
+						gen_tcp:close(Fd),
 						?assertEqual(<<"198230 0\n">>, Answer) end
 			}
 		]
