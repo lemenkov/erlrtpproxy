@@ -34,9 +34,6 @@
 
 -include("../include/common.hrl").
 
--define(RTPPROXY_IP, {127,0,0,1}).
--define(RTPPROXY_PORT, 33333).
-
 run_create(0, _) ->
 	ok;
 run_create(Number, Fd) ->
