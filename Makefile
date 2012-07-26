@@ -46,6 +46,10 @@ else
 	@install -p -m 0755 priv/erlrtpproxy.init $(DESTDIR)$(prefix)/etc/rc.d/init.d/erl$(NAME)
 endif
 
+benchmark: bench
+bench:
+	@escript ./priv/benchmark.escript
+
 clean:
 	@$(REBAR) clean $(REBAR_FLAGS)
 
