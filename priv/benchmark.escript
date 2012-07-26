@@ -1,6 +1,6 @@
 #!/usr/bin/escript
 %% -*- erlang -*-
-%%! -pa ebin
+%%! -pa ebin +K true +A 4 -smp enable
 
 %%%----------------------------------------------------------------------
 %%% Copyright (c) 2012 Peter Lemenkov <lemenkov@gmail.com>

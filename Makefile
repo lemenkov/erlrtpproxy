@@ -48,7 +48,7 @@ endif
 
 benchmark: bench
 bench:
-	@escript ./priv/benchmark.escript
+	@escript -n ./priv/benchmark.escript
 
 clean:
 	@$(REBAR) clean $(REBAR_FLAGS)
