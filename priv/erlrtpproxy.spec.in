@@ -80,7 +80,9 @@ rm -rf $RPM_BUILD_ROOT
 
 
 %check
+/usr/lib*/erlang/bin/epmd -daemon
 make test
+/usr/lib*/erlang/bin/epmd -kill
 
 
 %files
