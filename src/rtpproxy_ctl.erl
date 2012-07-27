@@ -30,7 +30,6 @@
 
 start() ->
 	% Start our pool
-	error_logger:error_msg("CWD: ~p~n", [file:get_cwd()]),
 	ConfigPath = case init:get_argument(config) of
 		error -> "../priv/erlrtpproxy.config"; % for testing
 		{ok,[[CPath]]} -> CPath
