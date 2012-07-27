@@ -34,14 +34,14 @@ start() ->
 	Nodes = [node()|pool:start(rtpproxy, " -config " ++ ConfigPath ++ " ")],
 
 	% Replace logger with erlsyslog
-	rpc:multicall(Nodes, error_logger, add_report_handler, erlsyslog),
+	rpc:multicall(Nodes, error_logger, add_report_handler, [erlsyslog]),
 
 	% Run gproc on each node
 	rpc:multicall(Nodes, application, set_env, [gproc, gproc_dist, all]),
-	rpc:multicall(Nodes, application, start, gproc),
+	rpc:multicall(Nodes, application, start, [gproc]),
 
 	% Load necessary config files
-	rpc:multicall(Nodes, application, load, rtpproxy),
+	rpc:multicall(Nodes, application, load, [rtpproxy]),
 
 	% Load main module
 	application:start(rtpproxy).
