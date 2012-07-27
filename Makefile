@@ -3,7 +3,7 @@ REBAR_FLAGS ?=
 
 VSN := "0.10.0"
 BUILD_DATE := `LANG=C date +"%a %b %d %Y"`
-NAME := rtpproxy_notifier
+NAME := rtpproxy
 
 ERLANG_ROOT := $(shell erl -eval 'io:format("~s", [code:root_dir()])' -s init stop -noshell)
 ERLDIR=$(ERLANG_ROOT)/lib/$(NAME)-$(VSN)
