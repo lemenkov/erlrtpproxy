@@ -76,23 +76,10 @@ rtpproxy_test_() ->
 				application:set_env(rtpproxy, ttl, 105000),
 
 				%%
-				%% Emulate starting pool of nodes
-				%%
-
-				Nodes = [node() | pool:start(rtpproxy)],
-
-				%%
-				%% Run gproc
-				%%
-
-				rpc:multicall(Nodes, application, set_env, [gproc, gproc_dist, all]),
-				rpc:multicall(Nodes, application, start, [gproc]),
-
-				%%
 				%% Start rtpproxy
 				%%
 
-				application:start(rtpproxy)
+				rtpproxy_ctl:start()
 		end,
 		fun (_) ->
 				gen_udp:close(Fd),
