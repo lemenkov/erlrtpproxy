@@ -270,11 +270,11 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, ssrc = SSRC, started = tru
 	inet:setopts(Fd, [{active, once}]),
 	try
 		{ok, Rtp} = rtp:decode(Msg),
-		gen_server:cast(Neighbour, {rtp, Rtp}),
 		case ensure_ssrc(SSRC, Rtp) of
 			true ->
 				?WARN("RTP addr changed, but known SSRC found. Updating addr.", []),
-				{noreply, State#state{ipf = Ip, portf = Port, lastseen = now(), alive = true}};
+				gen_server:cast(Neighbour, {rtp, Rtp}),
+				{noreply, State#state{ipf = Ip, portf = Port, ipt = Ip, portt = Port, lastseen = now(), alive = true}};
 			_ ->
 				?ERR("Disallow data from strange source with different SSRC", []),
 				{noreply, State}
@@ -297,7 +297,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{fd = Fd, parent = Parent, started =
 
 		% Initial SSRC setup
 		% Note - it could change during call w/o warning so beware
-		{noreply, State#state{ssrc = Rtp#rtp.ssrc, started = true, ipf = Ip, portf = Port, lastseen = now(), alive = true}}
+		{noreply, State#state{ssrc = Rtp#rtp.ssrc, started = true, ipf = Ip, portf = Port, ipt = Ip, portt = Port, lastseen = now(), alive = true}}
 	catch
 		_:_ -> rtp_utils:dump_packet(node(), self(), Msg),
 		{noreply, State}
@@ -352,7 +352,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, #state{rtcp = Fd, parent = Parent, started
 		{ok, Rtcp} = rtcp:decode(Msg),
 		% FIXME Do something with RTCP before sending it further
 		gen_server:cast(Parent, {rtcp, Rtcp, self()}),
-		{noreply, State#state{started1 = true, ipf1 = Ip, portf1 = Port}}
+		{noreply, State#state{started1 = true, ipf1 = Ip, portf1 = Port, ipt1 = Ip, portt1 = Port}}
 	catch
 		_:_ -> rtp_utils:dump_packet(node(), self(), Msg),
 		{noreply, State}
