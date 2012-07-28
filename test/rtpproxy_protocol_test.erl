@@ -84,6 +84,7 @@ rtpproxy_protocol_test_() ->
 				gen_udp:close(Fd),
 				application:stop(rtpproxy),
 				application:stop(gproc),
+				pool:stop(),
 				net_kernel:stop()
 		end,
 		[
