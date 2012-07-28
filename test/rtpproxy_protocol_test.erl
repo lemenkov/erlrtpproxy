@@ -28,7 +28,7 @@
 %%%
 %%%----------------------------------------------------------------------
 
--module(rtpproxy_test).
+-module(rtpproxy_protocol_test).
 
 -include_lib("eunit/include/eunit.hrl").
 
@@ -37,14 +37,13 @@
 -define(RTPPROXY_IP, {127,0,0,1}).
 -define(RTPPROXY_PORT, 33333).
 
-rtpproxy_test_() ->
+rtpproxy_protocol_test_() ->
 
 	%%
 	%% This is the socket which will be used for sending commands and receiving notifications messages
 	%%
 
 	{ok, Fd} = gen_udp:open(0, [{active, false}, binary]),
-	{ok, {_, Port}} = inet:sockname(Fd),
 
 	{setup,
 		fun() ->
@@ -52,7 +51,7 @@ rtpproxy_test_() ->
 				%% Set node name
 				%%
 
-				net_kernel:start(['erlrtpproxy_test@localhost', longnames]),
+				net_kernel:start(['erlrtpproxy_commands_test@localhost', longnames]),
 
 				%%
 				%% Set necessary options
