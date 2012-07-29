@@ -96,7 +96,6 @@ make test
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_ctl.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/utils.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/media.beam
-%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/rtp_socket.beam
 
 # OpenSER/OpenSIPS/Kamailio/Sippy interface
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/backend_ser.beam

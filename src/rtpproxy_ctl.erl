@@ -116,7 +116,7 @@ command(#cmd{type = ?CMD_X}) ->
 	lists:foreach(fun({Pid,{id,_CallId,_MediaId}}) -> gen_server:cast(Pid, stop) end, Pids);
 
 command(#cmd{type = ?CMD_I, params = [brief]}) ->
-	Length = length(gproc:lookup_global_properties(media)),
+	Length = length(gproc:lookup_global_properties(media)) div 2,
 	{ok, {stats, Length}};
 
 % TODO show information about calls
@@ -125,31 +125,28 @@ command(#cmd{type = ?CMD_I}) ->
 	% Stats = lists:map(fun(Pid) -> gen_server:call(Pid, ?CMD_Q) end, Calls),
 	% "sessions created: %llu\nactive sessions: %d\n active streams: %d\n"
 	% foreach session "%s/%s: caller = %s:%d/%s, callee = %s:%d/%s, stats = %lu/%lu/%lu/%lu, ttl = %d/%d\n"
-	Length = length(gproc:lookup_global_properties(media)),
+	Length = length(gproc:lookup_global_properties(media)) div 2,
 	% FIXME - provide real stats here
 	{ok, {stats, Length, Length}};
 
+command(#cmd{type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{tag = Tag}} = Cmd) ->
+	case gproc:lookup_global_name({media, CallId, MediaId, Tag}) of
+		undefined ->
+			gen_rtp_channel:start_link(media, Cmd#cmd.params, Cmd);
+		MediaThread ->
+			gen_rtp_channel:cast(MediaThread, Cmd)
+	end,
+	{ok, sent};
 command(#cmd{callid = CallId, mediaid = MediaId} = Cmd) ->
 	% First try to find existing session(s)
-	case gproc:lookup_global_name({id, CallId, MediaId}) of
-		undefined when Cmd#cmd.type == ?CMD_U ->
-			% Create new media thread
-			error_logger:warning_msg("Media stream does not exist. Creating new."),
-			pool:pspawn(media, start, [Cmd]),
-			{ok, sent};
-		undefined ->
-			error_logger:warning_msg("Media stream does not exist. Do nothing."),
-			{error, notfound};
+	MID = case MediaId of
+		0 -> '_';
+		_ -> MediaId
+	end,
+	case gproc:select({global,p}, [{{{p,g,media},'$1',{id,CallId,MID}}, [], ['$1']}]) of
 		[] ->
 			error_logger:warning_msg("Media stream does not exist. Do nothing."),
 			{error, notfound};
-		MediaThread when is_pid(MediaThread) ->
-			% Operate on existing media thread - wait for answer
-			gen_server:cast(MediaThread, Cmd),
-			case MediaId of
-				0 -> ok;
-				_ -> {ok, sent}
-			end;
 		MediaThreads when is_list(MediaThreads) ->
 			% Group command - return immediately
 			lists:foreach(fun(Pid) -> gen_server:cast(Pid, Cmd) end, MediaThreads)
