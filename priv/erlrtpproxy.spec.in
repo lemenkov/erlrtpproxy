@@ -15,17 +15,17 @@ URL:		http://code.google.com/p/erlrtpproxy/
 # wget --content-disposition --no-check-certificate http://github.com/lemenkov/erlrtpproxy/tarball/%VSN%
 Source0:	%{upstream}-%{realname}-%{version}-%{patchnumber}-g%{git_tag}.tar.gz
 BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
-BuildRequires:	erlang-eradius
+BuildRequires:	erlang-eradius >= 0.8.5
 BuildRequires:	erlang-erlsyslog
 BuildRequires:	erlang-gproc
 BuildRequires:	erlang-meck
 BuildRequires:	erlang-rebar
-BuildRequires:	erlang-rtplib
+BuildRequires:	erlang-rtplib >= 0.5.17
 Requires:	erlang
-Requires:	erlang-eradius
+Requires:	erlang-eradius >= 0.8.5
 Requires:	erlang-erlsyslog
 Requires:	erlang-gproc
-Requires:	erlang-rtplib
+Requires:	erlang-rtplib >= 0.5.17
 Requires(post): /sbin/chkconfig
 Requires(preun): /sbin/chkconfig
 Requires(preun): /sbin/service
