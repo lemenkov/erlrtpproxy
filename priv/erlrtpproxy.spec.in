@@ -15,8 +15,6 @@ URL:		http://code.google.com/p/erlrtpproxy/
 # wget --content-disposition --no-check-certificate http://github.com/lemenkov/erlrtpproxy/tarball/%VSN%
 Source0:	%{upstream}-%{realname}-%{version}-%{patchnumber}-g%{git_tag}.tar.gz
 BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
-
-BuildRequires:	erlang
 BuildRequires:	erlang-eradius
 BuildRequires:	erlang-erlsyslog
 BuildRequires:	erlang-gproc
