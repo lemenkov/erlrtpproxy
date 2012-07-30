@@ -199,14 +199,14 @@ rtpproxy_protocol_test_() ->
 						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<"356289 Ib\n">>),
 						{ok, {?RTPPROXY_IP, ?RTPPROXY_PORT, Answer}} = gen_udp:recv(Fd, 0),
 						% Here is an error in the generic rtpproxy - it doesn't return cookie, e.g. does not prepend 356289 to the beginning
-						?assertEqual(<<"356289 active sessions: 2\n">>, Answer) end
+						?assertEqual(<<"356289 active sessions: 1\n">>, Answer) end
 			},
 			{"Request overall statistics",
 				fun () ->
 						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<"451309 I\n">>),
 						{ok, {?RTPPROXY_IP, ?RTPPROXY_PORT, Answer}} = gen_udp:recv(Fd, 0),
 						% Here is an error in the generic rtpproxy - it doesn't return cookie, e.g. does not prepend 451309 to the beginning
-						?assertEqual(<<"451309 sessions created: 2 active sessions: 2\n">>, Answer) end
+						?assertEqual(<<"451309 sessions created: 1 active sessions: 1\n">>, Answer) end
 			},
 			{"Try to close existing session",
 				fun () ->
@@ -282,7 +282,7 @@ rtpproxy_protocol_test_() ->
 						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<"356289 Ib\n">>),
 						{ok, {?RTPPROXY_IP, ?RTPPROXY_PORT, Answer}} = gen_udp:recv(Fd, 0),
 						% Here is an error in the generic rtpproxy - it doesn't return cookie, e.g. does not prepend 356289 to the beginning
-						?assertEqual(<<"356289 active sessions: 2\n">>, Answer) end
+						?assertEqual(<<"356289 active sessions: 1\n">>, Answer) end
 			},
 			{"Close all active sessions (again - must return ok)",
 				fun () ->
