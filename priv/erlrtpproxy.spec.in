@@ -31,8 +31,8 @@ Requires(preun): /sbin/chkconfig
 Requires(preun): /sbin/service
 Requires(postun): /sbin/service
 Obsoletes:	erlrtpproxy-notifier
-Obsoletes:	erlrtpproxy-ser
 Obsoletes:	erlrtpproxy-radius
+Obsoletes:	erlrtpproxy-ser
 
 
 %description
