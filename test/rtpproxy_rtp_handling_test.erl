@@ -55,8 +55,6 @@ rtpproxy_rtp_handling_test_() ->
 	{ok, Fd1} = gen_udp:open(0, [{active, false}, binary]),
 	{ok, {_, Port1}} = inet:sockname(Fd1),
 
-	error_logger:error_msg("PORTS: ~p ~p~n", [Port0, Port1]),
-
 	Cookie = <<"24393_4">>,
 	CallId = <<"0003e30c-callid01@192.168.0.100">>,
 	TagFrom = <<"0003e30cc50cd69210b8c36b-0ecf0120">>,
@@ -116,6 +114,7 @@ rtpproxy_rtp_handling_test_() ->
 				fun () ->
 						% Create session
 						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<Cookie/binary, " Uc0,8,18,101 ", CallId/binary, " ", "192.0.43.10 ", SPort0/binary, " ", TagFrom/binary, ";1", "\n">>),
+
 						{ok, {?RTPPROXY_IP, ?RTPPROXY_PORT, Answer0}} = gen_udp:recv(Fd, 0),
 						#response{cookie = <<"24393_4">>, data = {{{_,_,_,_}=I,RPort0},{{_,_,_,_},_}}} = ser_proto:decode(Answer0),
 
