@@ -34,32 +34,55 @@
 
 -include("../include/common.hrl").
 
-run_create(0, _) ->
+run_create(0, _, _, _) ->
 	ok;
-run_create(Number, Fd) ->
+run_create(Number, Fd, Ip, Port) ->
 	C_U = io_lib:format("24393_4 Uc0,8,18,101 0003e30c-callid~p@192.168.0.100 192.0.43.10 27686 0003e30cc50cd69210b8c36b-0ecf0120;1~n", [Number]),
 	C_L = io_lib:format("24393_4 Lc0,8,18,101 0003e30c-callid~p@192.168.0.100 192.0.43.11 19686 0003e30cc50cd69210b8c36b-0ecf0120;1 1372466422;1~n", [Number]),
-	gen_udp:send(Fd, {127,0,0,1}, 22222, C_U),
-	{ok, _} = gen_udp:recv(Fd, 0),
-	gen_udp:send(Fd, {127,0,0,1}, 22222, C_L),
-	{ok, _} = gen_udp:recv(Fd, 0),
-	run_create(Number - 1, Fd).
+	gen_udp:send(Fd, Ip, Port, C_U),
+	case gen_udp:recv(Fd, 0, 500) of
+		{ok, _} -> ok;
+		_ -> io:format("create: update timeout no.~b~n", [Number])
+	end,
+	gen_udp:send(Fd, Ip, Port, C_L),
+	case gen_udp:recv(Fd, 0, 500) of
+		{ok, _} -> ok;
+		_ -> io:format("create: lookup timeout no.~b~n", [Number])
+	end,
+	run_create(Number - 1, Fd, Ip, Port).
 
-run_create_and_destroy(0, _) ->
+run_create_and_destroy(0, _, _, _) ->
 	ok;
-run_create_and_destroy(Number, Fd) ->
+run_create_and_destroy(Number, Fd, Ip, Port) ->
 	C_U = io_lib:format("24393_4 Uc0,8,18,101 0003e30c-callid~p@192.168.0.100 192.0.43.10 27686 0003e30cc50cd69210b8c36b-0ecf0120;1~n", [Number]),
 	C_L = io_lib:format("24393_4 Lc0,8,18,101 0003e30c-callid~p@192.168.0.100 192.0.43.11 19686 0003e30cc50cd69210b8c36b-0ecf0120;1 1372466422;1~n", [Number]),
 	C_D = io_lib:format("24393_4 D 0003e30c-callid~p@192.168.0.100 0003e30cc50cd69210b8c36b-0ecf0120 1372466422\n", [Number]),
-	gen_udp:send(Fd, {127,0,0,1}, 22222, C_U),
-	{ok, _} = gen_udp:recv(Fd, 0),
-	gen_udp:send(Fd, {127,0,0,1}, 22222, C_L),
-	{ok, _} = gen_udp:recv(Fd, 0),
-	gen_udp:send(Fd, {127,0,0,1}, 22222, C_D),
-	{ok, _} = gen_udp:recv(Fd, 0),
-	run_create_and_destroy(Number - 1, Fd).
+	gen_udp:send(Fd, Ip, Port, C_U),
+	case gen_udp:recv(Fd, 0, 500) of
+		{ok, _} -> ok;
+		_ -> io:format("create/destroy: update timeout no.~b~n", [Number])
+	end,
+	gen_udp:send(Fd, Ip, Port, C_L),
+	case gen_udp:recv(Fd, 0, 500) of
+		{ok, _} -> ok;
+		_ -> io:format("create/destroy: lookup timeout no.~b~n", [Number])
+	end,
+	gen_udp:send(Fd, Ip, Port, C_D),
+	case gen_udp:recv(Fd, 0, 500) of
+		{ok, _} -> ok;
+		_ -> io:format("create/destroy: destroy timeout no.~b~n", [Number])
+	end,
+	run_create_and_destroy(Number - 1, Fd, Ip, Port).
 
-main(_) ->
+main([StrIp, StrPort]) ->
+
+	%%
+	%% Set up Ip and Port of the (erl)rtpproxy
+	%%
+
+	{ok, Ip} = inet_parse:address(StrIp),
+	Port = list_to_integer(StrPort),
+
 	%%
 	%% This is the socket which will be used for sending commands and receiving notifications messages
 	%%
@@ -71,11 +94,11 @@ main(_) ->
 	%%
 
 	error_logger:tty(false),
-	gen_udp:send(Fd, {127,0,0,1}, 22222, <<"592_36821 V\n">>),
+	gen_udp:send(Fd, Ip, Port, <<"592_36821 V\n">>),
 	{ok, _} = gen_udp:recv(Fd, 0),
-	gen_udp:send(Fd, {127,0,0,1}, 22222, <<"24393_4 Uc0,8,18,101 0003e30c-callid01@192.168.0.100 192.0.43.10 27686 0003e30cc50cd69210b8c36b-0ecf0120;1\n">>),
+	gen_udp:send(Fd, Ip, Port, <<"24393_4 Uc0,8,18,101 0003e30c-callid01@192.168.0.100 192.0.43.10 27686 0003e30cc50cd69210b8c36b-0ecf0120;1\n">>),
 	{ok, _} = gen_udp:recv(Fd, 0),
-	gen_udp:send(Fd, {127,0,0,1}, 22222, <<"24393_4 Lc0,8,18,101 0003e30c-callid01@192.168.0.100 192.0.43.11 19686 0003e30cc50cd69210b8c36b-0ecf0120;1 1372466422;1\n">>),
+	gen_udp:send(Fd, Ip, Port, <<"24393_4 Lc0,8,18,101 0003e30c-callid01@192.168.0.100 192.0.43.11 19686 0003e30cc50cd69210b8c36b-0ecf0120;1 1372466422;1\n">>),
 	{ok, _} = gen_udp:recv(Fd, 0),
 	error_logger:tty(true),
 
@@ -85,16 +108,19 @@ main(_) ->
 	%%
 
 	Number1 = 100,
-	{Time1, _} = timer:tc(fun() -> run_create_and_destroy(Number1, Fd) end),
+	{Time1, _} = timer:tc(fun() -> run_create_and_destroy(Number1, Fd, Ip, Port) end),
 	io:format("Finished creating and tearing down ~p calls in ~p seconds~n", [Number1, Time1 / 1000000]),
 
 	Number2 = 250,
-	{Time2, _} = timer:tc(fun() -> run_create(Number2, Fd) end),
+	{Time2, _} = timer:tc(fun() -> run_create(Number2, Fd, Ip, Port) end),
 	io:format("Finished creating ~p calls in ~p seconds~n", [Number2, Time2 / 1000000]),
 
 	%%
 	%% Tear down everything
 	%%
 
-	gen_udp:close(Fd).
+	gen_udp:close(Fd);
+
+main(_) ->
+	io:format("USAGE: escript ./generic_benchmark.escript Ip Port~n").
 
