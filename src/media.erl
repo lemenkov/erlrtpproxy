@@ -60,11 +60,11 @@ handle_call(Call, _From,  State) ->
 	{stop,{error,unknown_call},State}.
 
 handle_cast(stop, State) ->
-	{stop, watchdog, State};
+	{stop, normal, State};
 handle_cast(#cmd{type = ?CMD_D, callid = CallId, mediaid = 0, to = null}, #state{callid = CallId} = State) ->
-	{stop, cancel, State};
+	{stop, normal, State};
 handle_cast(#cmd{type = ?CMD_D, callid = CallId, mediaid = 0}, #state{callid = CallId} = State) ->
-	{stop, bye, State};
+	{stop, normal, State};
 
 handle_cast(Other, State) ->
 	?ERR("Unmatched cast [~p]", [Other]),
