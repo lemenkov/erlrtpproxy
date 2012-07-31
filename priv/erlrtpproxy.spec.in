@@ -16,6 +16,7 @@ URL:		http://code.google.com/p/erlrtpproxy/
 Source0:	%{upstream}-%{realname}-%{version}-%{patchnumber}-g%{git_tag}.tar.gz
 BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildRequires:	erlang-eradius >= 0.8.5
+BuildRequires:	erlang-erlando
 BuildRequires:	erlang-erlsyslog
 BuildRequires:	erlang-gproc
 BuildRequires:	erlang-meck
