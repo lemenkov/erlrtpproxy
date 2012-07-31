@@ -134,7 +134,7 @@ command(#cmd{type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{ta
 		undefined ->
 			gen_rtp_channel:start(media, Cmd#cmd.params, Cmd);
 		MediaThread ->
-			gen_rtp_channel:cast(MediaThread, Cmd)
+			gen_server:cast(MediaThread, Cmd)
 	end,
 	{ok, sent};
 command(#cmd{callid = CallId, mediaid = MediaId} = Cmd) ->
