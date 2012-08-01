@@ -19,44 +19,7 @@
 
 -module(utils).
 
--export([get_fd_pair/1]).
 -export([is_rfc1918/1]).
-
-%% Open a pair of UDP ports - N and N+1 (for RTP and RTCP consequently)
-get_fd_pair({_, true, SockParams}) ->
-	{ok, Ip} = application:get_env(rtpproxy, ipv6),
-	get_fd_pair(Ip, SockParams ++ [inet6], 10);
-get_fd_pair({internal, false, SockParams}) ->
-	{ok, Ip} = application:get_env(rtpproxy, internal),
-	get_fd_pair(Ip, SockParams, 10);
-get_fd_pair({external, false, SockParams}) ->
-	{ok, Ip} = application:get_env(rtpproxy, external),
-	get_fd_pair(Ip, SockParams, 10).
-
-get_fd_pair(Ip, SockParams, 0) ->
-	error_logger:error_msg("Create new socket at ~p FAILED (~p)", [Ip, SockParams]),
-	error;
-get_fd_pair(Ip, SockParams, NTry) ->
-	case gen_udp:open(0, [binary, {ip, Ip}, {active, once}, {raw,1,11,<<1:32/native>>}] ++ SockParams) of
-		{ok, Fd} ->
-			{ok, {Ip,Port}} = inet:sockname(Fd),
-			Port2 = case Port rem 2 of
-				0 -> Port + 1;
-				1 -> Port - 1
-			end,
-			case gen_udp:open(Port2, [binary, {ip, Ip}, {active, once}, {raw,1,11,<<1:32/native>>}] ++ SockParams) of
-				{ok, Fd2} ->
-					if
-						Port > Port2 -> {Fd2, Fd};
-						Port < Port2 -> {Fd, Fd2}
-					end;
-				{error, _} ->
-					gen_udp:close(Fd),
-					get_fd_pair(Ip, SockParams, NTry - 1)
-			end;
-		{error, _} ->
-			get_fd_pair(Ip, SockParams, NTry - 1)
-	end.
 
 % TODO only IPv4 for now
 is_rfc1918({I0,I1,I2,I3} = IPv4) when

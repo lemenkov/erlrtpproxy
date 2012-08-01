@@ -76,7 +76,8 @@ code_change(_OldVsn, State, _Extra) ->
 terminate(Reason, #state{callid = CallId, mediaid = MediaId, notify_info = NotifyInfo}) ->
 	gen_server:cast({global, rtpproxy_notifier}, {stop, CallId, MediaId, NotifyInfo}),
 	% No need to explicitly unregister from gproc - it does so automatically
-	?ERR("terminated due to reason [~p]", [Reason]).
+	{memory, Bytes} = erlang:process_info(self(), memory),
+	?ERR("terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
 handle_info({Pkt, Ip, Port}, #state{callid = CallId, mediaid = MediaId, tag = Tag} = State) ->
 	case gproc:select({global,names}, [{ {{n,g,{media, CallId, MediaId,'$1'}},'$2','_'}, [{'/=', '$1', Tag}], ['$2'] }]) of
