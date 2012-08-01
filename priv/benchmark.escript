@@ -45,6 +45,15 @@ run_create(Number, Fd) ->
 	{ok, _} = gen_udp:recv(Fd, 0),
 	run_create(Number - 1, Fd).
 
+run_destroy(0, _) ->
+	ok;
+run_destroy(Number, Fd) ->
+%	io:format("DESTROY: ~b~n", [Number]),
+	C_D = io_lib:format("24393_4 D 0003e30c-callid~p@192.168.0.100 0003e30cc50cd69210b8c36b-0ecf0120 1372466422\n", [Number]),
+	gen_udp:send(Fd, {127,0,0,1}, 33333, C_D),
+	{ok, _} = gen_udp:recv(Fd, 0),
+	run_destroy(Number - 1, Fd).
+
 run_create_and_destroy(0, _) ->
 	ok;
 run_create_and_destroy(Number, Fd) ->
@@ -122,6 +131,8 @@ main(_) ->
 	{ok, _} = gen_udp:recv(Fd, 0),
 	gen_udp:send(Fd, {127,0,0,1}, 33333, <<"24393_4 Lc0,8,18,101 0003e30c-callid01@192.168.0.100 192.0.43.11 19686 0003e30cc50cd69210b8c36b-0ecf0120;1 1372466422;1\n">>),
 	{ok, _} = gen_udp:recv(Fd, 0),
+	gen_udp:send(Fd, {127,0,0,1}, 33333, <<"24393_4 D 0003e30c-callid01@192.168.0.100 0003e30cc50cd69210b8c36b-0ecf0120 1372466422\n">>),
+	{ok, _} = gen_udp:recv(Fd, 0),
 	error_logger:tty(true),
 
 
@@ -138,6 +149,7 @@ main(_) ->
 	Number2 = 250,
 	error_logger:tty(false),
 	{Time2, _} = timer:tc(fun() -> run_create(Number2, Fd) end),
+	run_destroy(Number2, Fd),
 	error_logger:tty(true),
 	error_logger:info_msg("Finished creating ~p calls in ~p seconds~n", [Number2, Time2 / 1000000]),
 
