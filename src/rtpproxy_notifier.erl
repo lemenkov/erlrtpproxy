@@ -50,14 +50,8 @@ handle_cast({Type, CallId, MediaId, Addr}, #state{radius = RadiusBackend, notify
 	Type == interim_update;
 	Type == stop ->
 	Send = ((Type == start) and not IgnoreStart) or (Type == interim_update) or ((Type == stop) and not IgnoreStop),
-	case RadiusBackend and Send of
-		true -> gen_server:cast(rtpproxy_notifier_backend_radius, {Type, CallId, MediaId, Addr});
-		_ -> ok
-	end,
-	case NotifyBackend and Send of
-		true -> gen_server:cast(rtpproxy_notifier_backend_notify, {Type, CallId, MediaId, Addr});
-		_ -> ok
-	end,
+	(RadiusBackend and Send) andalso gen_server:cast(rtpproxy_notifier_backend_radius, {Type, CallId, MediaId, Addr}),
+	(NotifyBackend and Send) andalso gen_server:cast(rtpproxy_notifier_backend_notify, {Type, CallId, MediaId, Addr}),
 	{noreply, State};
 
 handle_cast(Other, State) ->
