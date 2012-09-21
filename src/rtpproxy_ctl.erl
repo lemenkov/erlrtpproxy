@@ -132,7 +132,7 @@ command(#cmd{type = ?CMD_I}) ->
 command(#cmd{type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{tag = Tag}} = Cmd) ->
 	case gproc:lookup_global_name({media, CallId, MediaId, Tag}) of
 		undefined ->
-			gen_rtp_channel:start(media, Cmd#cmd.params, Cmd);
+			media:start(Cmd);
 		MediaThread ->
 			gen_server:cast(MediaThread, Cmd)
 	end,

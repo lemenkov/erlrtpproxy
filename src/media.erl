@@ -20,7 +20,9 @@
 -module(media).
 -author('lemenkov@gmail.com').
 
--behaviour(gen_rtp_channel).
+-behaviour(gen_server).
+
+-export([start/1]).
 -export([init/1]).
 -export([handle_call/3]).
 -export([handle_cast/2]).
@@ -31,26 +33,35 @@
 -include("../include/common.hrl").
 
 -record(state, {
+		cmd,
 		callid,
 		mediaid,
 		tag,
+		rtp,
 		notify_info
 	}
 ).
 
-init([Ip, PortRtp, PortRtcp, #cmd{type = ?CMD_U, origin = #origin{pid = Pid}, callid = CallId, mediaid = MediaId, from = #party{tag = Tag}, params = Params} = Cmd]) ->
+
+start(Cmd) ->
+	gen_server:start(?MODULE, [Cmd], []).
+
+init([#cmd{type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{tag = Tag}, params = Params} = Cmd]) ->
 	% Register itself
 	gproc:add_global_name({media, CallId, MediaId, Tag}),
 	% Register itself for group call and broadcast commands
 	gproc:add_global_property(media, {id, CallId, MediaId}),
 
+	% FIXME
 	{ok, I} = application:get_env(rtpproxy, external),
-	gen_server:cast(Pid, {reply, Cmd, {{I, PortRtp}, {I, PortRtcp}}}),
+	{ok, Pid} = gen_rtp_channel:start_link(Params ++ [{ip, I}]),
 
 	{ok, #state{
+			cmd = Cmd,
 			callid	= CallId,
 			mediaid = MediaId,
 			tag	= Tag,
+			rtp = Pid,
 			notify_info = proplists:get_value(notify, Params, [])
 		}
 	}.
@@ -65,6 +76,10 @@ handle_cast(#cmd{type = ?CMD_D, callid = CallId, mediaid = 0, to = null}, #state
 	{stop, normal, State};
 handle_cast(#cmd{type = ?CMD_D, callid = CallId, mediaid = 0}, #state{callid = CallId} = State) ->
 	{stop, normal, State};
+
+handle_cast({Pkt, Ip, Port}, #state{rtp = Pid} = State) ->
+	gen_server:cast(Pid, {Pkt, Ip, Port}),
+	{noreply, State};
 
 handle_cast(Other, State) ->
 	?ERR("Unmatched cast [~p]", [Other]),
@@ -85,6 +100,11 @@ handle_info({Pkt, Ip, Port}, #state{callid = CallId, mediaid = MediaId, tag = Ta
 		[Pid] -> gen_server:cast(Pid, {Pkt, Ip, Port})
 	end,
 	{noreply, State};
+
+handle_info({phy, {Ip, PortRtp, PortRtcp}}, #state{cmd = #cmd{origin = #origin{pid = Pid}} = Cmd} = State) ->
+	gen_server:cast(Pid, {reply, Cmd, {{Ip, PortRtp}, {Ip, PortRtcp}}}),
+	% No need to store Cmd any longer
+	{noreply, State#state{cmd = null}};
 
 handle_info(interim_update, #state{callid = CallID, mediaid = MediaID, notify_info = NotifyInfo} = State) ->
 	gen_server:cast({global, rtpproxy_notifier}, {interim_update, CallID, MediaID, NotifyInfo}),
