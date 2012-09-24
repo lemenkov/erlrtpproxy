@@ -34,7 +34,7 @@ handle_cast({start, CallId, MediaId, _}, State) ->
 	case ets:lookup(?MODULE, {callid, CallId, mediaid, MediaId}) of
 		[] ->
 			Req = State#rad_accreq{
-				login_time = erlang:now(),
+				login_time = os:timestamp(),
 				std_attrs=[{?Acct_Session_Id, CallId}],
 				vend_attrs = [{?Cisco, [{?h323_connect_time, date_time_fmt()}]}]
 			},
@@ -52,7 +52,7 @@ handle_cast({interim_update, CallId, MediaId, _}, State) ->
 		[{{callid,CallId,mediaid,MediaId},{req,Req0}}] ->
 			Login = to_now(Req0#rad_accreq.login_time),
 			SessTime = calendar:datetime_to_gregorian_seconds(
-				calendar:now_to_local_time(erlang:now())) -
+				calendar:now_to_local_time(os:timestamp())) -
 			        calendar:datetime_to_gregorian_seconds(calendar:now_to_local_time(Login)),
 			eradius_acc:acc_update(Req0#rad_accreq{session_time = SessTime});
 		_ ->
