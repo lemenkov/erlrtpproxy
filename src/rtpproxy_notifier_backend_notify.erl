@@ -28,6 +28,9 @@ handle_cast({Type, _, _, [{addr,{Ip,Port}},{tag,NotifyTag}]}, Fd) ->
 	error_logger:info_msg("Message (~p) delivered from ~p to ~s:~b~n", [Type, node(), inet_parse:ntoa(Ip), Port]),
 	{noreply, Fd};
 
+handle_cast(stop, State) ->
+	{stop, normal, State};
+
 handle_cast(Other, State) ->
 	error_logger:warning_msg("Bogus cast: ~p at ~p~n", [Other, node()]),
 	{noreply, State}.

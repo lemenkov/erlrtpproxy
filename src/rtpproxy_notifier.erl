@@ -54,6 +54,9 @@ handle_cast({Type, CallId, MediaId, Addr}, #state{radius = RadiusBackend, notify
 	(NotifyBackend and Send) andalso gen_server:cast(rtpproxy_notifier_backend_notify, {Type, CallId, MediaId, Addr}),
 	{noreply, State};
 
+handle_cast(stop, State) ->
+	{stop, normal, State};
+
 handle_cast(Other, State) ->
 	error_logger:warning_msg("Bogus cast: ~p at ~p~n", [Other, node()]),
 	{noreply, State}.
@@ -66,5 +69,7 @@ code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 terminate(Reason, _State) ->
+	gen_server:cast(rtpproxy_notifier_backend_radius, stop),
+	gen_server:cast(rtpproxy_notifier_backend_notify, stop),
 	error_logger:error_msg("Terminated: ~p at ~p~n", [Reason, node()]),
 	ok.

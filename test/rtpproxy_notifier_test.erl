@@ -78,6 +78,7 @@ rtpproxy_notifier_backend_notify_test_() ->
 		end,
 		fun (_) ->
 				gen_udp:close(Fd),
+				gen_server:cast({global, rtpproxy_notifier}, stop),
 				net_kernel:stop()
 		end,
 		[

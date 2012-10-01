@@ -77,6 +77,9 @@ handle_cast({stop, CallId, MediaId, _}, State) ->
 	end,
 	{noreply, State};
 
+handle_cast(stop, State) ->
+	{stop, normal, State};
+
 handle_cast(Other, State) ->
 	error_logger:warning_msg("Bogus cast: ~p at ~p~n", [Other, node()]),
 	{noreply, State}.
