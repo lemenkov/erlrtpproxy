@@ -125,6 +125,7 @@ rtpproxy_rtp_handling_test_() ->
 
 				application:stop(rtpproxy),
 				application:stop(gproc),
+				gen_server:cast({global, rtpproxy_notifier}, stop),
 				pool:stop(),
 				net_kernel:stop()
 		end,
