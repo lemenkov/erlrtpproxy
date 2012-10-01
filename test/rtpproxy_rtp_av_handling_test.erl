@@ -162,7 +162,7 @@ rtpproxy_rtp_handling_test_() ->
 						#response{cookie = <<"24393_4">>, data = {{{_,_,_,_}=I,VRPort1},{{_,_,_,_},_}}} = ser_proto:decode(VAnswer1),
 
 						%%
-						%% PCreate test RTP
+						%% Create test RTP
 						%%
 
 						RtpHello0 = #rtp{marker = 1, payload_type = 0, sequence_number = 1, timestamp = 100, ssrc = 123456, payload = <<"hello from Alice">>},
