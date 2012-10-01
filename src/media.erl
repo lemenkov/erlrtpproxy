@@ -66,6 +66,15 @@ handle_cast(#cmd{type = ?CMD_D, callid = CallId, mediaid = 0, to = null}, #state
 handle_cast(#cmd{type = ?CMD_D, callid = CallId, mediaid = 0}, #state{callid = CallId} = State) ->
 	{stop, normal, State};
 
+handle_cast(#cmd{params = Params}, #state{callid = CallID, mediaid = MediaID, notify_info = NotifyInfo} = State) ->
+	case proplists:get_value(acc, Params, none) of
+		start -> gen_server:cast({global, rtpproxy_notifier}, {start, CallID, MediaID, NotifyInfo});
+		interim_update -> gen_server:cast({global, rtpproxy_notifier}, {interim_update, CallID, MediaID, NotifyInfo});
+		stop -> gen_server:cast({global, rtpproxy_notifier}, {stop, CallID, MediaID, NotifyInfo});
+		_ -> ok
+	end,
+	{noreply, State};
+
 handle_cast(Other, State) ->
 	?ERR("Unmatched cast [~p]", [Other]),
 	{noreply, State}.
