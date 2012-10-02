@@ -65,7 +65,7 @@ rtpproxy_notifier_backend_notify_test_() ->
 				%% (normally we'll set them in the /etc/erlrtpproxy.config
 				%%
 
-				%application:set_env(rtpproxy, radacct_servers, [[{127,0,0,1},1813,"testradacctpass"]]),
+				application:set_env(rtpproxy, radacct_servers, [[{127,0,0,1},1813,"testradacctpass"]]),
 				application:set_env(rtpproxy, notify_servers, udp),
 				application:set_env(rtpproxy, ignore_start, true),
 				application:set_env(rtpproxy, ignore_stop, true),

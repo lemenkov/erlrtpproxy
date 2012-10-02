@@ -16,6 +16,7 @@ start_link() ->
 	gen_server:start_link({global, ?MODULE}, ?MODULE, [], []).
 
 init(_) ->
+	error_logger:info_msg("NOT: ~p ~p~n", [application:get_env(rtpproxy, radacct_servers), application:get_env(rtpproxy, notify_servers)]),
 	RadiusBackend = case application:get_env(rtpproxy, radacct_servers) of
 		{ok, RadAcctServers} ->
 			rtpproxy_notifier_backend_sup:start_link(radius, RadAcctServers),
@@ -32,7 +33,7 @@ init(_) ->
 	end,
 	{ok, IgnoreStart} = application:get_env(rtpproxy, ignore_start),
 	{ok, IgnoreStop} = application:get_env(rtpproxy, ignore_stop),
-	error_logger:info_msg("Started Notifier at ~p~n", [node()]),
+	error_logger:info_msg("Started Notifier at ~p [~p ~p]~n", [node(), IgnoreStart, IgnoreStop]),
 	{ok, #state{
 			radius = RadiusBackend,
 			notify = NotifyBackend,
@@ -49,6 +50,7 @@ handle_cast({Type, CallId, MediaId, Addr}, #state{radius = RadiusBackend, notify
 	Type == start;
 	Type == interim_update;
 	Type == stop ->
+	error_logger:warning_msg("CAST: ~p~n", [State]),
 	Send = ((Type == start) and not IgnoreStart) or (Type == interim_update) or ((Type == stop) and not IgnoreStop),
 	(RadiusBackend and Send) andalso gen_server:cast(rtpproxy_notifier_backend_radius, {Type, CallId, MediaId, Addr}),
 	(NotifyBackend and Send) andalso gen_server:cast(rtpproxy_notifier_backend_notify, {Type, CallId, MediaId, Addr}),
