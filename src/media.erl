@@ -77,6 +77,21 @@ handle_cast(#cmd{type = ?CMD_D, callid = CallId, mediaid = 0, to = null}, #state
 handle_cast(#cmd{type = ?CMD_D, callid = CallId, mediaid = 0}, #state{callid = CallId} = State) ->
 	{stop, normal, State};
 
+handle_cast(#cmd{type = ?CMD_U, from = #party{addr = IpAddr}, origin = #origin{pid = Pid}} = Cmd, #state{callid = CallId, mediaid = MediaId, tag = Tag} = State) ->
+	case gproc:select([{ { {p,g,phy} , '_' , {id, CallId, MediaId, Tag, '$1', '$2', '$3'} }, [], [['$1','$2','$3']]}]) of
+		[[Ip,PortRtp,PortRtcp]] ->
+			case IpAddr of
+				{0,0,0,0} ->
+					gen_server:cast(Pid, {reply, Cmd, {{{0,0,0,0}, PortRtp}, {{0,0,0,0}, PortRtcp}}});
+				_ ->
+					gen_server:cast(Pid, {reply, Cmd, {{Ip, PortRtp}, {Ip, PortRtcp}}})
+			end;
+		_ ->
+			% FIXME potential race condition on a client
+			ok
+	end,
+	{noreply, State};
+
 handle_cast(#cmd{params = Params}, #state{callid = CallID, mediaid = MediaID, notify_info = NotifyInfo} = State) ->
 	case proplists:get_value(acc, Params, none) of
 		start -> gen_server:cast({global, rtpproxy_notifier}, {start, CallID, MediaID, NotifyInfo});
@@ -110,9 +125,12 @@ handle_info({Pkt, Ip, Port}, #state{callid = CallId, mediaid = MediaId, tag = Ta
 	end,
 	{noreply, State};
 
-handle_info({phy, {Ip, PortRtp, PortRtcp}}, #state{cmd = #cmd{origin = #origin{pid = Pid}} = Cmd} = State) ->
+handle_info({phy, {Ip, PortRtp, PortRtcp}}, #state{callid = CallId, mediaid = MediaId, tag = Tag, cmd = #cmd{origin = #origin{pid = Pid}} = Cmd} = State) ->
+	% Store info about physical params
+	gproc:add_global_property(phy, {id, CallId, MediaId, Tag, Ip, PortRtp, PortRtcp}),
+	% Reply to server
 	gen_server:cast(Pid, {reply, Cmd, {{Ip, PortRtp}, {Ip, PortRtcp}}}),
-	% No need to store Cmd any longer
+	% No need to store original Cmd any longer
 	{noreply, State#state{cmd = null}};
 
 handle_info(interim_update, #state{callid = CallID, mediaid = MediaID, notify_info = NotifyInfo} = State) ->
