@@ -43,6 +43,8 @@ init([Ip, PortRtp, PortRtcp, #cmd{type = ?CMD_U, origin = #origin{pid = Pid}, ca
 	gproc:add_global_name({media, CallId, MediaId, Tag}),
 	% Register itself for group call and broadcast commands
 	gproc:add_global_property(media, {id, CallId, MediaId}),
+	% Store info about physical params
+	gproc:add_global_property(phy, {id, CallId, MediaId, Tag, Ip, PortRtp, PortRtcp}),
 
 	{ok, I} = application:get_env(rtpproxy, external),
 	gen_server:cast(Pid, {reply, Cmd, {{I, PortRtp}, {I, PortRtcp}}}),
@@ -65,6 +67,21 @@ handle_cast(#cmd{type = ?CMD_D, callid = CallId, mediaid = 0, to = null}, #state
 	{stop, normal, State};
 handle_cast(#cmd{type = ?CMD_D, callid = CallId, mediaid = 0}, #state{callid = CallId} = State) ->
 	{stop, normal, State};
+
+handle_cast(#cmd{type = ?CMD_U, from = #party{addr = IpAddr}, origin = #origin{pid = Pid}} = Cmd, #state{callid = CallId, mediaid = MediaId, tag = Tag} = State) ->
+	case gproc:select([{ { {p,g,phy} , '_' , {id, CallId, MediaId, Tag, '$1', '$2', '$3'} }, [], [['$1','$2','$3']]}]) of
+		[[Ip,PortRtp,PortRtcp]] ->
+			case IpAddr of
+				{0,0,0,0} ->
+					gen_server:cast(Pid, {reply, Cmd, {{{0,0,0,0}, PortRtp}, {{0,0,0,0}, PortRtcp}}});
+				_ ->
+					gen_server:cast(Pid, {reply, Cmd, {{Ip, PortRtp}, {Ip, PortRtcp}}})
+			end;
+		_ ->
+			% FIXME potential race condition on a client
+			ok
+	end,
+	{noreply, State};
 
 handle_cast(#cmd{params = Params}, #state{callid = CallID, mediaid = MediaID, notify_info = NotifyInfo} = State) ->
 	case proplists:get_value(acc, Params, none) of
