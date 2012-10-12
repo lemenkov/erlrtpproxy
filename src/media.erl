@@ -77,7 +77,7 @@ handle_cast(#cmd{type = ?CMD_D, callid = CallId, mediaid = 0, to = null}, #state
 handle_cast(#cmd{type = ?CMD_D, callid = CallId, mediaid = 0}, #state{callid = CallId} = State) ->
 	{stop, normal, State};
 
-handle_cast(#cmd{type = ?CMD_U, from = #party{addr = IpAddr}, origin = #origin{pid = Pid}} = Cmd, #state{callid = CallId, mediaid = MediaId, tag = Tag} = State) ->
+handle_cast(#cmd{type = ?CMD_U, from = #party{addr = {IpAddr,_}}, origin = #origin{pid = Pid}} = Cmd, #state{callid = CallId, mediaid = MediaId, tag = Tag} = State) ->
 	case gproc:select([{ { {p,g,phy} , '_' , {id, CallId, MediaId, Tag, '$1', '$2', '$3'} }, [], [['$1','$2','$3']]}]) of
 		[[Ip,PortRtp,PortRtcp]] ->
 			case IpAddr of

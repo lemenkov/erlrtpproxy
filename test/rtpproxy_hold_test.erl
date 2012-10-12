@@ -63,6 +63,8 @@ rtpproxy_rtp_handling_test_() ->
 	SPort0 = list_to_binary(io_lib:format("~b", [Port0])),
 	SPort1 = list_to_binary(io_lib:format("~b", [Port1])),
 
+	RtpProxyIpBinStr = list_to_binary(inet_parse:ntoa(?RTPPROXY_IP)),
+
 	{setup,
 		fun() ->
 				%%
@@ -138,7 +140,14 @@ rtpproxy_rtp_handling_test_() ->
 						{ok, {?RTPPROXY_IP, ?RTPPROXY_PORT, Answer2}} = gen_udp:recv(Fd, 0),
 
 						BinRPort0 = list_to_binary(io_lib:format("~B", [RPort0])),
-						?assertEqual(<<"24393_4 ", BinRPort0/binary, " 0.0.0.0\n">>, Answer2)
+						?assertEqual(<<"24393_4 ", BinRPort0/binary, " 0.0.0.0\n">>, Answer2),
+
+						% Other side is still able to receive data
+						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<Cookie/binary, " Lc0,8,18,101 ", CallId/binary, " ", "192.0.43.11 ", SPort1/binary, " ", TagFrom/binary, ";1", " ", TagTo/binary, ";1", "\n">>),
+						{ok, {?RTPPROXY_IP, ?RTPPROXY_PORT, Answer3}} = gen_udp:recv(Fd, 0),
+
+						BinRPort1 = list_to_binary(io_lib:format("~B", [RPort1])),
+						?assertEqual(<<"24393_4 ", BinRPort1/binary, " ", RtpProxyIpBinStr/binary, "\n">>, Answer3)
 				end
 			}
 		]
