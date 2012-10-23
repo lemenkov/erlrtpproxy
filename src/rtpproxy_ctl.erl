@@ -147,7 +147,8 @@ command(#cmd{callid = CallId, mediaid = MediaId} = Cmd) ->
 		0 -> '_';
 		_ -> MediaId
 	end,
-	case gproc:select({global,p}, [{{{p,g,media},'$1',{id,CallId,MID}}, [], ['$1']}]) of
+
+	case gproc:select([{{{p,g,media},'$1',{id,CallId,MID}}, [], ['$1']}]) of
 		[] ->
 			error_logger:warning_msg("Media stream does not exist. Do nothing."),
 			{error, notfound};
