@@ -38,6 +38,7 @@
 		mediaid,
 		tag,
 		rtp,
+		hold = false,
 		notify_info
 	}
 ).
@@ -92,6 +93,21 @@ handle_cast(#cmd{type = ?CMD_U, from = #party{addr = {IpAddr,_}}, origin = #orig
 	end,
 	{noreply, State};
 
+handle_cast(#cmd{type = ?CMD_P, callid = CallId, mediaid = MediaId}, #state{callid = CallId, mediaid = MediaId, tag = Tag} = State) ->
+	case gproc:select({global,names}, [{ {{n,g,{player, CallId, MediaId, Tag}},'$1','_'}, [], ['$1'] }]) of
+		[] ->
+			% FIXME empty PayloadInfo for now
+			player:start(CallId, MediaId, Tag, []);
+		[Pid] -> ok
+	end,
+	{noreply, State#state{hold = true}};
+handle_cast(#cmd{type = ?CMD_S, callid = CallId, mediaid = MediaId}, #state{callid = CallId, mediaid = MediaId, tag = Tag} = State) ->
+	case gproc:select({global,names}, [{ {{n,g,{player, CallId, MediaId, Tag}},'$1','_'}, [], ['$1'] }]) of
+		[] -> ok;
+		[Pid] -> gen_server:cast(Pid, stop)
+	end,
+	{noreply, State#state{hold = false}};
+
 handle_cast(#cmd{params = Params}, #state{callid = CallID, mediaid = MediaID, notify_info = NotifyInfo} = State) ->
 	case proplists:get_value(acc, Params, none) of
 		start -> gen_server:cast({global, rtpproxy_notifier}, {start, CallID, MediaID, NotifyInfo});
@@ -101,7 +117,15 @@ handle_cast(#cmd{params = Params}, #state{callid = CallID, mediaid = MediaID, no
 	end,
 	{noreply, State};
 
-handle_cast({Pkt, Ip, Port}, #state{rtp = Pid} = State) ->
+handle_cast({Pkt, Ip, Port}, #state{rtp = Pid, hold = false} = State) ->
+	gen_server:cast(Pid, {Pkt, Ip, Port}),
+	{noreply, State};
+
+handle_cast({Pkt, Ip, Port}, #state{rtp = Pid, hold = true} = State) ->
+	% Music on Hold / Mute
+	{noreply, State};
+
+handle_cast({'music-on-hold', Pkt, Ip, Port}, #state{rtp = Pid} = State) ->
 	gen_server:cast(Pid, {Pkt, Ip, Port}),
 	{noreply, State};
 
