@@ -105,7 +105,7 @@ handle_info(send, #state{callid = CallId, mediaid = MediaId, tag = Tag, ssrc = S
 				payload = Payload
 			},
 			% We don't know where to send so we're using null as Ip and null as Port
-			gen_server:cast(Pid, {Pkt, null, null}),
+			gen_server:cast(Pid, {'music-on-hold', Pkt, null, null}),
 			{noreply, State#state{sn = SequenceNumber + 1}}
 	end;
 
