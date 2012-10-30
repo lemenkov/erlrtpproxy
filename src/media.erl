@@ -98,7 +98,7 @@ handle_cast(#cmd{type = ?CMD_P, callid = CallId, mediaid = MediaId}, #state{call
 		[] ->
 			% FIXME empty PayloadInfo for now
 			player:start(CallId, MediaId, Tag, []);
-		[Pid] -> ok
+		[_] -> ok
 	end,
 	{noreply, State#state{hold = true}};
 handle_cast(#cmd{type = ?CMD_S, callid = CallId, mediaid = MediaId}, #state{callid = CallId, mediaid = MediaId, tag = Tag} = State) ->
@@ -121,7 +121,7 @@ handle_cast({Pkt, Ip, Port}, #state{rtp = Pid, hold = false} = State) ->
 	gen_server:cast(Pid, {Pkt, Ip, Port}),
 	{noreply, State};
 
-handle_cast({Pkt, Ip, Port}, #state{rtp = Pid, hold = true} = State) ->
+handle_cast({_Pkt, _Ip, _Port}, #state{hold = true} = State) ->
 	% Music on Hold / Mute
 	{noreply, State};
 
