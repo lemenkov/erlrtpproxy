@@ -534,11 +534,7 @@ decode_params([$C|Rest], Result) ->
 			decode_params(Rest, Result);
 		Ret ->
 			Rest1 = string:substr(Rest, Ret + 1),
-			Codecs = lists:map(fun guess_codec/1,
-				lists:map(fun guess_codec_n/1,
-					string:tokens(string:substr(Rest, 1, Ret), ",")
-				)
-			),
+			Codecs = parse_codecs(string:substr(Rest, 1, Ret)),
 			decode_params(Rest1, ensure_alone(Result, codecs, Codecs))
 	end;
 % Direction:
