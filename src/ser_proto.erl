@@ -148,7 +148,8 @@ encode(
 			]
 		}) ->
 	P = list_to_binary(io_lib:format("~b", [Playcount])),
-	<<Cookie/binary, <<" P">>/binary, P/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Filename/binary, <<" ">>/binary, Codecs/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
+	C = list_to_binary(print_codecs(Codecs)),
+	<<Cookie/binary, <<" P">>/binary, P/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Filename/binary, <<" ">>/binary, C/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
 encode(
 	#cmd{
 		cookie = Cookie,
@@ -164,7 +165,8 @@ encode(
 			]
 		}) ->
 	P = list_to_binary(io_lib:format("~b", [Playcount])),
-	<<Cookie/binary, <<" P">>/binary, P/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Filename/binary, <<" ">>/binary, Codecs/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<" ">>/binary, ToTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
+	C = list_to_binary(print_codecs(Codecs)),
+	<<Cookie/binary, <<" P">>/binary, P/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Filename/binary, <<" ">>/binary, C/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<" ">>/binary, ToTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_S, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag}, to = null}) ->
 	<<Cookie/binary, <<" S ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
@@ -289,7 +291,7 @@ parse_splitted([<<$P:8,Args/binary>>, CallId, PlayName, Codecs, FromTag0]) ->
 		callid=CallId,
 		mediaid=MediaId,
 		from=#party{tag=FromTag},
-		params=lists:sort(parse_playcount(Args) ++ [{filename, PlayName}, {codecs, Codecs}])
+		params=lists:sort(parse_playcount(Args) ++ [{filename, PlayName}, {codecs, parse_codecs(Codecs)}])
 	};
 % Playback pre-recorded audio (Music-on-hold and resume)
 parse_splitted([<<$P:8,Args/binary>>, CallId, PlayName, Codecs, FromTag0, ToTag]) ->
@@ -300,7 +302,7 @@ parse_splitted([<<$P:8,Args/binary>>, CallId, PlayName, Codecs, FromTag0, ToTag]
 		mediaid=MediaId,
 		from=#party{tag=FromTag},
 		to = ?SAFE_PARTY(ToTag),
-		params=lists:sort(parse_playcount(Args) ++ [{filename, PlayName}, {codecs, Codecs}])
+		params=lists:sort(parse_playcount(Args) ++ [{filename, PlayName}, {codecs, parse_codecs(Codecs)}])
 	};
 % Playback pre-recorded audio (Music-on-hold and resume)
 parse_splitted([<<$P:8,Args/binary>>, CallId, PlayName, Codecs, FromTag0, ToTag, ProbableIp, ProbablePort]) ->
@@ -312,7 +314,7 @@ parse_splitted([<<$P:8,Args/binary>>, CallId, PlayName, Codecs, FromTag0, ToTag,
 		mediaid=MediaId,
 		from=#party{tag=FromTag},
 		to = ?SAFE_PARTY(ToTag),
-		params=lists:sort(parse_playcount(Args) ++ [{filename, PlayName}, {codecs, Codecs}, {addr, {GuessIp, GuessPort}}])
+		params=lists:sort(parse_playcount(Args) ++ [{filename, PlayName}, {codecs, parse_codecs(Codecs)}, {addr, {GuessIp, GuessPort}}])
 	};
 
 % Stop playback or record (no ToTag)
@@ -475,6 +477,12 @@ parse_notify_addr(NotifyAddr) ->
 		List when is_list(List) -> % IPv6 probably FIXME
 			throw({error, ipv6notsupported})
 	end.
+
+parse_codecs(CodecBin) when is_binary(CodecBin) ->
+	parse_codecs(binary_to_list(CodecBin));
+parse_codecs(CodecStr) ->
+	try [ begin {Y, []} = string:to_integer(X), guess_codec(Y) end || X <- string:tokens(CodecStr, ",")]
+	catch _:_ -> [] end.
 
 decode_params(A) ->
 	decode_params(binary_to_list(A), []).
