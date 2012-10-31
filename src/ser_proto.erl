@@ -702,10 +702,6 @@ guess_codec(34) -> {'H263',90000,0};
 
 guess_codec(C) -> C.
 
-guess_codec_n(Codec) ->
-	{Y, _} = string:to_integer(Codec),
-	Y.
-
 guess_payload({'PCMU',8000,1}) -> 0;
 guess_payload({'GSM',8000,1}) -> 3;
 guess_payload({'G723',8000,1}) -> 4;
