@@ -117,16 +117,21 @@ encode(#cmd{cookie = Cookie, type = ?CMD_U, callid = CallId, mediaid = MediaId, 
 	ParamsBin = encode_params(Params),
 	Ip = list_to_binary(inet_parse:ntoa(GuessIp)),
 	Port = list_to_binary(io_lib:format("~b", [GuessPort])),
-	<<Cookie/binary, <<" U">>/binary, ParamsBin/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Ip/binary, <<" ">>/binary, Port/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
+	FT = print_tag_mediaid(FromTag, MediaId),
+	<<Cookie/binary, <<" U">>/binary, ParamsBin/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Ip/binary, <<" ">>/binary, Port/binary, <<" ">>/binary, FT/binary, <<"\n">>/binary>>;
 encode(#cmd{cookie = Cookie, type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag, addr = Addr}, to = #party{tag = ToTag}, params = Params}) ->
 	ParamsBin = encode_params(Params),
 	BinAddr = binary_print_addr(Addr),
-	<<Cookie/binary, <<" U">>/binary, ParamsBin/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, BinAddr/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<" ">>/binary, ToTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
+	FT = print_tag_mediaid(FromTag, MediaId),
+	TT = print_tag_mediaid(ToTag, MediaId),
+	<<Cookie/binary, <<" U">>/binary, ParamsBin/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, BinAddr/binary, <<" ">>/binary, FT/binary, <<" ">>/binary, TT/binary, <<"\n">>/binary>>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_L, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag, addr = Addr}, to = #party{tag = ToTag}, params = Params}) ->
 	ParamsBin = encode_params(Params),
 	BinAddr = binary_print_addr(Addr),
-	<<Cookie/binary, <<" L">>/binary, ParamsBin/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, BinAddr/binary, <<" ">>/binary, ToTag/binary, <<";">>/binary, MediaId/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
+	FT = print_tag_mediaid(FromTag, MediaId),
+	TT = print_tag_mediaid(ToTag, MediaId),
+	<<Cookie/binary, <<" L">>/binary, ParamsBin/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, BinAddr/binary, <<" ">>/binary, TT/binary, <<" ">>/binary, FT/binary, <<"\n">>/binary>>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_D, callid = CallId, from = #party{tag = FromTag}, to = null}) ->
 	<<Cookie/binary, <<" D ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<"\n">>/binary>>;
@@ -149,7 +154,8 @@ encode(
 		}) ->
 	P = list_to_binary(io_lib:format("~b", [Playcount])),
 	C = list_to_binary(print_codecs(Codecs)),
-	<<Cookie/binary, <<" P">>/binary, P/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Filename/binary, <<" ">>/binary, C/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
+	FT = print_tag_mediaid(FromTag, MediaId),
+	<<Cookie/binary, <<" P">>/binary, P/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Filename/binary, <<" ">>/binary, C/binary, <<" ">>/binary, FT/binary, <<"\n">>/binary>>;
 encode(
 	#cmd{
 		cookie = Cookie,
@@ -166,12 +172,17 @@ encode(
 		}) ->
 	P = list_to_binary(io_lib:format("~b", [Playcount])),
 	C = list_to_binary(print_codecs(Codecs)),
-	<<Cookie/binary, <<" P">>/binary, P/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Filename/binary, <<" ">>/binary, C/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<" ">>/binary, ToTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
+	FT = print_tag_mediaid(FromTag, MediaId),
+	TT = print_tag_mediaid(ToTag, MediaId),
+	<<Cookie/binary, <<" P">>/binary, P/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Filename/binary, <<" ">>/binary, C/binary, <<" ">>/binary, FT/binary, <<" ">>/binary, TT/binary, <<"\n">>/binary>>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_S, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag}, to = null}) ->
-	<<Cookie/binary, <<" S ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
+	FT = print_tag_mediaid(FromTag, MediaId),
+	<<Cookie/binary, <<" S ">>/binary, CallId/binary, <<" ">>/binary, FT/binary, <<"\n">>/binary>>;
 encode(#cmd{cookie = Cookie, type = ?CMD_S, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag}, to = #party{tag = ToTag}}) ->
-	<<Cookie/binary, <<" S ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<" ">>/binary, ToTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
+	FT = print_tag_mediaid(FromTag, MediaId),
+	TT = print_tag_mediaid(ToTag, MediaId),
+	<<Cookie/binary, <<" S ">>/binary, CallId/binary, <<" ">>/binary, FT/binary, <<" ">>/binary, TT/binary, <<"\n">>/binary>>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_R, callid = CallId, from = #party{tag = FromTag}, to = null}) ->
 	<<Cookie/binary, <<" R ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<"\n">>/binary>>;
@@ -179,7 +190,9 @@ encode(#cmd{cookie = Cookie, type = ?CMD_R, callid = CallId, from = #party{tag =
 	<<Cookie/binary, <<" R ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<" ">>/binary, ToTag/binary, <<"\n">>/binary>>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_Q, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag}, to = #party{tag = ToTag}}) ->
-	<<Cookie/binary, <<" Q ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<" ">>/binary, ToTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
+	FT = print_tag_mediaid(FromTag, MediaId),
+	TT = print_tag_mediaid(ToTag, MediaId),
+	<<Cookie/binary, <<" Q ">>/binary, CallId/binary, <<" ">>/binary, FT/binary, <<" ">>/binary, TT/binary, <<"\n">>/binary>>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_X}) ->
 	<<Cookie/binary, <<" X\n">>/binary>>;
@@ -673,6 +686,11 @@ ensure_alone(Proplist, Param, Value) ->
 
 ensure_mediaid([Tag, MediaId]) -> [Tag, MediaId];
 ensure_mediaid([Tag]) -> [Tag, <<"0">>].
+
+print_tag_mediaid(Tag, <<"0">>) ->
+	Tag;
+print_tag_mediaid(Tag, MediaId) ->
+	<<Tag/binary, ";", MediaId/binary>>.
 
 % FIXME use more atoms instead of numbers where possible
 % grep "a=rtpmap:" /var/log/messages | sed -e 's,.*a=rtpmap:,,g' | sort | uniq | sort -n
