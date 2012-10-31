@@ -93,7 +93,7 @@ handle_cast(#cmd{type = ?CMD_U, from = #party{addr = {IpAddr,_}}, origin = #orig
 	end,
 	{noreply, State};
 
-handle_cast(#cmd{type = ?CMD_P, callid = CallId, mediaid = MediaId, from = #party{tag = Tag}}, #state{callid = CallId, mediaid = MediaId, tag = Tag} = State) ->
+handle_cast(#cmd{type = ?CMD_P, callid = CallId, mediaid = MediaId, to = #party{tag = Tag}}, #state{callid = CallId, mediaid = MediaId, tag = Tag} = State) ->
 	case gproc:select({global,names}, [{ {{n,g,{player, CallId, MediaId, Tag}},'$1','_'}, [], ['$1'] }]) of
 		[] ->
 			% FIXME empty PayloadInfo for now
@@ -101,7 +101,7 @@ handle_cast(#cmd{type = ?CMD_P, callid = CallId, mediaid = MediaId, from = #part
 		[_] -> ok
 	end,
 	{noreply, State#state{hold = true}};
-handle_cast(#cmd{type = ?CMD_S, callid = CallId, mediaid = MediaId, from = #party{tag = Tag}}, #state{callid = CallId, mediaid = MediaId, tag = Tag} = State) ->
+handle_cast(#cmd{type = ?CMD_S, callid = CallId, mediaid = MediaId, to = #party{tag = Tag}}, #state{callid = CallId, mediaid = MediaId, tag = Tag} = State) ->
 	case gproc:select({global,names}, [{ {{n,g,{player, CallId, MediaId, Tag}},'$1','_'}, [], ['$1'] }]) of
 		[] -> ok;
 		[Pid] -> gen_server:cast(Pid, stop)
