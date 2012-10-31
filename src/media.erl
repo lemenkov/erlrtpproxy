@@ -57,13 +57,20 @@ init([#cmd{type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{tag 
 	{ok, I} = application:get_env(rtpproxy, external),
 	{ok, Pid} = gen_rtp_channel:start_link(Params ++ [{ip, I}]),
 
+	NotifyInfo = proplists:get_value(notify, Params, []),
+
+	case proplists:get_value(acc, Params, none) of
+		none -> ok;
+		Acc -> gen_server:cast({global, rtpproxy_notifier}, {Acc, CallId, MediaId, NotifyInfo})
+	end,
+
 	{ok, #state{
 			cmd = Cmd,
 			callid	= CallId,
 			mediaid = MediaId,
 			tag	= Tag,
 			rtp = Pid,
-			notify_info = proplists:get_value(notify, Params, [])
+			notify_info = NotifyInfo
 		}
 	}.
 
@@ -78,7 +85,10 @@ handle_cast(#cmd{type = ?CMD_D, callid = CallId, mediaid = 0, to = null}, #state
 handle_cast(#cmd{type = ?CMD_D, callid = CallId, mediaid = 0}, #state{callid = CallId} = State) ->
 	{stop, normal, State};
 
-handle_cast(#cmd{type = ?CMD_U, from = #party{addr = {IpAddr,_}}, origin = #origin{pid = Pid}} = Cmd, #state{callid = CallId, mediaid = MediaId, tag = Tag} = State) ->
+handle_cast(
+	#cmd{type = ?CMD_U, from = #party{addr = {IpAddr,_}}, origin = #origin{pid = Pid}, params = Params} = Cmd,
+	#state{callid = CallId, mediaid = MediaId, tag = Tag, notify_info = NotifyInfo} = State
+) ->
 	case gproc:select([{ { {p,g,phy} , '_' , {id, CallId, MediaId, Tag, '$1', '$2', '$3'} }, [], [['$1','$2','$3']]}]) of
 		[[Ip,PortRtp,PortRtcp]] ->
 			case IpAddr of
@@ -90,6 +100,10 @@ handle_cast(#cmd{type = ?CMD_U, from = #party{addr = {IpAddr,_}}, origin = #orig
 		_ ->
 			% FIXME potential race condition on a client
 			ok
+	end,
+	case proplists:get_value(acc, Params, none) of
+		none -> ok;
+		Acc -> gen_server:cast({global, rtpproxy_notifier}, {Acc, CallId, MediaId, NotifyInfo})
 	end,
 	{noreply, State};
 
@@ -107,15 +121,6 @@ handle_cast(#cmd{type = ?CMD_S, callid = CallId, mediaid = MediaId, to = #party{
 		[Pid] -> gen_server:cast(Pid, stop)
 	end,
 	{noreply, State#state{hold = false}};
-
-handle_cast(#cmd{params = Params}, #state{callid = CallID, mediaid = MediaID, notify_info = NotifyInfo} = State) ->
-	case proplists:get_value(acc, Params, none) of
-		start -> gen_server:cast({global, rtpproxy_notifier}, {start, CallID, MediaID, NotifyInfo});
-		interim_update -> gen_server:cast({global, rtpproxy_notifier}, {interim_update, CallID, MediaID, NotifyInfo});
-		stop -> gen_server:cast({global, rtpproxy_notifier}, {stop, CallID, MediaID, NotifyInfo});
-		_ -> ok
-	end,
-	{noreply, State};
 
 handle_cast({Pkt, Ip, Port}, #state{rtp = Pid, hold = false} = State) ->
 	gen_server:cast(Pid, {Pkt, Ip, Port}),
