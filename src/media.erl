@@ -107,11 +107,11 @@ handle_cast(
 	end,
 	{noreply, State};
 
-handle_cast(#cmd{type = ?CMD_P, callid = CallId, mediaid = MediaId, to = #party{tag = Tag}}, #state{callid = CallId, mediaid = MediaId, tag = Tag} = State) ->
+handle_cast(#cmd{type = ?CMD_P, callid = CallId, mediaid = MediaId, to = #party{tag = Tag}, params = Params}, #state{callid = CallId, mediaid = MediaId, tag = Tag} = State) ->
 	case gproc:select({global,names}, [{ {{n,g,{player, CallId, MediaId, Tag}},'$1','_'}, [], ['$1'] }]) of
 		[] ->
 			% FIXME empty PayloadInfo for now
-			player:start(CallId, MediaId, Tag, []);
+			player:start(CallId, MediaId, Tag, Params);
 		[_] -> ok
 	end,
 	{noreply, State#state{hold = true}};
