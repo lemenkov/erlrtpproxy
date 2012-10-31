@@ -460,7 +460,6 @@ parse_addr(ProbableIp, ProbablePort) ->
 	end.
 
 parse_playcount(ProbablePlayCount) ->
-	error_logger:error_msg("ProbablePlayCount: ~p~n", [ProbablePlayCount]),
 	try [{playcount, list_to_integer (binary_to_list(ProbablePlayCount))}]
 	catch
 		_:_ ->
