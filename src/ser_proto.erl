@@ -117,16 +117,21 @@ encode(#cmd{cookie = Cookie, type = ?CMD_U, callid = CallId, mediaid = MediaId, 
 	ParamsBin = encode_params(Params),
 	Ip = list_to_binary(inet_parse:ntoa(GuessIp)),
 	Port = list_to_binary(io_lib:format("~b", [GuessPort])),
-	<<Cookie/binary, <<" U">>/binary, ParamsBin/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Ip/binary, <<" ">>/binary, Port/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
+	FT = print_tag_mediaid(FromTag, MediaId),
+	<<Cookie/binary, <<" U">>/binary, ParamsBin/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Ip/binary, <<" ">>/binary, Port/binary, <<" ">>/binary, FT/binary, <<"\n">>/binary>>;
 encode(#cmd{cookie = Cookie, type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag, addr = Addr}, to = #party{tag = ToTag}, params = Params}) ->
 	ParamsBin = encode_params(Params),
 	BinAddr = binary_print_addr(Addr),
-	<<Cookie/binary, <<" U">>/binary, ParamsBin/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, BinAddr/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<" ">>/binary, ToTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
+	FT = print_tag_mediaid(FromTag, MediaId),
+	TT = print_tag_mediaid(ToTag, MediaId),
+	<<Cookie/binary, <<" U">>/binary, ParamsBin/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, BinAddr/binary, <<" ">>/binary, FT/binary, <<" ">>/binary, TT/binary, <<"\n">>/binary>>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_L, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag, addr = Addr}, to = #party{tag = ToTag}, params = Params}) ->
 	ParamsBin = encode_params(Params),
 	BinAddr = binary_print_addr(Addr),
-	<<Cookie/binary, <<" L">>/binary, ParamsBin/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, BinAddr/binary, <<" ">>/binary, ToTag/binary, <<";">>/binary, MediaId/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
+	FT = print_tag_mediaid(FromTag, MediaId),
+	TT = print_tag_mediaid(ToTag, MediaId),
+	<<Cookie/binary, <<" L">>/binary, ParamsBin/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, BinAddr/binary, <<" ">>/binary, TT/binary, <<" ">>/binary, FT/binary, <<"\n">>/binary>>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_D, callid = CallId, from = #party{tag = FromTag}, to = null}) ->
 	<<Cookie/binary, <<" D ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<"\n">>/binary>>;
@@ -148,7 +153,9 @@ encode(
 			]
 		}) ->
 	P = list_to_binary(io_lib:format("~b", [Playcount])),
-	<<Cookie/binary, <<" P">>/binary, P/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Filename/binary, <<" ">>/binary, Codecs/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
+	C = list_to_binary(print_codecs(Codecs)),
+	FT = print_tag_mediaid(FromTag, MediaId),
+	<<Cookie/binary, <<" P">>/binary, P/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Filename/binary, <<" ">>/binary, C/binary, <<" ">>/binary, FT/binary, <<"\n">>/binary>>;
 encode(
 	#cmd{
 		cookie = Cookie,
@@ -164,12 +171,18 @@ encode(
 			]
 		}) ->
 	P = list_to_binary(io_lib:format("~b", [Playcount])),
-	<<Cookie/binary, <<" P">>/binary, P/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Filename/binary, <<" ">>/binary, Codecs/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<" ">>/binary, ToTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
+	C = list_to_binary(print_codecs(Codecs)),
+	FT = print_tag_mediaid(FromTag, MediaId),
+	TT = print_tag_mediaid(ToTag, MediaId),
+	<<Cookie/binary, <<" P">>/binary, P/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Filename/binary, <<" ">>/binary, C/binary, <<" ">>/binary, FT/binary, <<" ">>/binary, TT/binary, <<"\n">>/binary>>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_S, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag}, to = null}) ->
-	<<Cookie/binary, <<" S ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
+	FT = print_tag_mediaid(FromTag, MediaId),
+	<<Cookie/binary, <<" S ">>/binary, CallId/binary, <<" ">>/binary, FT/binary, <<"\n">>/binary>>;
 encode(#cmd{cookie = Cookie, type = ?CMD_S, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag}, to = #party{tag = ToTag}}) ->
-	<<Cookie/binary, <<" S ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<" ">>/binary, ToTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
+	FT = print_tag_mediaid(FromTag, MediaId),
+	TT = print_tag_mediaid(ToTag, MediaId),
+	<<Cookie/binary, <<" S ">>/binary, CallId/binary, <<" ">>/binary, FT/binary, <<" ">>/binary, TT/binary, <<"\n">>/binary>>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_R, callid = CallId, from = #party{tag = FromTag}, to = null}) ->
 	<<Cookie/binary, <<" R ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<"\n">>/binary>>;
@@ -177,7 +190,9 @@ encode(#cmd{cookie = Cookie, type = ?CMD_R, callid = CallId, from = #party{tag =
 	<<Cookie/binary, <<" R ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<" ">>/binary, ToTag/binary, <<"\n">>/binary>>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_Q, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag}, to = #party{tag = ToTag}}) ->
-	<<Cookie/binary, <<" Q ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<";">>/binary, MediaId/binary, <<" ">>/binary, ToTag/binary, <<";">>/binary, MediaId/binary, <<"\n">>/binary>>;
+	FT = print_tag_mediaid(FromTag, MediaId),
+	TT = print_tag_mediaid(ToTag, MediaId),
+	<<Cookie/binary, <<" Q ">>/binary, CallId/binary, <<" ">>/binary, FT/binary, <<" ">>/binary, TT/binary, <<"\n">>/binary>>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_X}) ->
 	<<Cookie/binary, <<" X\n">>/binary>>;
@@ -289,7 +304,7 @@ parse_splitted([<<$P:8,Args/binary>>, CallId, PlayName, Codecs, FromTag0]) ->
 		callid=CallId,
 		mediaid=MediaId,
 		from=#party{tag=FromTag},
-		params=lists:sort(parse_playcount(Args) ++ [{filename, PlayName}, {codecs, Codecs}])
+		params=lists:sort(parse_playcount(Args) ++ [{filename, PlayName}, {codecs, parse_codecs(Codecs)}])
 	};
 % Playback pre-recorded audio (Music-on-hold and resume)
 parse_splitted([<<$P:8,Args/binary>>, CallId, PlayName, Codecs, FromTag0, ToTag]) ->
@@ -300,7 +315,7 @@ parse_splitted([<<$P:8,Args/binary>>, CallId, PlayName, Codecs, FromTag0, ToTag]
 		mediaid=MediaId,
 		from=#party{tag=FromTag},
 		to = ?SAFE_PARTY(ToTag),
-		params=lists:sort(parse_playcount(Args) ++ [{filename, PlayName}, {codecs, Codecs}])
+		params=lists:sort(parse_playcount(Args) ++ [{filename, PlayName}, {codecs, parse_codecs(Codecs)}])
 	};
 % Playback pre-recorded audio (Music-on-hold and resume)
 parse_splitted([<<$P:8,Args/binary>>, CallId, PlayName, Codecs, FromTag0, ToTag, ProbableIp, ProbablePort]) ->
@@ -312,7 +327,7 @@ parse_splitted([<<$P:8,Args/binary>>, CallId, PlayName, Codecs, FromTag0, ToTag,
 		mediaid=MediaId,
 		from=#party{tag=FromTag},
 		to = ?SAFE_PARTY(ToTag),
-		params=lists:sort(parse_playcount(Args) ++ [{filename, PlayName}, {codecs, Codecs}, {addr, {GuessIp, GuessPort}}])
+		params=lists:sort(parse_playcount(Args) ++ [{filename, PlayName}, {codecs, parse_codecs(Codecs)}, {addr, {GuessIp, GuessPort}}])
 	};
 
 % Stop playback or record (no ToTag)
@@ -460,7 +475,6 @@ parse_addr(ProbableIp, ProbablePort) ->
 	end.
 
 parse_playcount(ProbablePlayCount) ->
-	error_logger:error_msg("ProbablePlayCount: ~p~n", [ProbablePlayCount]),
 	try [{playcount, list_to_integer (binary_to_list(ProbablePlayCount))}]
 	catch
 		_:_ ->
@@ -476,6 +490,14 @@ parse_notify_addr(NotifyAddr) ->
 		List when is_list(List) -> % IPv6 probably FIXME
 			throw({error, ipv6notsupported})
 	end.
+
+parse_codecs(CodecBin) when is_binary(CodecBin) ->
+	parse_codecs(binary_to_list(CodecBin));
+parse_codecs("session") ->
+	% A very special case - we don't know what codec is used so rtpproxy must use the same as client uses
+	[session];
+parse_codecs(CodecStr) ->
+	[ begin {Y, []} = string:to_integer(X), guess_codec(Y) end || X <- string:tokens(CodecStr, ",")].
 
 decode_params(A) ->
 	decode_params(binary_to_list(A), []).
@@ -527,11 +549,7 @@ decode_params([$C|Rest], Result) ->
 			decode_params(Rest, Result);
 		Ret ->
 			Rest1 = string:substr(Rest, Ret + 1),
-			Codecs = lists:map(fun guess_codec/1,
-				lists:map(fun guess_codec_n/1,
-					string:tokens(string:substr(Rest, 1, Ret), ",")
-				)
-			),
+			Codecs = parse_codecs(string:substr(Rest, 1, Ret)),
 			decode_params(Rest1, ensure_alone(Result, codecs, Codecs))
 	end;
 % Direction:
@@ -654,6 +672,8 @@ encode_params([Unknown|Rest], Result) ->
 	error_logger:error_msg("Unsupported parameter while encoding: [~p]~n", [Unknown]),
 	encode_params(Rest, Result).
 
+print_codecs([session]) ->
+	"session";
 print_codecs(Codecs) ->
 	print_codecs(Codecs, []).
 print_codecs([], Result) ->
@@ -670,6 +690,11 @@ ensure_alone(Proplist, Param, Value) ->
 
 ensure_mediaid([Tag, MediaId]) -> [Tag, MediaId];
 ensure_mediaid([Tag]) -> [Tag, <<"0">>].
+
+print_tag_mediaid(Tag, <<"0">>) ->
+	Tag;
+print_tag_mediaid(Tag, MediaId) ->
+	<<Tag/binary, ";", MediaId/binary>>.
 
 % FIXME use more atoms instead of numbers where possible
 % grep "a=rtpmap:" /var/log/messages | sed -e 's,.*a=rtpmap:,,g' | sort | uniq | sort -n
@@ -698,10 +723,6 @@ guess_codec(31) -> {'H261',90000,0};
 guess_codec(34) -> {'H263',90000,0};
 
 guess_codec(C) -> C.
-
-guess_codec_n(Codec) ->
-	{Y, _} = string:to_integer(Codec),
-	Y.
 
 guess_payload({'PCMU',8000,1}) -> 0;
 guess_payload({'GSM',8000,1}) -> 3;

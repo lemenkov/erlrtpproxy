@@ -932,7 +932,12 @@ cmd_p_test_() ->
 			from = #party{tag = <<"0003e30cc50ccc9f743d4fa6-38d0bd14">>},
 			to = null,
 			params = [
-				{codecs, <<"session">>},
+				{codecs, [
+						{'PCMA',8000,1},
+						{'PCMU',8000,1},
+						101
+					]
+				},
 				{filename, <<"/var/run/tmp/hello_uac.wav">>},
 				{playcount, 20}
 			]
@@ -946,13 +951,18 @@ cmd_p_test_() ->
 			from = #party{tag = <<"0003e30cc50ccc5416857d59-357336dc">>},
 			to = #party{tag = <<"28d49e51a95d5a31d09b31ccc63c5f4b">>},
 			params = [
-				{codecs, <<"session">>},
+				{codecs, [
+						{'PCMA',8000,1},
+						{'PCMU',8000,1},
+						101
+					]
+				},
 				{filename, <<"/var/tmp/rtpproxy_test/media/01.wav">>},
 				{playcount, 10}
 			]
 		},
-	Cmd1Bin = <<"2154_5 P20 0003e30c-c50c0171-35b90751-013a3ef6@192.168.0.100 /var/run/tmp/hello_uac.wav session 0003e30cc50ccc9f743d4fa6-38d0bd14;1\n">>,
-	Cmd2Bin = <<"1389_5 P10 0003e30c-c50c016d-46bbcf2e-6369eecf@192.168.0.100 /var/tmp/rtpproxy_test/media/01.wav session 0003e30cc50ccc5416857d59-357336dc;1 28d49e51a95d5a31d09b31ccc63c5f4b;1\n">>,
+	Cmd1Bin = <<"2154_5 P20 0003e30c-c50c0171-35b90751-013a3ef6@192.168.0.100 /var/run/tmp/hello_uac.wav 8,0,101 0003e30cc50ccc9f743d4fa6-38d0bd14;1\n">>,
+	Cmd2Bin = <<"1389_5 P10 0003e30c-c50c016d-46bbcf2e-6369eecf@192.168.0.100 /var/tmp/rtpproxy_test/media/01.wav 8,0,101 0003e30cc50ccc5416857d59-357336dc;1 28d49e51a95d5a31d09b31ccc63c5f4b;1\n">>,
 
 	[
 		{"decoding from binary (no ToTag)",
@@ -972,6 +982,64 @@ cmd_p_test_() ->
 						{error_syntax, {"Wrong PlayCount", <<"HELLO">>}},
 						ser_proto:decode(<<"1389_5 Phello 0003e30c-c50c016d-46bbcf2e-6369eecf@192.168.0.100 /var/tmp/rtpproxy_test/media/01.wav session 0003e30cc50ccc5416857d59-357336dc;1 28d49e51a95d5a31d09b31ccc63c5f4b;1\n">>))
 			end
+		}
+	].
+
+cmd_p_b2bua_test_() ->
+	Cmd = #cmd{
+			type = ?CMD_P,
+			cookie = <<"c48cefdbbb29404b03c0130dde7a4d85">>,
+			origin = #origin{type = ser, pid = self()},
+			callid = <<"00192f73-cc5f002e-59bf7a37-05909bd2@192.168.1.71-0">>,
+			mediaid = <<"0">>,
+			from = #party{tag = <<"00192f73cc5fa60b4651ff30-2e0eb999">>},
+			to = #party{tag = <<"509108fe255-1c76bd0-8ed7b811">>},
+			params = [
+				{codecs, [
+						{'PCMA',8000,1},
+						{'PCMU',8000,1},
+						{'G729',8000,1},
+						101
+					]
+				},
+				{filename, <<"default_en">>},
+				{playcount, 0}
+			]
+		},
+	CmdBin = <<"c48cefdbbb29404b03c0130dde7a4d85 P0 00192f73-cc5f002e-59bf7a37-05909bd2@192.168.1.71-0 default_en 8,0,18,101 00192f73cc5fa60b4651ff30-2e0eb999 509108fe255-1c76bd0-8ed7b811">>,
+
+	[
+		{"decoding from binary",
+			fun() -> ?assertEqual(Cmd, ser_proto:decode(CmdBin)) end
+		},
+		{"encoding to binary",
+			fun() -> ?assertEqual(ser_proto:encode(Cmd), <<CmdBin/binary, "\n">>) end
+		}
+	].
+
+cmd_p_default_codecs_test_() ->
+	Cmd = #cmd{
+			type = ?CMD_P,
+			cookie = <<"c48cefdbbb29404b03c0130dde7a4d85">>,
+			origin = #origin{type = ser, pid = self()},
+			callid = <<"00192f73-cc5f002e-59bf7a37-05909bd2@192.168.1.71-0">>,
+			mediaid = <<"0">>,
+			from = #party{tag = <<"00192f73cc5fa60b4651ff30-2e0eb999">>},
+			to = #party{tag = <<"509108fe255-1c76bd0-8ed7b811">>},
+			params = [
+				{codecs, [session]},
+				{filename, <<"default_en">>},
+				{playcount, 0}
+			]
+		},
+	CmdBin = <<"c48cefdbbb29404b03c0130dde7a4d85 P0 00192f73-cc5f002e-59bf7a37-05909bd2@192.168.1.71-0 default_en session 00192f73cc5fa60b4651ff30-2e0eb999 509108fe255-1c76bd0-8ed7b811">>,
+
+	[
+		{"decoding from binary",
+			fun() -> ?assertEqual(Cmd, ser_proto:decode(CmdBin)) end
+		},
+		{"encoding to binary",
+			fun() -> ?assertEqual(ser_proto:encode(Cmd), <<CmdBin/binary, "\n">>) end
 		}
 	].
 

@@ -92,11 +92,13 @@ handle_info(send, #state{callid = CallId, mediaid = MediaId, tag = Tag, ssrc = S
 			{noreply, State};
 		[Pid] ->
 			<<Timestamp:32, _/binary>> = rtp_utils:now2ntp(),
+			% FIXME don't hardcode 160 here
 			Payload = safe_binary_part(Data, SequenceNumber, 160),
 			Pkt = #rtp{
 				padding = 0,
 				marker = case SequenceNumber of 0 -> 1; _ -> 0 end,
-				payload_type = ?RTP_PAYLOAD_PCMU, % FIXME
+				 % FIXME don't hardcode PCMU (and 160) here
+				payload_type = ?RTP_PAYLOAD_PCMU,
 				sequence_number = SequenceNumber,
 				timestamp = Timestamp,
 				ssrc = SSRC,
@@ -118,7 +120,7 @@ handle_info(Info, State) ->
 %%
 
 safe_binary_part(Data, SequenceNumber, SampleSize) ->
-	Length = size(Data) - 160,
+	Length = size(Data) - SampleSize,
 	P = SampleSize*SequenceNumber,
 	Position = case P < Length of
 		true -> P;
