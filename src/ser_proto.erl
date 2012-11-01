@@ -493,9 +493,11 @@ parse_notify_addr(NotifyAddr) ->
 
 parse_codecs(CodecBin) when is_binary(CodecBin) ->
 	parse_codecs(binary_to_list(CodecBin));
+parse_codecs("session") ->
+	% A very special case - we don't know what codec is used so rtpproxy must use the same as client uses
+	[session];
 parse_codecs(CodecStr) ->
-	try [ begin {Y, []} = string:to_integer(X), guess_codec(Y) end || X <- string:tokens(CodecStr, ",")]
-	catch _:_ -> [] end.
+	[ begin {Y, []} = string:to_integer(X), guess_codec(Y) end || X <- string:tokens(CodecStr, ",")].
 
 decode_params(A) ->
 	decode_params(binary_to_list(A), []).
@@ -670,6 +672,8 @@ encode_params([Unknown|Rest], Result) ->
 	error_logger:error_msg("Unsupported parameter while encoding: [~p]~n", [Unknown]),
 	encode_params(Rest, Result).
 
+print_codecs([session]) ->
+	"session";
 print_codecs(Codecs) ->
 	print_codecs(Codecs, []).
 print_codecs([], Result) ->

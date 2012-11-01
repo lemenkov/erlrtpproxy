@@ -1017,6 +1017,32 @@ cmd_p_b2bua_test_() ->
 		}
 	].
 
+cmd_p_default_codecs_test_() ->
+	Cmd = #cmd{
+			type = ?CMD_P,
+			cookie = <<"c48cefdbbb29404b03c0130dde7a4d85">>,
+			origin = #origin{type = ser, pid = self()},
+			callid = <<"00192f73-cc5f002e-59bf7a37-05909bd2@192.168.1.71-0">>,
+			mediaid = <<"0">>,
+			from = #party{tag = <<"00192f73cc5fa60b4651ff30-2e0eb999">>},
+			to = #party{tag = <<"509108fe255-1c76bd0-8ed7b811">>},
+			params = [
+				{codecs, [session]},
+				{filename, <<"default_en">>},
+				{playcount, 0}
+			]
+		},
+	CmdBin = <<"c48cefdbbb29404b03c0130dde7a4d85 P0 00192f73-cc5f002e-59bf7a37-05909bd2@192.168.1.71-0 default_en session 00192f73cc5fa60b4651ff30-2e0eb999 509108fe255-1c76bd0-8ed7b811">>,
+
+	[
+		{"decoding from binary",
+			fun() -> ?assertEqual(Cmd, ser_proto:decode(CmdBin)) end
+		},
+		{"encoding to binary",
+			fun() -> ?assertEqual(ser_proto:encode(Cmd), <<CmdBin/binary, "\n">>) end
+		}
+	].
+
 cmd_s_test_() ->
 	Cmd1 = #cmd{
 			type = ?CMD_S,
