@@ -31,6 +31,7 @@
 -export([terminate/2]).
 
 -include("../include/common.hrl").
+-include_lib("rtplib/include/rtp.hrl").
 
 -record(state, {
 		cmd,
@@ -38,6 +39,7 @@
 		mediaid,
 		tag,
 		rtp,
+		type,
 		hold = false,
 		notify_info
 	}
@@ -107,11 +109,11 @@ handle_cast(
 	end,
 	{noreply, State};
 
-handle_cast(#cmd{type = ?CMD_P, callid = CallId, mediaid = MediaId, to = #party{tag = Tag}, params = Params}, #state{callid = CallId, mediaid = MediaId, tag = Tag} = State) ->
+handle_cast(#cmd{type = ?CMD_P, callid = CallId, mediaid = MediaId, to = #party{tag = Tag}, params = Params}, #state{callid = CallId, mediaid = MediaId, tag = Tag, type = PayloadType} = State) ->
 	case gproc:select({global,names}, [{ {{n,g,{player, CallId, MediaId, Tag}},'$1','_'}, [], ['$1'] }]) of
 		[] ->
 			% FIXME empty PayloadInfo for now
-			player:start(CallId, MediaId, Tag, Params);
+			player:start(CallId, MediaId, Tag, ensure_codec(Params, PayloadType));
 		[_] -> ok
 	end,
 	{noreply, State#state{hold = true}};
@@ -147,6 +149,12 @@ terminate(Reason, #state{callid = CallId, mediaid = MediaId, notify_info = Notif
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	?ERR("terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
+handle_info({#rtp{payload_type = Type} = Pkt, Ip, Port}, #state{callid = CallId, mediaid = MediaId, tag = Tag} = State) ->
+	case gproc:select({global,names}, [{ {{n,g,{media, CallId, MediaId,'$1'}},'$2','_'}, [{'/=', '$1', Tag}], ['$2'] }]) of
+		[] -> ok;
+		[Pid] -> gen_server:cast(Pid, {Pkt, Ip, Port})
+	end,
+	{noreply, State#state{type = Type}};
 handle_info({Pkt, Ip, Port}, #state{callid = CallId, mediaid = MediaId, tag = Tag} = State) ->
 	case gproc:select({global,names}, [{ {{n,g,{media, CallId, MediaId,'$1'}},'$2','_'}, [{'/=', '$1', Tag}], ['$2'] }]) of
 		[] -> ok;
@@ -166,3 +174,12 @@ handle_info(interim_update, #state{callid = CallID, mediaid = MediaID, notify_in
 	gen_server:cast({global, rtpproxy_notifier}, {interim_update, CallID, MediaID, NotifyInfo}),
 	{noreply, State}.
 
+%%
+%% Internal functions
+%%
+
+ensure_codec(Params, CurrPayloadType) ->
+	CodecType = rtp_utils:get_codec_from_payload(CurrPayloadType),
+	% FIXME we just ignore payload type sent by OpenSIPS/B2BUA and append
+	% current one for now
+	[{codecs,[CodecType]}|proplists:delete(payload, Params)].

@@ -67,9 +67,9 @@ init([CallId, MediaId, Tag, PayloadInfo]) ->
 		_ -> throw({error, playback_codec_unsupported})
 	end,
 
-	% FIXME 20 millisecond is the default but it could be smaller in some cases
+	SSRC = proplists:get_value(ssrc, PayloadInfo, random:uniform(2 bsl 31)),
+
 	{ok, TRef} = timer:send_interval(Clock, send),
-	% FIXME add additional 160 bytes to the end
 	{ok, Data} = file:read_file("/tmp/" ++ Filename ++ FileExt),
 	{ok, #state{
 			callid	= CallId,
@@ -79,7 +79,7 @@ init([CallId, MediaId, Tag, PayloadInfo]) ->
 			data	= Data,
 			type	= Type,
 			ssize	= FrameLength,
-			ssrc	= random:uniform(2 bsl 31),
+			ssrc	= SSRC,
 			repeats = Playcount
 		}
 	}.
