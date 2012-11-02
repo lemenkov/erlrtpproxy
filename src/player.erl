@@ -39,6 +39,8 @@
 		tag,
 		tref,
 		data,
+		type,
+		ssize,
 		sn = 0,
 		repeats = 0,
 		ssrc
@@ -53,17 +55,32 @@ init([CallId, MediaId, Tag, PayloadInfo]) ->
 	% Register itself
 	gproc:add_global_name({player, CallId, MediaId, Tag}),
 
+	% How many times we should playbak (FIXME not used for now)
+	Playcount = proplists:get_value(playcount, PayloadInfo, 0),
+	% We need a codec
+	[CodecInfo | _] = proplists:get_value(codecs, PayloadInfo),
+	Filename = binary_to_list(proplists:get_value(filename, PayloadInfo, <<"default">>)),
+	{FileExt, Type, FrameLength, Clock} = case CodecInfo of
+		{'PCMU', _, _} -> {".pcmu", ?RTP_PAYLOAD_PCMU, 160, 20};
+		{'PCMA', _, _} -> {".pcma", ?RTP_PAYLOAD_PCMA, 160, 20};
+		{'GSM', _, _} -> {".gsm", ?RTP_PAYLOAD_GSM, 33, 20};
+		_ -> throw({error, playback_codec_unsupported})
+	end,
+
 	% FIXME 20 millisecond is the default but it could be smaller in some cases
-	{ok, TRef} = timer:send_interval(20, send),
+	{ok, TRef} = timer:send_interval(Clock, send),
 	% FIXME add additional 160 bytes to the end
-	{ok, Data} = file:read_file("/tmp/default.pcmu"),
+	{ok, Data} = file:read_file("/tmp/" ++ Filename ++ FileExt),
 	{ok, #state{
 			callid	= CallId,
 			mediaid = MediaId,
 			tag	= Tag,
 			tref	= TRef,
 			data	= Data,
-			ssrc	= random:uniform(2 bsl 31)
+			type	= Type,
+			ssize	= FrameLength,
+			ssrc	= random:uniform(2 bsl 31),
+			repeats = Playcount
 		}
 	}.
 
@@ -86,19 +103,17 @@ terminate(Reason, #state{tref = TRef}) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	?ERR("player terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
-handle_info(send, #state{callid = CallId, mediaid = MediaId, tag = Tag, ssrc = SSRC, sn = SequenceNumber, data = Data} = State) ->
+handle_info(send, #state{callid = CallId, mediaid = MediaId, tag = Tag, ssrc = SSRC, sn = SequenceNumber, type = Type, ssize = FrameLength, data = Data} = State) ->
 	case gproc:select({global,names}, [{ {{n,g,{media, CallId, MediaId,'$1'}},'$2','_'}, [{'/=', '$1', Tag}], ['$2'] }]) of
 		[] ->
 			{noreply, State};
 		[Pid] ->
 			<<Timestamp:32, _/binary>> = rtp_utils:now2ntp(),
-			% FIXME don't hardcode 160 here
-			Payload = safe_binary_part(Data, SequenceNumber, 160),
+			Payload = safe_binary_part(Data, SequenceNumber, FrameLength),
 			Pkt = #rtp{
 				padding = 0,
 				marker = case SequenceNumber of 0 -> 1; _ -> 0 end,
-				 % FIXME don't hardcode PCMU (and 160) here
-				payload_type = ?RTP_PAYLOAD_PCMU,
+				payload_type = Type,
 				sequence_number = SequenceNumber,
 				timestamp = Timestamp,
 				ssrc = SSRC,
