@@ -182,4 +182,4 @@ ensure_codec(Params, CurrPayloadType) ->
 	CodecType = rtp_utils:get_codec_from_payload(CurrPayloadType),
 	% FIXME we just ignore payload type sent by OpenSIPS/B2BUA and append
 	% current one for now
-	[{codecs,[CodecType]}|proplists:delete(payload, Params)].
+	[{codecs,[CodecType]}|proplists:delete(codecs, Params)].
