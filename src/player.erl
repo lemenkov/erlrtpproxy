@@ -99,8 +99,8 @@ terminate(Reason, #state{tref = TRef}) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	?ERR("player terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
-handle_info(send, #state{callid = CallId, mediaid = MediaId, tag = Tag, sn = SequenceNumber, type = Type, ssize = FrameLength, data = Data} = State) ->
-	case gproc:select({global,names}, [{ {{n,g,{media, CallId, MediaId,Tag}},'$1','_'}, [], ['$1'] }]) of
+handle_info(send, #state{callid = C, mediaid = M, tag = T, sn = SequenceNumber, type = Type, ssize = FrameLength, data = Data} = State) ->
+	case gproc:select({global,names}, [{{{n,g,{media, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
 		[] ->
 			{noreply, State};
 		[Pid] ->

@@ -49,11 +49,11 @@
 start(Cmd) ->
 	gen_server:start(?MODULE, [Cmd], []).
 
-init([#cmd{type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{tag = Tag}, params = Params} = Cmd]) ->
+init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, params = Params} = Cmd]) ->
 	% Register itself
-	gproc:add_global_name({media, CallId, MediaId, Tag}),
+	gproc:add_global_name({media, C, M, T}),
 	% Register itself for group call and broadcast commands
-	gproc:add_global_property(media, {id, CallId, MediaId}),
+	gproc:add_global_property(media, {id, C, M}),
 
 	% FIXME
 	{ok, I} = application:get_env(rtpproxy, external),
@@ -63,15 +63,15 @@ init([#cmd{type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{tag 
 
 	case proplists:get_value(acc, Params, none) of
 		none -> ok;
-		Acc -> gen_server:cast({global, rtpproxy_notifier}, {Acc, CallId, MediaId, NotifyInfo})
+		Acc -> gen_server:cast({global, rtpproxy_notifier}, {Acc, C, M, NotifyInfo})
 	end,
 
 	{ok, #state{
-			cmd = Cmd,
-			callid	= CallId,
-			mediaid = MediaId,
-			tag	= Tag,
-			rtp = Pid,
+			cmd 	= Cmd,
+			callid	= C,
+			mediaid	= M,
+			tag	= T,
+			rtp	= Pid,
 			notify_info = NotifyInfo
 		}
 	}.
@@ -82,16 +82,16 @@ handle_call(Call, _From,  State) ->
 
 handle_cast(stop, State) ->
 	{stop, normal, State};
-handle_cast(#cmd{type = ?CMD_D, callid = CallId, mediaid = 0, to = null}, #state{callid = CallId} = State) ->
+handle_cast(#cmd{type = ?CMD_D, callid = C, mediaid = 0, to = null}, #state{callid = C} = State) ->
 	{stop, normal, State};
-handle_cast(#cmd{type = ?CMD_D, callid = CallId, mediaid = 0}, #state{callid = CallId} = State) ->
+handle_cast(#cmd{type = ?CMD_D, callid = C, mediaid = 0}, #state{callid = C} = State) ->
 	{stop, normal, State};
 
 handle_cast(
 	#cmd{type = ?CMD_U, from = #party{addr = {IpAddr,_}}, origin = #origin{pid = Pid}, params = Params} = Cmd,
-	#state{callid = CallId, mediaid = MediaId, tag = Tag, notify_info = NotifyInfo} = State
+	#state{callid = C, mediaid = M, tag = T, notify_info = NotifyInfo} = State
 ) ->
-	case gproc:select([{ { {p,g,phy} , '_' , {id, CallId, MediaId, Tag, '$1', '$2', '$3'} }, [], [['$1','$2','$3']]}]) of
+	case gproc:select([{ { {p,g,phy} , '_' , {id, C, M, T, '$1', '$2', '$3'} }, [], [['$1','$2','$3']]}]) of
 		[[Ip,PortRtp,PortRtcp]] ->
 			case IpAddr of
 				{0,0,0,0} ->
@@ -105,22 +105,22 @@ handle_cast(
 	end,
 	case proplists:get_value(acc, Params, none) of
 		none -> ok;
-		Acc -> gen_server:cast({global, rtpproxy_notifier}, {Acc, CallId, MediaId, NotifyInfo})
+		Acc -> gen_server:cast({global, rtpproxy_notifier}, {Acc, C, M, NotifyInfo})
 	end,
 	{noreply, State};
 
-handle_cast(#cmd{type = ?CMD_P, callid = CallId, mediaid = MediaId, to = #party{tag = Tag}, params = Params}, #state{callid = CallId, mediaid = MediaId, tag = Tag, type = PayloadType} = State) ->
-	case gproc:select({global,names}, [{ {{n,g,{player, CallId, MediaId, Tag}},'$1','_'}, [], ['$1'] }]) of
+handle_cast(#cmd{type = ?CMD_P, callid = C, mediaid = M, to = #party{tag = T}, params = P}, #state{callid = C, mediaid = M, tag = T, type = Type} = State) ->
+	case gproc:select({global,names}, [{{{n, g, {player, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
 		[] ->
-			CodecType = rtp_utils:get_codec_from_payload(PayloadType),
+			CodecType = rtp_utils:get_codec_from_payload(Type),
 			% FIXME we just ignore payload type sent by OpenSIPS/B2BUA and append
 			% current one for now
-			player:start(CallId, MediaId, Tag, [{codecs,[CodecType]}|proplists:delete(codecs, Params)]);
+			player:start(C, M, T, [{codecs,[CodecType]}|proplists:delete(codecs, P)]);
 		[_] -> ok
 	end,
 	{noreply, State#state{hold = true}};
-handle_cast(#cmd{type = ?CMD_S, callid = CallId, mediaid = MediaId, to = #party{tag = Tag}}, #state{callid = CallId, mediaid = MediaId, tag = Tag} = State) ->
-	case gproc:select({global,names}, [{ {{n,g,{player, CallId, MediaId, Tag}},'$1','_'}, [], ['$1'] }]) of
+handle_cast(#cmd{type = ?CMD_S, callid = C, mediaid = M, to = #party{tag = T}}, #state{callid = C, mediaid = M, tag = T} = State) ->
+	case gproc:select({global,names}, [{{{n, g, {player, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
 		[] -> ok;
 		[Pid] -> gen_server:cast(Pid, stop)
 	end,
@@ -146,35 +146,35 @@ handle_cast(Other, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, #state{callid = CallId, mediaid = MediaId, notify_info = NotifyInfo}) ->
-	gen_server:cast({global, rtpproxy_notifier}, {stop, CallId, MediaId, NotifyInfo}),
+terminate(Reason, #state{callid = C, mediaid = M, notify_info = NotifyInfo}) ->
+	gen_server:cast({global, rtpproxy_notifier}, {stop, C, M, NotifyInfo}),
 	% No need to explicitly unregister from gproc - it does so automatically
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	?ERR("terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
-handle_info({#rtp{payload_type = Type} = Pkt, Ip, Port}, #state{callid = CallId, mediaid = MediaId, tag = Tag} = State) ->
-	case gproc:select({global,names}, [{ {{n,g,{media, CallId, MediaId,'$1'}},'$2','_'}, [{'/=', '$1', Tag}], ['$2'] }]) of
+handle_info({#rtp{payload_type = Type} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T} = State) ->
+	case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
 		[] -> ok;
 		[Pid] -> gen_server:cast(Pid, {Pkt, Ip, Port})
 	end,
 	{noreply, State#state{type = Type}};
-handle_info({Pkt, Ip, Port}, #state{callid = CallId, mediaid = MediaId, tag = Tag} = State) ->
-	case gproc:select({global,names}, [{ {{n,g,{media, CallId, MediaId,'$1'}},'$2','_'}, [{'/=', '$1', Tag}], ['$2'] }]) of
+handle_info({Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T} = State) ->
+	case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
 		[] -> ok;
 		[Pid] -> gen_server:cast(Pid, {Pkt, Ip, Port})
 	end,
 	{noreply, State};
 
-handle_info({phy, {Ip, PortRtp, PortRtcp}}, #state{callid = CallId, mediaid = MediaId, tag = Tag, cmd = #cmd{origin = #origin{pid = Pid}} = Cmd} = State) ->
+handle_info({phy, {Ip, PortRtp, PortRtcp}}, #state{callid = C, mediaid = M, tag = T, cmd = #cmd{origin = #origin{pid = Pid}} = Cmd} = State) ->
 	% Store info about physical params
-	gproc:add_global_property(phy, {id, CallId, MediaId, Tag, Ip, PortRtp, PortRtcp}),
+	gproc:add_global_property(phy, {id, C, M, T, Ip, PortRtp, PortRtcp}),
 	% Reply to server
 	gen_server:cast(Pid, {reply, Cmd, {{Ip, PortRtp}, {Ip, PortRtcp}}}),
 	% No need to store original Cmd any longer
 	{noreply, State#state{cmd = null}};
 
-handle_info(interim_update, #state{callid = CallID, mediaid = MediaID, notify_info = NotifyInfo} = State) ->
-	gen_server:cast({global, rtpproxy_notifier}, {interim_update, CallID, MediaID, NotifyInfo}),
+handle_info(interim_update, #state{callid = C, mediaid = M, notify_info = NotifyInfo} = State) ->
+	gen_server:cast({global, rtpproxy_notifier}, {interim_update, C, M, NotifyInfo}),
 	{noreply, State}.
 
 %%
