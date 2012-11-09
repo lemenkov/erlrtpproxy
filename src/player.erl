@@ -42,8 +42,7 @@
 		type,
 		ssize,
 		sn = 0,
-		repeats = 0,
-		ssrc
+		repeats = 0
 	}
 ).
 
@@ -67,8 +66,6 @@ init([CallId, MediaId, Tag, PayloadInfo]) ->
 		_ -> throw({error, playback_codec_unsupported})
 	end,
 
-	SSRC = proplists:get_value(ssrc, PayloadInfo, random:uniform(2 bsl 31)),
-
 	{ok, TRef} = timer:send_interval(Clock, send),
 	{ok, Data} = file:read_file("/tmp/" ++ Filename ++ FileExt),
 	{ok, #state{
@@ -79,7 +76,6 @@ init([CallId, MediaId, Tag, PayloadInfo]) ->
 			data	= Data,
 			type	= Type,
 			ssize	= FrameLength,
-			ssrc	= SSRC,
 			repeats = Playcount
 		}
 	}.
@@ -103,26 +99,13 @@ terminate(Reason, #state{tref = TRef}) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	?ERR("player terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
-handle_info(send, #state{callid = CallId, mediaid = MediaId, tag = Tag, ssrc = SSRC, sn = SequenceNumber, type = Type, ssize = FrameLength, data = Data} = State) ->
+handle_info(send, #state{callid = CallId, mediaid = MediaId, tag = Tag, sn = SequenceNumber, type = Type, ssize = FrameLength, data = Data} = State) ->
 	case gproc:select({global,names}, [{ {{n,g,{media, CallId, MediaId,'$1'}},'$2','_'}, [{'/=', '$1', Tag}], ['$2'] }]) of
 		[] ->
 			{noreply, State};
 		[Pid] ->
-			<<Timestamp:32, _/binary>> = rtp_utils:now2ntp(),
 			Payload = safe_binary_part(Data, SequenceNumber, FrameLength),
-			Pkt = #rtp{
-				padding = 0,
-				marker = case SequenceNumber of 0 -> 1; _ -> 0 end,
-				payload_type = Type,
-				sequence_number = SequenceNumber,
-				timestamp = Timestamp,
-				ssrc = SSRC,
-				csrcs = [],
-				extension = null,
-				payload = Payload
-			},
-			% We don't know where to send so we're using null as Ip and null as Port
-			gen_server:cast(Pid, {'music-on-hold', Pkt, null, null}),
+			gen_server:cast(Pid, {'music-on-hold', Type, Payload}),
 			{noreply, State#state{sn = SequenceNumber + 1}}
 	end;
 
