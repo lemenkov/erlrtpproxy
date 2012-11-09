@@ -100,7 +100,7 @@ terminate(Reason, #state{tref = TRef}) ->
 	?ERR("player terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
 handle_info(send, #state{callid = CallId, mediaid = MediaId, tag = Tag, sn = SequenceNumber, type = Type, ssize = FrameLength, data = Data} = State) ->
-	case gproc:select({global,names}, [{ {{n,g,{media, CallId, MediaId,'$1'}},'$2','_'}, [{'/=', '$1', Tag}], ['$2'] }]) of
+	case gproc:select({global,names}, [{ {{n,g,{media, CallId, MediaId,Tag}},'$1','_'}, [], ['$1'] }]) of
 		[] ->
 			{noreply, State};
 		[Pid] ->
