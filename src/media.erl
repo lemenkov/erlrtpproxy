@@ -109,9 +109,10 @@ handle_cast(
 	end,
 	{noreply, State};
 
-handle_cast(#cmd{type = ?CMD_P, callid = C, mediaid = M, to = #party{tag = T}, params = P}, #state{callid = C, mediaid = M, tag = T, type = Type} = State) ->
+handle_cast(#cmd{type = ?CMD_P, callid = C, mediaid = M, to = #party{tag = T}, params = P}, #state{callid = C, mediaid = M, tag = T, type = Type, rtp = RtpPid} = State) ->
 	case gproc:select({global,names}, [{{{n, g, {player, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
 		[] ->
+			gen_server:cast(RtpPid, {keepalive, disable}),
 			CodecType = rtp_utils:get_codec_from_payload(Type),
 			% FIXME we just ignore payload type sent by OpenSIPS/B2BUA and append
 			% current one for now
@@ -119,16 +120,17 @@ handle_cast(#cmd{type = ?CMD_P, callid = C, mediaid = M, to = #party{tag = T}, p
 		[_] -> ok
 	end,
 	{noreply, State#state{hold = true}};
-handle_cast(#cmd{type = ?CMD_S, callid = C, mediaid = M, to = #party{tag = T}}, #state{callid = C, mediaid = M, tag = T} = State) ->
+handle_cast(#cmd{type = ?CMD_S, callid = C, mediaid = M, to = #party{tag = T}}, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid} = State) ->
 	case gproc:select({global,names}, [{{{n, g, {player, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
 		[] -> ok;
-		[Pid] -> gen_server:cast(Pid, stop)
+		[Pid] ->
+			gen_server:cast(Pid, stop),
+			gen_server:cast(RtpPid, {keepalive, enable})
 	end,
 	{noreply, State#state{hold = false}};
 
 handle_cast({'music-on-hold', Type, Payload}, #state{rtp = Pid} = State) ->
 	gen_server:cast(Pid, {raw, Type, Payload}),
-	gen_server:cast(Pid, alive),
 	{noreply, State};
 
 handle_cast({Pkt, Ip, Port}, #state{rtp = Pid, hold = false} = State) ->
