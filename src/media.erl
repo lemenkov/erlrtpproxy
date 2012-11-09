@@ -136,6 +136,7 @@ handle_cast({_Pkt, _Ip, _Port}, #state{hold = true} = State) ->
 
 handle_cast({'music-on-hold', Type, Payload}, #state{rtp = Pid} = State) ->
 	gen_server:cast(Pid, {raw, Type, Payload}),
+	gen_server:cast(Pid, alive),
 	{noreply, State};
 
 handle_cast(Other, State) ->
