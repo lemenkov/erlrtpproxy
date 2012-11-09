@@ -112,8 +112,10 @@ handle_cast(
 handle_cast(#cmd{type = ?CMD_P, callid = CallId, mediaid = MediaId, to = #party{tag = Tag}, params = Params}, #state{callid = CallId, mediaid = MediaId, tag = Tag, type = PayloadType} = State) ->
 	case gproc:select({global,names}, [{ {{n,g,{player, CallId, MediaId, Tag}},'$1','_'}, [], ['$1'] }]) of
 		[] ->
-			% FIXME empty PayloadInfo for now
-			player:start(CallId, MediaId, Tag, ensure_codec(Params, PayloadType));
+			CodecType = rtp_utils:get_codec_from_payload(PayloadType),
+			% FIXME we just ignore payload type sent by OpenSIPS/B2BUA and append
+			% current one for now
+			player:start(CallId, MediaId, Tag, [{codecs,[CodecType]}|proplists:delete(codecs, Params)]);
 		[_] -> ok
 	end,
 	{noreply, State#state{hold = true}};
@@ -177,9 +179,3 @@ handle_info(interim_update, #state{callid = CallID, mediaid = MediaID, notify_in
 %%
 %% Internal functions
 %%
-
-ensure_codec(Params, CurrPayloadType) ->
-	CodecType = rtp_utils:get_codec_from_payload(CurrPayloadType),
-	% FIXME we just ignore payload type sent by OpenSIPS/B2BUA and append
-	% current one for now
-	[{codecs,[CodecType]}|proplists:delete(codecs, Params)].
