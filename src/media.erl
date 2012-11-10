@@ -178,7 +178,3 @@ handle_info({phy, {Ip, PortRtp, PortRtcp}}, #state{callid = C, mediaid = M, tag 
 handle_info(interim_update, #state{callid = C, mediaid = M, notify_info = NotifyInfo} = State) ->
 	gen_server:cast({global, rtpproxy_notifier}, {interim_update, C, M, NotifyInfo}),
 	{noreply, State}.
-
-%%
-%% Internal functions
-%%
