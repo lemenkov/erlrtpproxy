@@ -130,7 +130,7 @@ handle_cast(#cmd{type = ?CMD_S, callid = C, mediaid = M, to = #party{tag = T}}, 
 	{noreply, State#state{hold = false}};
 
 handle_cast({'music-on-hold', Type, Payload}, #state{rtp = Pid} = State) ->
-	gen_server:cast(Pid, {raw, Type, Payload}),
+	gen_server:cast(Pid, {{Type, Payload}, null, null}),
 	{noreply, State};
 
 handle_cast({Pkt, Ip, Port}, #state{rtp = Pid, hold = false} = State) ->
