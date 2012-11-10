@@ -63,6 +63,7 @@ init([CallId, MediaId, Tag, PayloadInfo]) ->
 		{'PCMU', _, _} -> {".pcmu", ?RTP_PAYLOAD_PCMU, 160, 20};
 		{'PCMA', _, _} -> {".pcma", ?RTP_PAYLOAD_PCMA, 160, 20};
 		{'GSM', _, _} -> {".gsm", ?RTP_PAYLOAD_GSM, 33, 20};
+		{'G729', _, _} -> {".gsm", ?RTP_PAYLOAD_G729, 10, 20};
 		_ -> throw({error, playback_codec_unsupported})
 	end,
 
