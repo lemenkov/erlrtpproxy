@@ -31,7 +31,6 @@
 -export([terminate/2]).
 
 -include("../include/common.hrl").
--include_lib("rtplib/include/rtp.hrl").
 
 -record(state, {
 		cmd,
