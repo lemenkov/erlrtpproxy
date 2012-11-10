@@ -153,7 +153,7 @@ terminate(Reason, #state{callid = C, mediaid = M, notify_info = NotifyInfo}) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	?ERR("terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
-handle_info({{Type, Payload} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T} = State) ->
+handle_info({{Type, _} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T} = State) ->
 	case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
 		[] -> ok;
 		[Pid] -> gen_server:cast(Pid, {Pkt, Ip, Port})
