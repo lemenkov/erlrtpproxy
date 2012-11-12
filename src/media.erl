@@ -79,6 +79,13 @@ handle_call(Call, _From,  State) ->
 	?ERR("Unmatched call [~p]", [Call]),
 	{stop,{error,unknown_call},State}.
 
+handle_cast({keepalive, enable}, #state{rtp = RtpPid} = State) ->
+	gen_server:cast(RtpPid, {keepalive, enable}),
+	{noreply, State};
+handle_cast({keepalive, disable}, #state{rtp = RtpPid} = State) ->
+	gen_server:cast(RtpPid, {keepalive, disable}),
+	{noreply, State};
+
 handle_cast(stop, State) ->
 	{stop, normal, State};
 handle_cast(#cmd{type = ?CMD_D, callid = C, mediaid = 0, to = null}, #state{callid = C} = State) ->
@@ -111,11 +118,15 @@ handle_cast(
 handle_cast(#cmd{type = ?CMD_P, callid = C, mediaid = M, to = #party{tag = T}, params = P}, #state{callid = C, mediaid = M, tag = T, type = Type, rtp = RtpPid} = State) ->
 	case gproc:select({global,names}, [{{{n, g, {player, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
 		[] ->
-			gen_server:cast(RtpPid, {keepalive, disable}),
 			CodecType = rtp_utils:get_codec_from_payload(Type),
 			% FIXME we just ignore payload type sent by OpenSIPS/B2BUA and append
 			% current one for now
-			player:start(C, M, T, [{codecs,[CodecType]}|proplists:delete(codecs, P)]);
+			player:start(C, M, T, [{codecs,[CodecType]}|proplists:delete(codecs, P)]),
+			gen_server:cast(RtpPid, {keepalive, disable}),
+			case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
+				[] -> ok;
+				[OtherPid] -> gen_server:cast(OtherPid, {keepalive, disable})
+			end;
 		[_] -> ok
 	end,
 	{noreply, State#state{hold = true}};
@@ -124,7 +135,11 @@ handle_cast(#cmd{type = ?CMD_S, callid = C, mediaid = M, to = #party{tag = T}}, 
 		[] -> ok;
 		[Pid] ->
 			gen_server:cast(Pid, stop),
-			gen_server:cast(RtpPid, {keepalive, enable})
+			gen_server:cast(RtpPid, {keepalive, enable}),
+			case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
+				[] -> ok;
+				[OtherPid] -> gen_server:cast(OtherPid, {keepalive, enable})
+			end
 	end,
 	{noreply, State#state{hold = false}};
 
