@@ -32,6 +32,7 @@
 
 -include("../include/common.hrl").
 -include_lib("rtplib/include/rtp.hrl").
+-include_lib("kernel/include/file.hrl"). % for #file_descriptor{}
 
 -record(state, {
 		callid,
@@ -68,13 +69,14 @@ init([CallId, MediaId, Tag, PayloadInfo]) ->
 	end,
 
 	{ok, TRef} = timer:send_interval(Clock, send),
-	{ok, Data} = file:read_file("/tmp/" ++ Filename ++ FileExt),
+	{ok, FileInfo} = file:read_file_info("/tmp/" ++ Filename ++ FileExt),
+	{ok, Fd} = emmap:open("/tmp/" ++ Filename ++ FileExt, [read, shared, direct, nolock]),
 	{ok, #state{
 			callid	= CallId,
 			mediaid = MediaId,
 			tag	= Tag,
 			tref	= TRef,
-			data	= Data,
+			data	= {Fd, FileInfo#file_info.size},
 			type	= Type,
 			ssize	= FrameLength,
 			repeats = Playcount
@@ -95,8 +97,9 @@ handle_cast(Other, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, #state{tref = TRef}) ->
+terminate(Reason, #state{data = {Fd, _}, tref = TRef}) ->
 	timer:cancel(TRef),
+	file:close(Fd),
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	?ERR("player terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
@@ -105,7 +108,7 @@ handle_info(send, #state{callid = C, mediaid = M, tag = T, sn = SequenceNumber, 
 		[] ->
 			{noreply, State};
 		[Pid] ->
-			Payload = safe_binary_part(Data, SequenceNumber, FrameLength),
+			{ok, Payload} = safe_binary_part(Data, SequenceNumber, FrameLength),
 			gen_server:cast(Pid, {'music-on-hold', Type, Payload}),
 			{noreply, State#state{sn = SequenceNumber + 1}}
 	end;
@@ -118,11 +121,11 @@ handle_info(Info, State) ->
 %% Private functions
 %%
 
-safe_binary_part(Data, SequenceNumber, SampleSize) ->
-	Length = size(Data) - SampleSize,
+safe_binary_part({Fd, Size}, SequenceNumber, SampleSize) ->
+	Length = Size - SampleSize,
 	P = SampleSize*SequenceNumber,
 	Position = case P < Length of
 		true -> P;
 		_ -> P rem Length
 	end,
-	binary:part(Data, Position, SampleSize).
+	file:pread(Fd, Position, SampleSize).
