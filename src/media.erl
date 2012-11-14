@@ -40,6 +40,7 @@
 		rtp,
 		type,
 		hold = false,
+		copy,
 		notify_info
 	}
 ).
@@ -60,6 +61,8 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, param
 
 	NotifyInfo = proplists:get_value(notify, Params, []),
 
+	Copy = proplists:get_value(copy, Params, false),
+
 	case proplists:get_value(acc, Params, none) of
 		none -> ok;
 		Acc -> gen_server:cast({global, rtpproxy_notifier}, {Acc, C, M, NotifyInfo})
@@ -71,6 +74,7 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, param
 			mediaid	= M,
 			tag	= T,
 			rtp	= Pid,
+			copy	= Copy,
 			notify_info = NotifyInfo
 		}
 	}.
@@ -143,12 +147,14 @@ handle_cast(#cmd{type = ?CMD_S, callid = C, mediaid = M, to = #party{tag = T}}, 
 	end,
 	{noreply, State#state{hold = false}};
 
-handle_cast({'music-on-hold', Type, Payload}, #state{rtp = Pid} = State) ->
+handle_cast({'music-on-hold', Type, Payload}, #state{rtp = Pid, callid = C, mediaid = M, tag = T, copy = Copy} = State) ->
 	gen_server:cast(Pid, {{Type, Payload}, null, null}),
+	Copy andalso gen_server:cast(file_writer, {{Type, Payload}, C, M, T}),
 	{noreply, State};
 
-handle_cast({Pkt, null, null}, #state{rtp = Pid, hold = false} = State) ->
+handle_cast({Pkt, null, null}, #state{rtp = Pid, hold = false, callid = C, mediaid = M, tag = T, copy = Copy} = State) ->
 	gen_server:cast(Pid, {Pkt, null, null}),
+	Copy andalso gen_server:cast(file_writer, {Pkt, C, M, T}),
 	{noreply, State};
 
 handle_cast({_Pkt, _Ip, _Port}, #state{hold = true} = State) ->
@@ -162,13 +168,14 @@ handle_cast(Other, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, #state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_info = NotifyInfo}) ->
+terminate(Reason, #state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_info = NotifyInfo, copy = Copy}) ->
 	gen_server:cast({global, rtpproxy_notifier}, {stop, C, M, NotifyInfo}),
 	case gproc:select({global,names}, [{{{n, g, {player, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
 		[] -> ok;
 		[PlayerPid] -> gen_server:cast(PlayerPid, stop)
 	end,
 	gen_rtp_channel:close(RtpPid),
+	Copy andalso gen_server:cast(file_writer, {eof, C, M, T}),
 	% No need to explicitly unregister from gproc - it does so automatically
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	?ERR("terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
