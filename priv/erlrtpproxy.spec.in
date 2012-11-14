@@ -23,6 +23,7 @@ BuildRequires:	erlang-meck
 BuildRequires:	erlang-rebar
 BuildRequires:	erlang-rtplib >= 0.5.17
 Requires:	erlang
+Requires:	erlang-emmap
 Requires:	erlang-eradius >= 0.8.5
 Requires:	erlang-erlsyslog
 Requires:	erlang-gproc

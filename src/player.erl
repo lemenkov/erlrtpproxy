@@ -68,13 +68,13 @@ init([CallId, MediaId, Tag, PayloadInfo]) ->
 	end,
 
 	{ok, TRef} = timer:send_interval(Clock, send),
-	{ok, Data} = file:read_file("/tmp/" ++ Filename ++ FileExt),
+	{ok, {Fd, Size}} = gen_server:call(storage, {get, "/tmp/" ++ Filename ++ FileExt}),
 	{ok, #state{
 			callid	= CallId,
 			mediaid = MediaId,
 			tag	= Tag,
 			tref	= TRef,
-			data	= Data,
+			data	= {Fd, Size},
 			type	= Type,
 			ssize	= FrameLength,
 			repeats = Playcount
@@ -105,7 +105,7 @@ handle_info(send, #state{callid = C, mediaid = M, tag = T, sn = SequenceNumber, 
 		[] ->
 			{noreply, State};
 		[Pid] ->
-			Payload = safe_binary_part(Data, SequenceNumber, FrameLength),
+			{ok, Payload} = safe_binary_part(Data, SequenceNumber, FrameLength),
 			gen_server:cast(Pid, {'music-on-hold', Type, Payload}),
 			{noreply, State#state{sn = SequenceNumber + 1}}
 	end;
@@ -118,11 +118,11 @@ handle_info(Info, State) ->
 %% Private functions
 %%
 
-safe_binary_part(Data, SequenceNumber, SampleSize) ->
-	Length = size(Data) - SampleSize,
+safe_binary_part({Fd, Size}, SequenceNumber, SampleSize) ->
+	Length = Size - SampleSize,
 	P = SampleSize*SequenceNumber,
 	Position = case P < Length of
 		true -> P;
 		_ -> P rem Length
 	end,
-	binary:part(Data, Position, SampleSize).
+	file:pread(Fd, Position, SampleSize).

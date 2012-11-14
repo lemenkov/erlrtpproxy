@@ -56,7 +56,7 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, param
 
 	% FIXME
 	{ok, I} = application:get_env(rtpproxy, external),
-	{ok, Pid} = gen_rtp_channel:start_link(Params ++ [{ip, I}, {rebuildrtp, true}]),
+	{ok, Pid} = gen_rtp_channel:open(0, Params ++ [{ip, I}, {rebuildrtp, true}]),
 
 	NotifyInfo = proplists:get_value(notify, Params, []),
 
@@ -147,8 +147,8 @@ handle_cast({'music-on-hold', Type, Payload}, #state{rtp = Pid} = State) ->
 	gen_server:cast(Pid, {{Type, Payload}, null, null}),
 	{noreply, State};
 
-handle_cast({Pkt, Ip, Port}, #state{rtp = Pid, hold = false} = State) ->
-	gen_server:cast(Pid, {Pkt, Ip, Port}),
+handle_cast({Pkt, null, null}, #state{rtp = Pid, hold = false} = State) ->
+	gen_server:cast(Pid, {Pkt, null, null}),
 	{noreply, State};
 
 handle_cast({_Pkt, _Ip, _Port}, #state{hold = true} = State) ->
@@ -162,22 +162,27 @@ handle_cast(Other, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, #state{callid = C, mediaid = M, notify_info = NotifyInfo}) ->
+terminate(Reason, #state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_info = NotifyInfo}) ->
 	gen_server:cast({global, rtpproxy_notifier}, {stop, C, M, NotifyInfo}),
+	case gproc:select({global,names}, [{{{n, g, {player, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
+		[] -> ok;
+		[PlayerPid] -> gen_server:cast(PlayerPid, stop)
+	end,
+	gen_rtp_channel:close(RtpPid),
 	% No need to explicitly unregister from gproc - it does so automatically
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	?ERR("terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
-handle_info({{Type, _} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T} = State) ->
+handle_info({{Type, _} = Pkt, _Ip, _Port}, #state{callid = C, mediaid = M, tag = T} = State) ->
 	case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
 		[] -> ok;
-		[Pid] -> gen_server:cast(Pid, {Pkt, Ip, Port})
+		[Pid] -> gen_server:cast(Pid, {Pkt, null, null})
 	end,
 	{noreply, State#state{type = Type}};
-handle_info({Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T} = State) ->
+handle_info({Pkt, _Ip, _Port}, #state{callid = C, mediaid = M, tag = T} = State) ->
 	case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
 		[] -> ok;
-		[Pid] -> gen_server:cast(Pid, {Pkt, Ip, Port})
+		[Pid] -> gen_server:cast(Pid, {Pkt, null, null})
 	end,
 	{noreply, State};
 
