@@ -26,5 +26,8 @@ init([]) ->
 	% Load SER protocol backend
 	BackendProcess = {backend_ser, {backend_ser, start_link, [ser]}, transient, 10000, worker, []},
 
-	{ok,{SupFlags, [ListenerProcess, BackendProcess]}}.
+	% Load storage for mmap-ed files
+	StorageProcess = {storage, {storage, start_link, []}, transient, 10000, worker, []},
+
+	{ok, {SupFlags, [ListenerProcess, BackendProcess, StorageProcess]}}.
 

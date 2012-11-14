@@ -32,7 +32,6 @@
 
 -include("../include/common.hrl").
 -include_lib("rtplib/include/rtp.hrl").
--include_lib("kernel/include/file.hrl"). % for #file_descriptor{}
 
 -record(state, {
 		callid,
@@ -69,14 +68,13 @@ init([CallId, MediaId, Tag, PayloadInfo]) ->
 	end,
 
 	{ok, TRef} = timer:send_interval(Clock, send),
-	{ok, FileInfo} = file:read_file_info("/tmp/" ++ Filename ++ FileExt),
-	{ok, Fd} = emmap:open("/tmp/" ++ Filename ++ FileExt, [read, shared, direct, nolock]),
+	{ok, {Fd, Size}} = gen_server:call(storage, {get, "/tmp/" ++ Filename ++ FileExt}),
 	{ok, #state{
 			callid	= CallId,
 			mediaid = MediaId,
 			tag	= Tag,
 			tref	= TRef,
-			data	= {Fd, FileInfo#file_info.size},
+			data	= {Fd, Size},
 			type	= Type,
 			ssize	= FrameLength,
 			repeats = Playcount
@@ -97,9 +95,8 @@ handle_cast(Other, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, #state{data = {Fd, _}, tref = TRef}) ->
+terminate(Reason, #state{tref = TRef}) ->
 	timer:cancel(TRef),
-	file:close(Fd),
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	?ERR("player terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
