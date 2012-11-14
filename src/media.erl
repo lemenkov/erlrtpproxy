@@ -56,7 +56,7 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, param
 
 	% FIXME
 	{ok, I} = application:get_env(rtpproxy, external),
-	{ok, Pid} = gen_rtp_channel:start_link(Params ++ [{ip, I}, {rebuildrtp, true}]),
+	{ok, Pid} = gen_rtp_channel:open(0, Params ++ [{ip, I}, {rebuildrtp, true}]),
 
 	NotifyInfo = proplists:get_value(notify, Params, []),
 
