@@ -147,8 +147,8 @@ handle_cast({'music-on-hold', Type, Payload}, #state{rtp = Pid} = State) ->
 	gen_server:cast(Pid, {{Type, Payload}, null, null}),
 	{noreply, State};
 
-handle_cast({Pkt, Ip, Port}, #state{rtp = Pid, hold = false} = State) ->
-	gen_server:cast(Pid, {Pkt, Ip, Port}),
+handle_cast({Pkt, null, null}, #state{rtp = Pid, hold = false} = State) ->
+	gen_server:cast(Pid, {Pkt, null, null}),
 	{noreply, State};
 
 handle_cast({_Pkt, _Ip, _Port}, #state{hold = true} = State) ->
@@ -173,16 +173,16 @@ terminate(Reason, #state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	?ERR("terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
-handle_info({{Type, _} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T} = State) ->
+handle_info({{Type, _} = Pkt, _Ip, _Port}, #state{callid = C, mediaid = M, tag = T} = State) ->
 	case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
 		[] -> ok;
-		[Pid] -> gen_server:cast(Pid, {Pkt, Ip, Port})
+		[Pid] -> gen_server:cast(Pid, {Pkt, null, null})
 	end,
 	{noreply, State#state{type = Type}};
-handle_info({Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T} = State) ->
+handle_info({Pkt, _Ip, _Port}, #state{callid = C, mediaid = M, tag = T} = State) ->
 	case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
 		[] -> ok;
-		[Pid] -> gen_server:cast(Pid, {Pkt, Ip, Port})
+		[Pid] -> gen_server:cast(Pid, {Pkt, null, null})
 	end,
 	{noreply, State};
 
