@@ -29,5 +29,8 @@ init([]) ->
 	% Load storage for mmap-ed files
 	StorageProcess = {storage, {storage, start_link, []}, transient, 10000, worker, []},
 
-	{ok, {SupFlags, [ListenerProcess, BackendProcess, StorageProcess]}}.
+	% Load storage for mmap-ed files
+	FileWriterProcess = {file_writer, {file_writer, start_link, []}, transient, 10000, worker, []},
+
+	{ok, {SupFlags, [ListenerProcess, BackendProcess, StorageProcess, FileWriterProcess]}}.
 
