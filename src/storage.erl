@@ -56,6 +56,9 @@ handle_call(Request, _From, State) ->
 	error_logger:warning_msg("Storage: strange call [~p]", [Request]),
         {reply, ok, State}.
 
+handle_cast(stop, State) ->
+	{stop, normal, State};
+
 handle_cast(Msg, State) ->
         error_logger:warning_msg("Storage: strange cast: ~p.~n", [Msg]),
         {noreply, State}.

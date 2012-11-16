@@ -62,6 +62,9 @@ handle_cast({eof, CallId, MediaId, Tag}, Ets) ->
 	end,
 	{noreply, Ets};
 
+handle_cast(stop, State) ->
+	{stop, normal, State};
+
 handle_cast(Msg, State) ->
 	error_logger:warning_msg("File Writer: strange cast: ~p.~n", [Msg]),
 	{noreply, State}.
