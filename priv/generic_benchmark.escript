@@ -32,8 +32,6 @@
 %%%
 %%%----------------------------------------------------------------------
 
--include("../include/common.hrl").
-
 run_create(0, _, _, _) ->
 	ok;
 run_create(Number, Fd, Ip, Port) ->
