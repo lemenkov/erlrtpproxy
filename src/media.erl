@@ -69,7 +69,7 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, param
 	end,
 
 	{ok, #state{
-			cmd 	= Cmd,
+			cmd	= Cmd,
 			callid	= C,
 			mediaid	= M,
 			tag	= T,
