@@ -40,10 +40,6 @@ start() ->
 	% Replace logger with erlsyslog
 	rpc:multicall(Nodes, error_logger, add_report_handler, [erlsyslog]),
 
-	% Load NIFs
-	rpc:multicall(Nodes, crc32c, init, []),
-	rpc:multicall(Nodes, sas, init, []),
-
 	% Run gproc on each node
 	rpc:multicall(Nodes, application, set_env, [gproc, gproc_dist, all]),
 	rpc:multicall(Nodes, application, start, [gproc]),
