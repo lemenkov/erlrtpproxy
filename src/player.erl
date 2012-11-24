@@ -100,12 +100,18 @@ terminate(Reason, #state{tref = TRef}) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	?ERR("player terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
-handle_info(send, #state{callid = C, mediaid = M, tag = T, sn = SequenceNumber, type = Type, ssize = FrameLength, data = Data} = State) ->
+handle_info(send, #state{callid = C, mediaid = M, tag = T, sn = SequenceNumber, type = Type, ssize = FrameLength, data = {Fd, Size}} = State) ->
 	case gproc:select({global,names}, [{{{n,g,{media, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
 		[] ->
 			{noreply, State};
 		[Pid] ->
-			{ok, Payload} = safe_binary_part(Data, SequenceNumber, FrameLength),
+			Length = Size - FrameLength,
+			P = FrameLength*SequenceNumber,
+			Position = case P < Length of
+				true -> P;
+				_ -> P rem Length
+			end,
+			{ok, Payload} = file:pread(Fd, Position, FrameLength),
 			gen_server:cast(Pid, {'music-on-hold', Type, Payload}),
 			{noreply, State#state{sn = SequenceNumber + 1}}
 	end;
@@ -113,16 +119,3 @@ handle_info(send, #state{callid = C, mediaid = M, tag = T, sn = SequenceNumber, 
 handle_info(Info, State) ->
 	?ERR("Unmatched info [~p]", [Info]),
 	{noreply, State}.
-
-%%
-%% Private functions
-%%
-
-safe_binary_part({Fd, Size}, SequenceNumber, SampleSize) ->
-	Length = Size - SampleSize,
-	P = SampleSize*SequenceNumber,
-	Position = case P < Length of
-		true -> P;
-		_ -> P rem Length
-	end,
-	file:pread(Fd, Position, SampleSize).
