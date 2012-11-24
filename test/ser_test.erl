@@ -114,7 +114,7 @@ ser_udp_test_() ->
 				%% Start real SER frontend
 				%%
 
-				ser_sup:start_link()
+				rtpproxy_sup:start_link()
 		end,
 		fun (_) ->
 				gen_udp:close(Fd),
@@ -274,7 +274,7 @@ ser_tcp_test_() ->
 				%% Start real SER frontend
 				%%
 
-				ser_sup:start_link(),
+				rtpproxy_sup:start_link(),
 
 				%%
 				%% Load fake rtpproxy_ctl module - we'll test it later

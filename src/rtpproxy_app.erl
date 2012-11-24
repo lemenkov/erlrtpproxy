@@ -4,10 +4,7 @@
 
 start(_Type, _StartArgs) ->
 	rtpproxy_notifier_sup:start_link(),
-	case application:get_env(rtpproxy, backend) of
-		{ok, ser} -> ser_sup:start_link();
-		Other -> throw({error, {unsupported, Other}})
-	end.
+	rtpproxy_sup:start_link().
 
 stop(_State) ->
 	ok.

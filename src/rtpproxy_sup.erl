@@ -1,4 +1,4 @@
--module(ser_sup).
+-module(rtpproxy_sup).
 -behaviour(supervisor).
 
 -export([start_link/0]).
@@ -24,7 +24,9 @@ init([]) ->
 	end,
 
 	% Load SER protocol backend
-	BackendProcess = {backend_ser, {backend_ser, start_link, [ser]}, transient, 10000, worker, []},
+	BackendProcess = case application:get_env(rtpproxy, backend) of
+		{ok, ser} -> {backend_ser, {backend_ser, start_link, [ser]}, transient, 10000, worker, []}
+	end,
 
 	% Load storage for mmap-ed files
 	StorageProcess = {storage, {storage, start_link, []}, transient, 10000, worker, []},
