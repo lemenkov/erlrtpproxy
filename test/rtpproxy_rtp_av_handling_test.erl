@@ -104,6 +104,7 @@ rtpproxy_rtp_handling_test_() ->
 				%% Options for rtpproxy itself
 				application:set_env(rtpproxy, external, ?RTPPROXY_IP),
 				application:set_env(rtpproxy, ttl, 105000),
+				application:set_env(rtpproxy, rebuildrtp, false),
 
 				%%
 				%% Start rtpproxy
