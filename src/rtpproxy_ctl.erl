@@ -51,50 +51,31 @@ start() ->
 	application:start(rtpproxy).
 
 stop() ->
-	Status = case init:get_plain_arguments() of
+	Node = case init:get_plain_arguments() of
 		[NodeStr] ->
-			Node = list_to_atom(NodeStr),
-			try rpc:call(Node, rtpproxy_ctl, command, [#cmd{type = ?CMD_X}], 5000) of
-				{badrpc, _} ->
-					2;
-				_ ->
-					case rpc:call(Node, init, stop, [], 5000) of
-						{badrpc, _} ->
-							2;
-						_ ->
-							0
-					end
-			catch _:_ ->
-				2
-			end;
+			list_to_atom(NodeStr);
 		_ ->
-			1
+			halt(1)
 	end,
-	halt(Status).
+	call(Node, rtpproxy_ctl, command, [#cmd{type = ?CMD_X}], 2),
+	call(Node, init, stop, [], 2),
+	halt(0).
 
 status_pp() ->
-	Status = case init:get_plain_arguments() of
+	Node = case init:get_plain_arguments() of
 		[NodeStr] ->
-			Node = list_to_atom(NodeStr),
-			try rpc:call(Node, rtpproxy_ctl, command, [#cmd{type = ?CMD_I, params = [brief]}], 5000) of
-%			try rpc:call(Node, rtpproxy_ctl, status, [], 5000) of
-				{badrpc, _} ->
-					4;
-				{ok, {stats, Number}} ->
-					io:format("active calls: ~p~n", [Number]),
-					0;
-				undefined ->
-					ok = io:format("~n"),
-					3
-			catch _:_ ->
-				ok = io:format("~n"),
-				4
-			end;
+			list_to_atom(NodeStr);
 		_ ->
-			ok = io:format("~n"),
-			4
+			halt(1)
 	end,
-	halt(Status).
+	case call(Node, rtpproxy_ctl, command, [#cmd{type = ?CMD_I, params = [brief]}], 4) of
+		{ok, {stats, Number}} ->
+			io:format("active calls: ~p~n", [Number]),
+			halt(0);
+		undefined ->
+			ok = io:format("~n"),
+			halt(3)
+	end.
 
 % FIXME this must be reworked (no preformatted strings - just plain stats)
 status() ->
@@ -151,4 +132,18 @@ command(#cmd{callid = CallId, mediaid = MediaId} = Cmd) ->
 		MediaThreads when is_list(MediaThreads) ->
 			% Group command - return immediately
 			lists:foreach(fun(Pid) -> gen_server:cast(Pid, Cmd) end, MediaThreads)
+	end.
+
+%%
+%% Private functions
+%%
+
+call(Node, M, F, A, HaltRet) ->
+	try rpc:call(Node, M, F, A, 5000) of
+		{badrpc, _} ->
+			halt(HaltRet);
+		Rest ->
+			Rest
+	catch _:_ ->
+		halt(HaltRet)
 	end.
