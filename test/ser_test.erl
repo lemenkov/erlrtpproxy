@@ -121,6 +121,8 @@ ser_udp_test_() ->
 				meck:unload(rtpproxy_ctl),
 				gen_server:cast(listener, stop),
 				gen_server:cast(backend_ser, stop),
+				gen_server:cast(file_writer, stop),
+				gen_server:cast(storage, stop),
 				net_kernel:stop()
 		end,
 		[
@@ -329,6 +331,8 @@ ser_tcp_test_() ->
 				meck:unload(rtpproxy_ctl),
 				gen_server:cast(listener, stop),
 				gen_server:cast(backend_ser, stop),
+				gen_server:cast(file_writer, stop),
+				gen_server:cast(storage, stop),
 				net_kernel:stop()
 		end,
 		[

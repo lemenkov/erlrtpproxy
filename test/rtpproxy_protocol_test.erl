@@ -85,6 +85,9 @@ rtpproxy_protocol_test_() ->
 				application:stop(rtpproxy),
 				application:stop(gproc),
 				gen_server:cast({global, rtpproxy_notifier}, stop),
+				gen_server:cast(backend_ser, stop),
+				gen_server:cast(file_writer, stop),
+				gen_server:cast(storage, stop),
 				pool:stop(),
 				net_kernel:stop()
 		end,
