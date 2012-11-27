@@ -518,22 +518,7 @@ decode_params([], Result) ->
 		_ ->
 			proplists:delete(symmetric, R1) ++ [{symmetric, true}]
 	end,
-	R3 = case {proplists:get_value(transcode, R2), proplists:get_value(codecs, R2)} of
-		{undefined, _} ->
-			R2;
-		{_, undefined} ->
-			% Requested transcoding but no codecs are available - kill transcode
-			proplists:delete(transcode, R2);
-		{Codec, Codecs} ->
-			case lists:member(Codec, Codecs) of
-				true ->
-					R2;
-				_ ->
-					% Requested transcoding to incompatible codec - kill transcode
-					proplists:delete(transcode, R2)
-			end
-	end,
-	lists:sort(R3);
+	lists:sort(R2);
 % IPv6
 decode_params([$6|Rest], Result) ->
 	decode_params(Rest, ensure_alone(Result, ipv6));
