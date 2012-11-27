@@ -185,10 +185,6 @@ parse_cmd_u_3_2_transcode_test() ->
 			]
 		}, ser_proto:decode(<<"438_41061 Ut4c8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.0.43.5 16432 6b0a8f6cfc543db1o1;1">>)).
 
-%parse_cmd_u_3_3_transcode_incompatible_test() ->
-%	?assertThrow(
-%		{error_syntax, "Requested transcoding to incompatible codec"},
-%		ser_proto:decode(<<"438_41061 Ut5c8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1">>)).
 parse_cmd_u_3_3_transcode_incompatible_test() ->
 	?assertEqual(
 		#cmd{
@@ -213,14 +209,11 @@ parse_cmd_u_3_3_transcode_incompatible_test() ->
 					]
 				},
 				{direction, {external, external}},
-				{symmetric, true}
+				{symmetric, true},
+				{transcode, {'DVI4',8000,1}}
 			]
 		}, ser_proto:decode(<<"438_41061 Ut5c8,0,2,4,18,96,97,98,100,101 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1">>)).
 
-%parse_cmd_u_3_4_transcode_no_codecs_test() ->
-%	?assertThrow(
-%		{error_syntax, "Requested transcoding but no codecs are available"},
-%		ser_proto:decode(<<"438_41061 Ut1 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1">>)).
 parse_cmd_u_3_4_transcode_no_codecs_test() ->
 	?assertEqual(
 		#cmd{
@@ -232,9 +225,10 @@ parse_cmd_u_3_4_transcode_no_codecs_test() ->
 			from = #party{tag = <<"6b0a8f6cfc543db1o1">>},
 			params = [
 				{direction, {external, external}},
-				{symmetric, true}
+				{symmetric, true},
+				{transcode,{'GSM',8000,1}}
 			]
-		}, ser_proto:decode(<<"438_41061 Ut1 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1">>)).
+		}, ser_proto:decode(<<"438_41061 Ut3 e12ea248-94a5e885@192.168.5.3 192.168.5.3 16432 6b0a8f6cfc543db1o1;1">>)).
 
 parse_cmd_u_4_zeroes_test() ->
 	?assertEqual(
