@@ -31,7 +31,7 @@ handle_call(Message, From, State) ->
 
 handle_cast({start, CallId, MediaId, _}, State) ->
 	error_logger:info_msg("Got start from ~s ~p at ~p~n", [CallId, MediaId, node()]),
-	case ets:lookup(?MODULE, {callid, CallId, mediaid, MediaId}) of
+	case ets:lookup(?MODULE, {CallId, MediaId}) of
 		[] ->
 			Req = State#rad_accreq{
 				login_time = os:timestamp(),
@@ -39,7 +39,7 @@ handle_cast({start, CallId, MediaId, _}, State) ->
 				vend_attrs = [{?Cisco, [{?h323_connect_time, date_time_fmt()}]}]
 			},
 			eradius_acc:acc_start(Req),
-			ets:insert_new(?MODULE, {{callid, CallId, mediaid, MediaId}, {req, Req}});
+			ets:insert_new(?MODULE, {{CallId, MediaId}, {Req, os:timestamp()}});
 		_ ->
 			% Already sent - discard
 			ok
@@ -48,13 +48,19 @@ handle_cast({start, CallId, MediaId, _}, State) ->
 
 handle_cast({interim_update, CallId, MediaId, _}, State) ->
 	error_logger:info_msg("Got interim update from ~s ~p at ~p~n", [CallId, MediaId, node()]),
-	case ets:lookup(?MODULE, {callid, CallId, mediaid, MediaId}) of
-		[{{callid,CallId,mediaid,MediaId},{req,Req0}}] ->
-			Login = to_now(Req0#rad_accreq.login_time),
-			SessTime = calendar:datetime_to_gregorian_seconds(
-				calendar:now_to_local_time(os:timestamp())) -
-			        calendar:datetime_to_gregorian_seconds(calendar:now_to_local_time(Login)),
-			eradius_acc:acc_update(Req0#rad_accreq{session_time = SessTime});
+	case ets:lookup(?MODULE, {CallId, MediaId}) of
+		[{{CallId, MediaId}, {Req0, PrevTimestamp}}] ->
+			Timestamp = os:timestamp(),
+			case to_seconds(Timestamp) - to_seconds(PrevTimestamp) > 10 of
+				true ->
+					Login = to_now(Req0#rad_accreq.login_time),
+					SessTime = to_seconds(Timestamp) - to_seconds(Login),
+					eradius_acc:acc_update(Req0#rad_accreq{session_time = SessTime}),
+					ets:update_element(?MODULE, {CallId, MediaId}, {2, Timestamp});
+				_ ->
+					% A difference between two consequent updates was too short
+					ok
+			end;
 		_ ->
 			% Bogus - discard
 			ok
@@ -63,14 +69,14 @@ handle_cast({interim_update, CallId, MediaId, _}, State) ->
 
 handle_cast({stop, CallId, MediaId, _}, State) ->
 	error_logger:info_msg("Got stop from ~s ~p at ~p~n", [CallId, MediaId, node()]),
-	case ets:lookup(?MODULE, {callid, CallId, mediaid, MediaId}) of
-		[{{callid,CallId,mediaid,MediaId},{req,Req0}}] ->
+	case ets:lookup(?MODULE, {CallId, MediaId}) of
+		[{{CallId, MediaId}, {Req0, _}}] ->
 			Req1 = eradius_acc:set_logout_time(Req0),
 			Req2 = Req1#rad_accreq{
 				vend_attrs = [{?Cisco, [{?h323_disconnect_time, date_time_fmt()}]}]
 			},
 			eradius_acc:acc_stop(Req2),
-			ets:delete(?MODULE, {callid, CallId, mediaid, MediaId});
+			ets:delete(?MODULE, {CallId, MediaId});
 		_ ->
 			% Bogus - discard
 			ok
@@ -109,3 +115,8 @@ to_now(Now = {MSec, Sec, USec}) when is_integer(MSec), is_integer(Sec), is_integ
 	Now;
 to_now(Now) when is_integer(Now) ->
 	{Now div 1000000, Now rem 1000000, 0}.
+
+to_seconds(Now = {MSec, Sec, USec}) when is_integer(MSec), is_integer(Sec), is_integer(USec) ->
+	calendar:datetime_to_gregorian_seconds(calendar:now_to_local_time(Now));
+to_seconds(Seconds) when is_integer(Seconds) ->
+	Seconds.
