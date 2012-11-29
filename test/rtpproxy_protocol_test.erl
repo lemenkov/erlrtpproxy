@@ -82,14 +82,12 @@ rtpproxy_protocol_test_() ->
 		end,
 		fun (_) ->
 				gen_udp:close(Fd),
-				application:stop(rtpproxy),
-				application:stop(gproc),
-				gen_server:cast(rtpproxy_notifier, stop),
-				gen_server:cast(backend_ser, stop),
-				gen_server:cast(file_writer, stop),
-				gen_server:cast(storage, stop),
-				pool:stop(),
-				net_kernel:stop()
+
+				%%
+				%% Stop rtpproxy
+				%%
+
+				rtpproxy_ctl:stop()
 		end,
 		[
 			{"Try to handshake (get magic number back -20040107)",

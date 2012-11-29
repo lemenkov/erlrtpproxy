@@ -124,14 +124,11 @@ rtpproxy_rtp_handling_test_() ->
 				gen_udp:close(Fd2),
 				gen_udp:close(Fd3),
 
-				application:stop(rtpproxy),
-				application:stop(gproc),
-				gen_server:cast(rtpproxy_notifier, stop),
-				gen_server:cast(backend_ser, stop),
-				gen_server:cast(file_writer, stop),
-				gen_server:cast(storage, stop),
-				pool:stop(),
-				net_kernel:stop()
+				%%
+				%% Stop rtpproxy
+				%%
+
+				rtpproxy_ctl:stop()
 		end,
 		[
 			{"Try to create new session with two media streams (A/V) and exchange RTP packets (with IP:Port and SSRC checking)",
