@@ -14,7 +14,7 @@ start_link(Args) ->
 	gen_server:start_link({local, ?MODULE}, ?MODULE, Args, []).
 
 % FIXME add more types than udp
-init([udp]) ->
+init(udp) ->
 	{ok, Fd} = gen_udp:open(0, [binary, {active, true}]),
 	error_logger:info_msg("Started rtpproxy notify protocol backend (UDP) at ~p~n", [node()]),
 	{ok, Fd}.

@@ -41,5 +41,20 @@ init([]) ->
 	% Load notification process
 	NotifierProcess = ?CHILD(rtpproxy_notifier),
 
-	{ok, {SupFlags, [ListenerProcess, BackendProcess, StorageProcess, FileWriterProcess, NotifierProcess]}}.
+	% Check and load (if configured) notification backends
+	RadiusBackendProcess = case application:get_env(rtpproxy, radacct_servers) of
+		{ok, RadAcctServers} ->
+			[?CHILD(rtpproxy_notifier_backend_radius, [RadAcctServers])];
+		_ ->
+			[]
+	end,
+	NotifyBackendProcess = case application:get_env(rtpproxy, notify_servers) of
+		{ok, NotifyServers} ->
+			[?CHILD(rtpproxy_notifier_backend_notify, NotifyServers)];
+		_ ->
+			[]
+	end,
+	NotifyBackends = RadiusBackendProcess ++ NotifyBackendProcess,
+
+	{ok, {SupFlags, [ListenerProcess, BackendProcess, StorageProcess, FileWriterProcess, NotifierProcess |NotifyBackends]}}.
 
