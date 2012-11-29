@@ -65,20 +65,38 @@ rtpproxy_notifier_backend_notify_test_() ->
 				%% (normally we'll set them in the /etc/erlrtpproxy.config
 				%%
 
+				%% Set up backend's type (SER for now)
+				application:set_env(rtpproxy, backend, ser),
+
+				%% Options for SER backend
+				application:set_env(rtpproxy, listen, {udp, "127.0.0.1", ?RTPPROXY_PORT}),
+
+				%% Options for notification backend
 				%application:set_env(rtpproxy, radacct_servers, [[{127,0,0,1},1813,"testradacctpass"]]),
 				application:set_env(rtpproxy, notify_servers, udp),
 				application:set_env(rtpproxy, ignore_start, true),
 				application:set_env(rtpproxy, ignore_stop, true),
 
+				%% Options for rtpproxy itself
+				application:set_env(rtpproxy, external, ?RTPPROXY_IP),
+				application:set_env(rtpproxy, ttl, 105000),
+				application:set_env(rtpproxy, rebuildrtp, false),
+
 				%%
-				%% Start real Notification backend
+				%% Start rtpproxy
 				%%
 
-				rtpproxy_notifier_sup:start_link()
+				rtpproxy_ctl:start()
 		end,
 		fun (_) ->
 				gen_udp:close(Fd),
+				application:stop(rtpproxy),
+				application:stop(gproc),
 				gen_server:cast(rtpproxy_notifier, stop),
+				gen_server:cast(backend_ser, stop),
+				gen_server:cast(file_writer, stop),
+				gen_server:cast(storage, stop),
+				pool:stop(),
 				net_kernel:stop()
 		end,
 		[

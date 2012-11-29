@@ -4,6 +4,9 @@
 -export([start_link/0]).
 -export([init/1]).
 
+%% Helper macro for declaring children of supervisor
+-define(CHILD(I, Type), {I, {I, start_link, []}, transient, 5000, Type, [I]}).
+
 start_link() ->
 	supervisor:start_link(?MODULE, []).
 
@@ -29,10 +32,13 @@ init([]) ->
 	end,
 
 	% Load storage for mmap-ed files
-	StorageProcess = {storage, {storage, start_link, []}, transient, 10000, worker, []},
+	StorageProcess = ?CHILD(storage, worker),
 
 	% Load file writer
-	FileWriterProcess = {file_writer, {file_writer, start_link, []}, transient, 10000, worker, []},
+	FileWriterProcess = ?CHILD(file_writer, worker),
 
-	{ok, {SupFlags, [ListenerProcess, BackendProcess, StorageProcess, FileWriterProcess]}}.
+	% Load notification process
+	NotifierProcess = ?CHILD(rtpproxy_notifier, worker),
+
+	{ok, {SupFlags, [ListenerProcess, BackendProcess, StorageProcess, FileWriterProcess, NotifierProcess]}}.
 
