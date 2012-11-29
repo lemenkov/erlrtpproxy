@@ -78,26 +78,26 @@ rtpproxy_notifier_backend_notify_test_() ->
 		end,
 		fun (_) ->
 				gen_udp:close(Fd),
-				gen_server:cast({global, rtpproxy_notifier}, stop),
+				gen_server:cast(rtpproxy_notifier, stop),
 				net_kernel:stop()
 		end,
 		[
 			{"Test start notification (should be filtered)",
 				fun() ->
-						gen_server:cast({global, rtpproxy_notifier}, {start, CallId, MediaId, NotifyInfo}),
+						gen_server:cast(rtpproxy_notifier, {start, CallId, MediaId, NotifyInfo}),
 						?assertEqual({error,timeout}, gen_udp:recv(Fd, 0, 1000))
 				end
 			},
 			{"Test interim update notification",
 				fun() ->
-						gen_server:cast({global, rtpproxy_notifier}, {interim_update, CallId, MediaId, NotifyInfo}),
+						gen_server:cast(rtpproxy_notifier, {interim_update, CallId, MediaId, NotifyInfo}),
 						{ok, {_, _, Answer}} = gen_udp:recv(Fd, 0, 1000),
 						?assertEqual(NotifyTag, Answer)
 				end
 			},
 			{"Test stop notification (should be filtered)",
 				fun() ->
-						gen_server:cast({global, rtpproxy_notifier}, {stop, CallId, MediaId, NotifyInfo}),
+						gen_server:cast(rtpproxy_notifier, {stop, CallId, MediaId, NotifyInfo}),
 						?assertEqual({error,timeout}, gen_udp:recv(Fd, 0, 1000))
 				end
 			}

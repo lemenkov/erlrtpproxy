@@ -13,7 +13,7 @@
 -record(state, {radius=false, notify=false, ignore_start = false, ignore_stop = false}).
 
 start_link() ->
-	gen_server:start_link({global, ?MODULE}, ?MODULE, [], []).
+	gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init(_) ->
 	RadiusBackend = case application:get_env(rtpproxy, radacct_servers) of
