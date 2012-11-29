@@ -11,7 +11,7 @@ LimitNOFILE=32000
 RestartSec=5
 WorkingDirectory=/var/lib/erlrtpproxy
 ExecStart=/usr/bin/erl $ERL_PARAMETERS -name erlrtpproxy@${ERL_NODE} -rsh $RSH -config $CONFIG_FILE -noinput -detached -s rtpproxy_ctl
-ExecStop=/usr/bin/erl -noinput $ERL_PARAMETERS -name close@${ERL_NODE} -s rtpproxy_ctl stop -extra erlrtpproxy@${ERL_NODE}
+ExecStop=/usr/bin/erl -noinput $ERL_PARAMETERS -name close@${ERL_NODE} -s rtpproxy_ctl stop_sysv -extra erlrtpproxy@${ERL_NODE}
 
 [Install]
 WantedBy=multi-user.target

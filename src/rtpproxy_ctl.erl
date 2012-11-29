@@ -21,8 +21,8 @@
 -author('lemenkov@gmail.com').
 
 -export([start/0]).
--export([stop/0]).
--export([status_pp/0]).
+-export([stop_sysv/0]).
+-export([status_sysv/0]).
 -export([status/0]).
 -export([command/1]).
 
@@ -50,7 +50,7 @@ start() ->
 	% Load main module
 	application:start(rtpproxy).
 
-stop() ->
+stop_sysv() ->
 	Node = case init:get_plain_arguments() of
 		[NodeStr] ->
 			list_to_atom(NodeStr);
@@ -61,7 +61,7 @@ stop() ->
 	call(Node, init, stop, [], 2),
 	halt(0).
 
-status_pp() ->
+status_sysv() ->
 	Node = case init:get_plain_arguments() of
 		[NodeStr] ->
 			list_to_atom(NodeStr);
