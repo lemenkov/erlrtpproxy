@@ -23,7 +23,7 @@ init([]) ->
 			{udp_listener, {udp_listener, start_link, [[backend_ser, Ip, Port]]}, transient, 10000, worker, []}
 	end,
 
-	% Load SER protocol backend
+	% Load protocol backend (only SER is supported)
 	BackendProcess = case application:get_env(rtpproxy, backend) of
 		{ok, ser} -> {backend_ser, {backend_ser, start_link, [ser]}, transient, 10000, worker, []}
 	end,
