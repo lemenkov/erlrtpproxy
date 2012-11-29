@@ -39,7 +39,7 @@ handle_cast({start, CallId, MediaId, _}, State) ->
 				vend_attrs = [{?Cisco, [{?h323_connect_time, date_time_fmt()}]}]
 			},
 			eradius_acc:acc_start(Req),
-			ets:insert_new(?MODULE, {{CallId, MediaId}, {Req, os:timestamp()}});
+			ets:insert_new(?MODULE, {{CallId, MediaId}, {Req, {0,0,0}}});
 		_ ->
 			% Already sent - discard
 			ok
