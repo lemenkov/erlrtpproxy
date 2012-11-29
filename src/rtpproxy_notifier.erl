@@ -55,6 +55,8 @@ handle_cast({Type, CallId, MediaId, Addr}, #state{radius = RadiusBackend, notify
 	{noreply, State};
 
 handle_cast(stop, State) ->
+	gen_server:cast(rtpproxy_notifier_backend_radius, stop),
+	gen_server:cast(rtpproxy_notifier_backend_notify, stop),
 	{stop, normal, State};
 
 handle_cast(Other, State) ->
