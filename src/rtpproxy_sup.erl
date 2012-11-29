@@ -4,8 +4,9 @@
 -export([start_link/0]).
 -export([init/1]).
 
-%% Helper macro for declaring children of supervisor
--define(CHILD(I, Type), {I, {I, start_link, []}, transient, 5000, Type, [I]}).
+%% Helper macros for declaring children of supervisor
+-define(CHILD(I), {I, {I, start_link, []}, transient, 5000, worker, [I]}).
+-define(CHILD(I,P), {I, {I, start_link, [P]}, transient, 5000, worker, [I]}).
 
 start_link() ->
 	supervisor:start_link(?MODULE, []).
@@ -21,24 +22,24 @@ init([]) ->
 	{ok, Ip} = inet_parse:address(IpStr),
 	ListenerProcess = case Proto of
 		tcp ->
-			{tcp_listener, {tcp_listener, start_link, [[backend_ser, Ip, Port]]}, transient, 10000, worker, []};
+			?CHILD(tcp_listener, [backend_ser, Ip, Port]);
 		udp ->
-			{udp_listener, {udp_listener, start_link, [[backend_ser, Ip, Port]]}, transient, 10000, worker, []}
+			?CHILD(udp_listener, [backend_ser, Ip, Port])
 	end,
 
 	% Load protocol backend (only SER is supported)
 	BackendProcess = case application:get_env(rtpproxy, backend) of
-		{ok, ser} -> {backend_ser, {backend_ser, start_link, [ser]}, transient, 10000, worker, []}
+		{ok, ser} -> ?CHILD(backend_ser, ser)
 	end,
 
 	% Load storage for mmap-ed files
-	StorageProcess = ?CHILD(storage, worker),
+	StorageProcess = ?CHILD(storage),
 
 	% Load file writer
-	FileWriterProcess = ?CHILD(file_writer, worker),
+	FileWriterProcess = ?CHILD(file_writer),
 
 	% Load notification process
-	NotifierProcess = ?CHILD(rtpproxy_notifier, worker),
+	NotifierProcess = ?CHILD(rtpproxy_notifier),
 
 	{ok, {SupFlags, [ListenerProcess, BackendProcess, StorageProcess, FileWriterProcess, NotifierProcess]}}.
 
