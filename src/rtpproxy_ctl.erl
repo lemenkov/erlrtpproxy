@@ -20,6 +20,7 @@
 -module(rtpproxy_ctl).
 -author('lemenkov@gmail.com').
 
+-export([acc/4]).
 -export([start/0]).
 -export([stop/0]).
 -export([stop_sysv/0]).
@@ -28,6 +29,14 @@
 -export([command/1]).
 
 -include("../include/common.hrl").
+
+acc(Type, CallId, MediaId, Addr) when Type == start; Type == interim_update; Type == stop ->
+	{ok, IgnoreStart} = application:get_env(rtpproxy, ignore_start),
+	{ok, IgnoreStop} = application:get_env(rtpproxy, ignore_stop),
+	Send = ((Type == start) and not IgnoreStart) or (Type == interim_update) or ((Type == stop) and not IgnoreStop),
+	Send andalso gen_server:cast(rtpproxy_notifier_backend_radius, {Type, CallId, MediaId, Addr}),
+	Send andalso gen_server:cast(rtpproxy_notifier_backend_notify, {Type, CallId, MediaId, Addr}),
+	ok.
 
 start() ->
 	% Start our pool

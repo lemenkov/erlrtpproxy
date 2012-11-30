@@ -38,9 +38,6 @@ init([]) ->
 	% Load file writer
 	FileWriterProcess = ?CHILD(file_writer),
 
-	% Load notification process
-	NotifierProcess = ?CHILD(rtpproxy_notifier),
-
 	% Check and load (if configured) notification backends
 	RadiusBackendProcess = case application:get_env(rtpproxy, radacct_servers) of
 		{ok, RadAcctServers} ->
@@ -56,5 +53,5 @@ init([]) ->
 	end,
 	NotifyBackends = RadiusBackendProcess ++ NotifyBackendProcess,
 
-	{ok, {SupFlags, [ListenerProcess, BackendProcess, StorageProcess, FileWriterProcess, NotifierProcess |NotifyBackends]}}.
+	{ok, {SupFlags, [ListenerProcess, BackendProcess, StorageProcess, FileWriterProcess | NotifyBackends]}}.
 

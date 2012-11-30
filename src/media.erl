@@ -66,7 +66,7 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, param
 
 	case proplists:get_value(acc, Params, none) of
 		none -> ok;
-		Acc -> gen_server:cast(rtpproxy_notifier, {Acc, C, M, NotifyInfo})
+		Acc -> rtpproxy_ctl:acc(Acc, C, M, NotifyInfo)
 	end,
 
 	{ok, #state{
@@ -116,7 +116,7 @@ handle_cast(
 	end,
 	case proplists:get_value(acc, Params, none) of
 		none -> ok;
-		Acc -> gen_server:cast(rtpproxy_notifier, {Acc, C, M, NotifyInfo})
+		Acc -> rtpproxy_ctl:acc(Acc, C, M, NotifyInfo)
 	end,
 	{noreply, State};
 
@@ -170,7 +170,7 @@ code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 terminate(Reason, #state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_info = NotifyInfo, copy = Copy}) ->
-	gen_server:cast(rtpproxy_notifier, {stop, C, M, NotifyInfo}),
+	rtpproxy_ctl:acc(stop, C, M, NotifyInfo),
 	case gproc:select({global,names}, [{{{n, g, {player, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
 		[] -> ok;
 		[PlayerPid] -> gen_server:cast(PlayerPid, stop)
@@ -203,5 +203,5 @@ handle_info({phy, {Ip, PortRtp, PortRtcp}}, #state{callid = C, mediaid = M, tag 
 	{noreply, State#state{cmd = null}};
 
 handle_info(interim_update, #state{callid = C, mediaid = M, notify_info = NotifyInfo} = State) ->
-	gen_server:cast(rtpproxy_notifier, {interim_update, C, M, NotifyInfo}),
+	rtpproxy_ctl:acc(interim_update, C, M, NotifyInfo),
 	{noreply, State}.
