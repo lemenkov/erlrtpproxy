@@ -18,70 +18,20 @@ start_link() ->
 	gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init(_) ->
-	{ok, RadAcctServers} = application:get_env(rtpproxy, radacct_servers),
 	eradius_dict:start(),
 	eradius_dict:load_tables(["dictionary", "dictionary_cisco", "dictionary_rfc2865", "dictionary_rfc2866"]),
 	eradius_acc:start(),
 	?MODULE = ets:new(?MODULE, [public, named_table]),
 	error_logger:info_msg("Started RADIUS backend at ~p~n", [node()]),
-	{ok, #rad_accreq{servers=RadAcctServers}}.
+	{ok, []}.
 
 handle_call(Message, From, State) ->
 	error_logger:warning_msg("Bogus call: ~p from ~p at ~p~n", [Message, From, node()]),
 	{reply, {error, unknown_call}, State}.
 
-handle_cast({start, CallId, MediaId, _}, State) ->
-	error_logger:info_msg("Got start from ~s ~p at ~p~n", [CallId, MediaId, node()]),
-	case ets:lookup(?MODULE, {CallId, MediaId}) of
-		[] ->
-			Req = State#rad_accreq{
-				login_time = os:timestamp(),
-				std_attrs=[{?Acct_Session_Id, CallId}],
-				vend_attrs = [{?Cisco, [{?h323_connect_time, date_time_fmt()}]}]
-			},
-			eradius_acc:acc_start(Req),
-			ets:insert_new(?MODULE, {{CallId, MediaId}, {Req, {0,0,0}}});
-		_ ->
-			% Already sent - discard
-			ok
-	end,
-	{noreply, State};
-
-handle_cast({interim_update, CallId, MediaId, _}, State) ->
-	error_logger:info_msg("Got interim update from ~s ~p at ~p~n", [CallId, MediaId, node()]),
-	case ets:lookup(?MODULE, {CallId, MediaId}) of
-		[{{CallId, MediaId}, {Req0, PrevTimestamp}}] ->
-			Timestamp = os:timestamp(),
-			case to_seconds(Timestamp) - to_seconds(PrevTimestamp) > 10 of
-				true ->
-					Login = to_now(Req0#rad_accreq.login_time),
-					SessTime = to_seconds(Timestamp) - to_seconds(Login),
-					eradius_acc:acc_update(Req0#rad_accreq{session_time = SessTime}),
-					ets:update_element(?MODULE, {CallId, MediaId}, {2, Timestamp});
-				_ ->
-					% A difference between two consequent updates was too short
-					ok
-			end;
-		_ ->
-			% Bogus - discard
-			ok
-	end,
-	{noreply, State};
-
-handle_cast({stop, CallId, MediaId, _}, State) ->
-	error_logger:info_msg("Got stop from ~s ~p at ~p~n", [CallId, MediaId, node()]),
-	case ets:lookup(?MODULE, {CallId, MediaId}) of
-		[{{CallId, MediaId}, {Req0, _}}] ->
-			Req1 = eradius_acc:set_logout_time(Req0),
-			Req2 = Req1#rad_accreq{
-				vend_attrs = [{?Cisco, [{?h323_disconnect_time, date_time_fmt()}]}]
-			},
-			eradius_acc:acc_stop(Req2),
-			ets:delete(?MODULE, {CallId, MediaId});
-		_ ->
-			% Bogus - discard
-			ok
-	end,
+handle_cast({Type, CallId, MediaId, _}, State) ->
+	error_logger:info_msg("Got ~p from ~s ~p at ~p~n", [Type, CallId, MediaId, node()]),
+	radius_process(Type, CallId, MediaId, ets:lookup(?MODULE, {CallId, MediaId})),
 	{noreply, State};
 
 handle_cast(stop, State) ->
@@ -105,6 +55,38 @@ terminate(Reason, _State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%
 %% Internal functions %%
 %%%%%%%%%%%%%%%%%%%%%%%%
+
+radius_process(start, CallId, MediaId, []) ->
+	{ok, RadAcctServers} = application:get_env(rtpproxy, radacct_servers),
+	Req = #rad_accreq{
+		servers = RadAcctServers,
+		login_time = os:timestamp(),
+		std_attrs=[{?Acct_Session_Id, CallId}],
+		vend_attrs = [{?Cisco, [{?h323_connect_time, date_time_fmt()}]}]
+	},
+	eradius_acc:acc_start(Req),
+	ets:insert_new(?MODULE, {{CallId, MediaId}, {Req, {0,0,0}}});
+radius_process(interim_update, CallId, MediaId, [{{CallId, MediaId}, {Req0, PrevTimestamp}}]) ->
+	Timestamp = os:timestamp(),
+	case to_seconds(Timestamp) - to_seconds(PrevTimestamp) > 10 of
+		true ->
+			Login = to_now(Req0#rad_accreq.login_time),
+			SessTime = to_seconds(Timestamp) - to_seconds(Login),
+			eradius_acc:acc_update(Req0#rad_accreq{session_time = SessTime}),
+			ets:update_element(?MODULE, {CallId, MediaId}, {2, Timestamp});
+		_ ->
+			% A difference between two consequent updates was too short
+			ok
+	end;
+radius_process(stop, CallId, MediaId, [{{CallId, MediaId}, {Req0, _}}]) ->
+	Req1 = eradius_acc:set_logout_time(Req0),
+	Req2 = Req1#rad_accreq{
+		vend_attrs = [{?Cisco, [{?h323_disconnect_time, date_time_fmt()}]}]
+	},
+	eradius_acc:acc_stop(Req2),
+	ets:delete(?MODULE, {CallId, MediaId});
+radius_process(_, _, _, _) ->
+	ok.
 
 date_time_fmt() ->
 	{{YYYY,MM,DD},{Hour,Min,Sec}} = erlang:localtime(),
