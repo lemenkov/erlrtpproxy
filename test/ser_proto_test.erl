@@ -774,6 +774,46 @@ parse_cmd_u_21_wrong_ipv6_test() ->
 		{error_syntax,{"Wrong IP","fe80::ff:ff:ff:ff%eth0"}},
 		ser_proto:decode(<<"3898_5 USc0 2-1649@fe80::ff:ff:ff:ff%eth0 fe80::ff:ff:ff:ff%eth0 6000 1649SIPpTag002;1">>)).
 
+parse_cmd_u_22_param_remote_test() ->
+	?assertEqual(
+		#cmd{
+			type = ?CMD_U,
+			cookie = <<"15312_107">>,
+			origin = #origin{type = ser, pid = self()},
+			callid = <<"cd74de9d-b4e5-1230-a7a2-000c29a5a46b">>,
+			mediaid = <<"1">>,
+			from = #party{tag = <<"gQpjBN9QKZSBQ">>, addr = {{192,0,43,10},16834}, rtcpaddr = {{192,0,43,10},16835}},
+			to = #party{tag = <<>>},
+			params = [
+				{codecs,[{'PCMA',8000,1},101,{'CN',8000,1}]},
+				{direction, {external, external}},
+				{notify, [{addr,{{192,168,14,25},9999}}, {tag, <<"632.180216664">>}]},
+				{remote,{10,200,200,13}},
+				{symmetric, true},
+				{transcode,{'G729',8000,1}}
+			]
+		}, ser_proto:decode(<<"15312_107 Ut18R10.200.200.13c8,101,13 cd74de9d-b4e5-1230-a7a2-000c29a5a46b 192.0.43.10 16834 gQpjBN9QKZSBQ;1 ;1 192.168.14.25:9999 632.180216664">>)).
+
+parse_cmd_u_23_param_local_test() ->
+	?assertEqual(
+		#cmd{
+			type = ?CMD_U,
+			cookie = <<"15312_107">>,
+			origin = #origin{type = ser, pid = self()},
+			callid = <<"cd74de9d-b4e5-1230-a7a2-000c29a5a46b">>,
+			mediaid = <<"1">>,
+			from = #party{tag = <<"gQpjBN9QKZSBQ">>, addr = {{192,0,43,10},16834}, rtcpaddr = {{192,0,43,10},16835}},
+			to = #party{tag = <<>>},
+			params = [
+				{codecs,[{'PCMA',8000,1},101,{'CN',8000,1}]},
+				{direction, {external, external}},
+				{local,{10,200,200,13}},
+				{notify, [{addr,{{192,168,14,25},9999}}, {tag, <<"632.180216664">>}]},
+				{symmetric, true},
+				{transcode,{'G729',8000,1}}
+			]
+		}, ser_proto:decode(<<"15312_107 Ut18l10.200.200.13c8,101,13 cd74de9d-b4e5-1230-a7a2-000c29a5a46b 192.0.43.10 16834 gQpjBN9QKZSBQ;1 ;1 192.168.14.25:9999 632.180216664">>)).
+
 cmd_l_test_() ->
 	Cmd1 = #cmd{
 			type = ?CMD_L,

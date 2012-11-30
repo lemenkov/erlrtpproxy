@@ -560,10 +560,28 @@ decode_params([$I|Rest], Result) ->
 	decode_params(Rest, ensure_alone(Result, direction, {internal, internal}));
 % l - local address (?)
 decode_params([$L|Rest], Result) ->
-	decode_params(Rest, ensure_alone(Result, local));
+	case string:span(Rest, "0123456789.") of
+		0 ->
+			% Bogus - skip incomplete modifier
+			error_logger:error_msg("Found L parameter w/o necessary values - skipping~n"),
+			decode_params(Rest, Result);
+		Ret ->
+			Rest1 = string:substr(Rest, Ret + 1),
+			{IpAddr, _} = parse_addr(string:substr(Rest, 1, Ret), "0"),
+			decode_params(Rest1, ensure_alone(Result, local, IpAddr))
+	end;
 % r - remote address (?)
 decode_params([$R|Rest], Result) ->
-	decode_params(Rest, ensure_alone(Result, remote));
+	case string:span(Rest, "0123456789.") of
+		0 ->
+			% Bogus - skip incomplete modifier
+			error_logger:error_msg("Found R parameter w/o necessary values - skipping~n"),
+			decode_params(Rest, Result);
+		Ret ->
+			Rest1 = string:substr(Rest, Ret + 1),
+			{IpAddr, _} = parse_addr(string:substr(Rest, 1, Ret), "0"),
+			decode_params(Rest1, ensure_alone(Result, remote, IpAddr))
+	end;
 % Symmetric
 decode_params([$S|Rest], Result) ->
 	decode_params(Rest, ensure_alone(Result, symmetric));
