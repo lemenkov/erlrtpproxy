@@ -29,7 +29,7 @@ init([]) ->
 
 	% Load protocol backend (only SER is supported)
 	BackendProcess = case application:get_env(rtpproxy, backend) of
-		{ok, ser} -> ?CHILD(backend_ser, ser)
+		{ok, ser} -> ?CHILD(backend_ser)
 	end,
 
 	% Load storage for mmap-ed files
