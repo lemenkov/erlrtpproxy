@@ -46,8 +46,8 @@ init([]) ->
 			[]
 	end,
 	NotifyBackendProcess = case application:get_env(rtpproxy, notify_servers) of
-		{ok, NotifyServers} ->
-			[?CHILD(rtpproxy_notifier_backend_notify, NotifyServers)];
+		{ok, _} ->
+			[?CHILD(rtpproxy_notifier_backend_notify)];
 		_ ->
 			[]
 	end,

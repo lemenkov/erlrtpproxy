@@ -2,7 +2,7 @@
 
 -behaviour(gen_server).
 
--export([start_link/1]).
+-export([start_link/0]).
 -export([init/1]).
 -export([handle_call/3]).
 -export([handle_cast/2]).
@@ -10,25 +10,42 @@
 -export([code_change/3]).
 -export([terminate/2]).
 
-start_link(Args) ->
-	gen_server:start_link({local, ?MODULE}, ?MODULE, Args, []).
+start_link() ->
+	gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-init(tcp) ->
-	error_logger:info_msg("Started rtpproxy notify protocol backend (TCP) at ~p~n", [node()]),
-	{ok, {tcp, []}};
-init(udp) ->
-	{ok, Fd} = gen_udp:open(0, [binary, {active, true}]),
-	error_logger:info_msg("Started rtpproxy notify protocol backend (UDP) at ~p~n", [node()]),
-	{ok, {udp, Fd}}.
+init(_) ->
+	case application:get_env(rtpproxy, notify_servers) of
+		{ok, tcp} ->
+			error_logger:info_msg("Started rtpproxy notify protocol backend (TCP) at ~p~n", [node()]),
+			{ok, {tcp, []}};
+		{ok, udp} ->
+			{ok, Fd} = gen_udp:open(0, [binary, {active, true}]),
+			error_logger:info_msg("Started rtpproxy notify protocol backend (UDP) at ~p~n", [node()]),
+			{ok, {udp, Fd}}
+	end.
 
 handle_call(Message, From, State) ->
 	error_logger:warning_msg("Bogus call: ~p from ~p at ~p~n", [Message, From, node()]),
 	{reply, {error, unknown_call}, State}.
 
 handle_cast({Type, _, _, [{addr,{Ip,Port}},{tag,NotifyTag}]}, {tcp, FdSet}) ->
-	% FIXME
-	error_logger:info_msg("Message (~p) delivered from ~p to ~s:~b~n", [Type, node(), inet_parse:ntoa(Ip), Port]),
-	{noreply, {tcp, FdSet}};
+	{Fd, NewFdSet} = case proplists:get_value({Ip,Port}, FdSet, null) of
+		null ->
+			{ok, F} = gen_tcp:connect(Ip, Port, [binary, {active, true}]),
+			{F, FdSet ++ [{{Ip,Port}, F}]};
+		F ->
+			{F, FdSet}
+	end,
+	case gen_tcp:send(Fd, NotifyTag) of
+		ok ->
+			error_logger:info_msg("Message (~p) delivered from ~p to ~s:~b~n", [Type, node(), inet_parse:ntoa(Ip), Port]),
+			{noreply, {tcp, NewFdSet}};
+		{error, E} ->
+			error_logger:info_msg("Message (~p) delivered from ~p CANNOT be sent to ~s:~b due to ~p~n", [Type, node(), inet_parse:ntoa(Ip), Port, E]),
+			gen_tcp:close(Fd),
+			{noreply, {tcp, lists:delete({{Ip,Port}, Fd}, NewFdSet)}}
+	end;
+
 handle_cast({Type, _, _, [{addr,{Ip,Port}},{tag,NotifyTag}]}, {udp, Fd}) ->
 	gen_udp:send(Fd, Ip, Port, NotifyTag),
 	error_logger:info_msg("Message (~p) delivered from ~p to ~s:~b~n", [Type, node(), inet_parse:ntoa(Ip), Port]),
@@ -49,7 +66,7 @@ code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 terminate(Reason, {tcp, FdSet}) ->
-	lists:map(fun(X) -> gen_tcp:close(X) end, FdSet),
+	lists:map(fun({_Addr,X}) -> gen_tcp:close(X) end, FdSet),
 	error_logger:error_msg("Terminated: ~p at ~p~n", [Reason, node()]),
 	ok;
 terminate(Reason, {udp, Fd}) ->
