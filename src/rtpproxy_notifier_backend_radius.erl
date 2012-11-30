@@ -2,7 +2,7 @@
 
 -behaviour(gen_server).
 
--export([start_link/1]).
+-export([start_link/0]).
 -export([init/1]).
 -export([handle_call/3]).
 -export([handle_cast/2]).
@@ -14,10 +14,11 @@
 -include_lib("eradius/include/dictionary_cisco.hrl").
 -include_lib("eradius/include/dictionary_rfc2866.hrl").
 
-start_link(Args) ->
-	gen_server:start_link({local, ?MODULE}, ?MODULE, Args, []).
+start_link() ->
+	gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-init([RadAcctServers]) ->
+init(_) ->
+	{ok, RadAcctServers} = application:get_env(rtpproxy, radacct_servers),
 	eradius_dict:start(),
 	eradius_dict:load_tables(["dictionary", "dictionary_cisco", "dictionary_rfc2865", "dictionary_rfc2866"]),
 	eradius_acc:start(),

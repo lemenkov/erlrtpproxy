@@ -40,8 +40,8 @@ init([]) ->
 
 	% Check and load (if configured) notification backends
 	RadiusBackendProcess = case application:get_env(rtpproxy, radacct_servers) of
-		{ok, RadAcctServers} ->
-			[?CHILD(rtpproxy_notifier_backend_radius, [RadAcctServers])];
+		{ok, _} ->
+			[?CHILD(rtpproxy_notifier_backend_radius)];
 		_ ->
 			[]
 	end,
