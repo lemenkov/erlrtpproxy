@@ -119,3 +119,110 @@ rtpproxy_notifier_backend_notify_udp_test_() ->
 			}
 		]
 	}.
+
+rtpproxy_notifier_backend_notify_tcp_test_() ->
+
+	%%
+	%% This is the socket which will be used for receiving notifications messages
+	%%
+
+	{ok, Fd} = gen_tcp:listen(0, [{active, false}, binary]),
+	{ok, {_, Port}} = inet:sockname(Fd),
+	% Common notification info
+	CallId = <<"smaalefzrxxfrqw@localhost.localdomain-0">>,
+	MediaId = <<"0">>,
+	NotifyTag = <<"27124048">>,
+	NotifyInfo = [{addr, {?RTPPROXY_IP, Port}}, {tag, NotifyTag}],
+
+	{setup,
+		fun() ->
+				%%
+				%% Set node name
+				%%
+
+				net_kernel:start(['rtpproxy_notifier_test@localhost', longnames]),
+
+				%%
+				%% Set necessary options
+				%% (normally we'll set them in the /etc/erlrtpproxy.config
+				%%
+
+				%% Set up backend's type (SER for now)
+				application:set_env(rtpproxy, backend, ser),
+
+				%% Options for SER backend
+				application:set_env(rtpproxy, listen, {udp, "127.0.0.1", ?RTPPROXY_PORT}),
+
+				%% Options for notification backend
+				application:unset_env(rtpproxy, radacct_servers),
+				application:set_env(rtpproxy, notify_servers, tcp),
+				application:set_env(rtpproxy, ignore_start, true),
+				application:set_env(rtpproxy, ignore_stop, false),
+
+				%% Options for rtpproxy itself
+				application:set_env(rtpproxy, external, ?RTPPROXY_IP),
+				application:set_env(rtpproxy, ttl, 105000),
+				application:set_env(rtpproxy, rebuildrtp, false),
+
+				%%
+				%% Start socket accepting thread
+				%%
+
+				spawn(fun() ->
+							ets:new(rtpproxy_notifier_backend_notify_tcp_test_ets, [public, named_table]),
+							accept(Fd)
+					end),
+
+				%%
+				%% Start rtpproxy
+				%%
+
+				rtpproxy_ctl:start()
+		end,
+		fun (_) ->
+				gen_tcp:close(Fd),
+
+				%%
+				%% Stop rtpproxy
+				%%
+
+				rtpproxy_ctl:stop()
+		end,
+		[
+			{"Test start notification (should be filtered)",
+				fun() ->
+						rtpproxy_ctl:acc(start, CallId, MediaId, NotifyInfo),
+						% Poor man synchronization object
+						timer:sleep(100),
+						% No attempts to connect
+						?assertEqual([],  ets:lookup(rtpproxy_notifier_backend_notify_tcp_test_ets, fd))
+				end
+			},
+			{"Test stop notification",
+				fun() ->
+						rtpproxy_ctl:acc(stop, CallId, MediaId, NotifyInfo),
+						% Poor man synchronization object
+						timer:sleep(100),
+						% We have a connection - let's tr to read from it
+						[{fd,ActiveFd}] = ets:lookup(rtpproxy_notifier_backend_notify_tcp_test_ets, fd),
+						{ok, Answer} = gen_tcp:recv(ActiveFd, 0, 1000),
+						?assertEqual(NotifyTag, Answer)
+				end
+			}
+		]
+	}.
+
+accept(Fd) ->
+	case gen_tcp:accept(Fd) of
+		{ok, Socket} ->
+			ets:insert_new(rtpproxy_notifier_backend_notify_tcp_test_ets, {fd, Socket}),
+			accept(Fd);
+		_ ->
+			case ets:lookup(rtpproxy_notifier_backend_notify_tcp_test_ets, fd) of
+				[{fd,ActiveFd}] ->
+					gen_tcp:close(ActiveFd);
+				_ ->
+					ok
+			end,
+			ets:delete(rtpproxy_notifier_backend_notify_tcp_test_ets)
+	end.
