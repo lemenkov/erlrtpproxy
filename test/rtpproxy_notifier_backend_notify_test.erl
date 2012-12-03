@@ -28,7 +28,7 @@
 %%%
 %%%----------------------------------------------------------------------
 
--module(rtpproxy_notifier_test).
+-module(rtpproxy_notifier_backend_notify_test).
 
 -include_lib("eunit/include/eunit.hrl").
 
