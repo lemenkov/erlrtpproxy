@@ -72,7 +72,7 @@ rtpproxy_notifier_backend_notify_udp_test_() ->
 				application:set_env(rtpproxy, listen, {udp, "127.0.0.1", ?RTPPROXY_PORT}),
 
 				%% Options for notification backend
-				%application:set_env(rtpproxy, radacct_servers, [[{127,0,0,1},1813,"testradacctpass"]]),
+				application:unset_env(rtpproxy, radacct_servers),
 				application:set_env(rtpproxy, notify_servers, udp),
 				application:set_env(rtpproxy, ignore_start, true),
 				application:set_env(rtpproxy, ignore_stop, true),
