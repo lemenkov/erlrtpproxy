@@ -170,7 +170,7 @@ rtpproxy_notifier_backend_notify_tcp_test_() ->
 
 				spawn(fun() ->
 							ets:new(rtpproxy_notifier_backend_notify_tcp_test_ets, [public, named_table]),
-							accept(Fd)
+							accept(rtpproxy_notifier_backend_notify_tcp_test_ets, Fd)
 					end),
 
 				%%
@@ -212,17 +212,129 @@ rtpproxy_notifier_backend_notify_tcp_test_() ->
 		]
 	}.
 
-accept(Fd) ->
+rtpproxy_notifier_backend_notify_tcp_two_addresses_test_() ->
+
+	%%
+	%% This is the socket which will be used for receiving notifications messages
+	%%
+
+	%% First subscriber
+	{ok, Fd1} = gen_tcp:listen(0, [{active, false}, binary]),
+	{ok, {_, Port1}} = inet:sockname(Fd1),
+
+	%% Second subscriber
+	{ok, Fd2} = gen_tcp:listen(0, [{active, false}, binary]),
+	{ok, {_, Port2}} = inet:sockname(Fd2),
+
+	{setup,
+		fun() ->
+				%%
+				%% Set node name
+				%%
+
+				net_kernel:start(['rtpproxy_notifier_test@localhost', longnames]),
+
+				%%
+				%% Set necessary options
+				%% (normally we'll set them in the /etc/erlrtpproxy.config
+				%%
+
+				%% Set up backend's type (SER for now)
+				application:set_env(rtpproxy, backend, ser),
+
+				%% Options for SER backend
+				application:set_env(rtpproxy, listen, {udp, "127.0.0.1", ?RTPPROXY_PORT}),
+
+				%% Options for notification backend
+				application:unset_env(rtpproxy, radacct_servers),
+				application:set_env(rtpproxy, notify_servers, tcp),
+				application:set_env(rtpproxy, ignore_start, true),
+				application:set_env(rtpproxy, ignore_stop, false),
+
+				%% Options for rtpproxy itself
+				application:set_env(rtpproxy, external, ?RTPPROXY_IP),
+				application:set_env(rtpproxy, ttl, 105000),
+				application:set_env(rtpproxy, rebuildrtp, false),
+
+				%%
+				%% Start two simultaneous socket accepting thread
+				%%
+
+				spawn(fun() ->
+							ets:new(rtpproxy_notifier_backend_notify_tcp_test_1_ets, [public, named_table]),
+							accept(rtpproxy_notifier_backend_notify_tcp_test_1_ets, Fd1)
+					end),
+
+				spawn(fun() ->
+							ets:new(rtpproxy_notifier_backend_notify_tcp_test_2_ets, [public, named_table]),
+							accept(rtpproxy_notifier_backend_notify_tcp_test_2_ets, Fd2)
+					end),
+
+				%%
+				%% Start rtpproxy
+				%%
+
+				rtpproxy_ctl:start()
+		end,
+		fun (_) ->
+				gen_tcp:close(Fd1),
+				gen_tcp:close(Fd2),
+
+				%%
+				%% Stop rtpproxy
+				%%
+
+				rtpproxy_ctl:stop()
+		end,
+		[
+			{"Test stop notification to the first subscriber",
+				fun() ->
+						% Common notification info
+						CallId = <<"smaalefzrxxfrqw@localhost.localdomain-0__1">>,
+						MediaId = <<"0">>,
+						NotifyTag = <<"27124048_1">>,
+						NotifyInfo = [{addr, {?RTPPROXY_IP, Port1}}, {tag, NotifyTag}],
+
+						rtpproxy_ctl:acc(stop, CallId, MediaId, NotifyInfo),
+						% Poor man synchronization object
+						timer:sleep(100),
+						% We have a connection - let's tr to read from it
+						[{fd,ActiveFd}] = ets:lookup(rtpproxy_notifier_backend_notify_tcp_test_1_ets, fd),
+						{ok, Answer} = gen_tcp:recv(ActiveFd, 0, 1000),
+						?assertEqual(NotifyTag, Answer)
+				end
+			},
+			{"Test stop notification to the second subscriber",
+				fun() ->
+						% Common notification info
+						CallId = <<"smaalefzrxxfrqw@localhost.localdomain-0__2">>,
+						MediaId = <<"0">>,
+						NotifyTag = <<"27124048_2">>,
+						NotifyInfo = [{addr, {?RTPPROXY_IP, Port2}}, {tag, NotifyTag}],
+
+						rtpproxy_ctl:acc(stop, CallId, MediaId, NotifyInfo),
+						% Poor man synchronization object
+						timer:sleep(100),
+						% We have a connection - let's tr to read from it
+						[{fd,ActiveFd}] = ets:lookup(rtpproxy_notifier_backend_notify_tcp_test_2_ets, fd),
+						{ok, Answer} = gen_tcp:recv(ActiveFd, 0, 1000),
+						?assertEqual(NotifyTag, Answer)
+				end
+			}
+		]
+	}.
+
+accept(Ets, Fd) ->
 	case gen_tcp:accept(Fd) of
 		{ok, Socket} ->
-			ets:insert_new(rtpproxy_notifier_backend_notify_tcp_test_ets, {fd, Socket}),
-			accept(Fd);
+			ets:insert_new(Ets, {fd, Socket}),
+			accept(Ets, Fd);
 		_ ->
-			case ets:lookup(rtpproxy_notifier_backend_notify_tcp_test_ets, fd) of
+			case ets:lookup(Ets, fd) of
 				[{fd,ActiveFd}] ->
 					gen_tcp:close(ActiveFd);
 				_ ->
 					ok
 			end,
-			ets:delete(rtpproxy_notifier_backend_notify_tcp_test_ets)
+			ets:delete(Ets)
 	end.
