@@ -55,8 +55,16 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, param
 	% Register itself for group call and broadcast commands
 	gproc:add_global_property(media, {id, C, M}),
 
-	% FIXME
-	{ok, I} = application:get_env(rtpproxy, external),
+	Ip = case {proplists:get_value(local, Params), proplists:get_value(remote, Params)} of
+		{undefined, undefined} ->
+			{ok, I} = application:get_env(rtpproxy, external), I;
+		{undefined, {_,_,_,_}} ->
+			{ok, I} = application:get_env(rtpproxy, external), I;
+		{{_,_,_,_}, undefined} ->
+%			{ok, I} = application:get_env(rtpproxy, internal), I <- FIXME
+			{ok, I} = application:get_env(rtpproxy, external), I
+	end,
+
 	{ok, RebuildRtp} = application:get_env(rtpproxy, rebuildrtp),
 	{ok, Pid} = gen_rtp_channel:open(0, Params ++ [{ip, I}, {rebuildrtp, RebuildRtp}]),
 
