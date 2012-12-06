@@ -45,7 +45,6 @@
 	}
 ).
 
-
 start(Cmd) ->
 	gen_server:start(?MODULE, [Cmd], []).
 
@@ -156,9 +155,9 @@ handle_cast(#cmd{type = ?CMD_S, callid = C, mediaid = M, to = #party{tag = T}}, 
 	end,
 	{noreply, State#state{hold = false}};
 
-handle_cast({'music-on-hold', Type, Payload}, #state{rtp = Pid, callid = C, mediaid = M, tag = T, copy = Copy} = State) ->
-	gen_server:cast(Pid, {{Type, Payload}, null, null}),
-	Copy andalso gen_server:cast(file_writer, {{Type, Payload}, C, M, T}),
+handle_cast({'music-on-hold', Type, Payload, Timestamp}, #state{rtp = Pid, callid = C, mediaid = M, tag = T, copy = Copy} = State) ->
+	gen_server:cast(Pid, {{Type, Payload, Timestamp}, null, null}),
+	Copy andalso gen_server:cast(file_writer, {{Type, Payload, Timestamp}, C, M, T}),
 	{noreply, State};
 
 handle_cast({Pkt, null, null}, #state{rtp = Pid, hold = false, callid = C, mediaid = M, tag = T, copy = Copy} = State) ->
@@ -189,7 +188,7 @@ terminate(Reason, #state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	?ERR("terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
-handle_info({{Type, _} = Pkt, _Ip, _Port}, #state{callid = C, mediaid = M, tag = T} = State) ->
+handle_info({{Type, _, _} = Pkt, _Ip, _Port}, #state{callid = C, mediaid = M, tag = T} = State) ->
 	case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
 		[] -> ok;
 		[Pid] -> gen_server:cast(Pid, {Pkt, null, null})

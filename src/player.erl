@@ -42,7 +42,8 @@
 		type,
 		ssize,
 		sn = 0,
-		repeats = 0
+		repeats = 0,
+		starttime
 	}
 ).
 
@@ -77,7 +78,8 @@ init([CallId, MediaId, Tag, PayloadInfo]) ->
 			data	= {Fd, Size},
 			type	= Type,
 			ssize	= FrameLength,
-			repeats = Playcount
+			repeats = Playcount,
+			starttime = begin {MegaSecs, Secs, _} = os:timestamp(), MegaSecs*1000000000 + Secs*1000  end
 		}
 	}.
 
@@ -100,7 +102,7 @@ terminate(Reason, #state{tref = TRef}) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	?ERR("player terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
-handle_info(send, #state{callid = C, mediaid = M, tag = T, sn = SequenceNumber, type = Type, ssize = FrameLength, data = {Fd, Size}} = State) ->
+handle_info(send, #state{callid = C, mediaid = M, tag = T, sn = SequenceNumber, type = Type, ssize = FrameLength, data = {Fd, Size}, starttime = ST} = State) ->
 	case gproc:select({global,names}, [{{{n,g,{media, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
 		[] ->
 			{noreply, State};
@@ -112,7 +114,8 @@ handle_info(send, #state{callid = C, mediaid = M, tag = T, sn = SequenceNumber, 
 				_ -> P rem Length
 			end,
 			{ok, Payload} = file:pread(Fd, Position, FrameLength),
-			gen_server:cast(Pid, {'music-on-hold', Type, Payload}),
+			Timestamp = rtp_utils:mktimestamp(Type, ST),
+			gen_server:cast(Pid, {'music-on-hold', Type, Payload, Timestamp}),
 			{noreply, State#state{sn = SequenceNumber + 1}}
 	end;
 

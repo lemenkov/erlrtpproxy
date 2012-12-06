@@ -43,7 +43,7 @@ handle_call(Request, _From, State) ->
 	error_logger:warning_msg("File Writer: strange call [~p]", [Request]),
 	{reply, ok, State}.
 
-handle_cast({{Type, Payload}, CallId, MediaId, Tag}, Ets) ->
+handle_cast({{Type, Payload, _}, CallId, MediaId, Tag}, Ets) ->
 	Fd = case ets:lookup(Ets, {CallId, MediaId, Tag}) of
 		[] ->
 			Filename = "/tmp/capture_cid_" ++ to_list(CallId) ++ "_mid_" ++ to_list(MediaId) ++ "_tag_" ++ to_list(Tag) ++ "." ++ to_list(Type),
