@@ -32,7 +32,9 @@ dispatch(Req) ->
 					JSON = "{hello:\"html\"}",
 					Req:respond({200, [], JSON});
 				["json" | Rest] ->
-					JSON = "{hello:\"stats\"}",
+					Length = length(gproc:lookup_global_properties(media)) div 2,
+					Calls = {struct,drop_dupes(lists:map(fun({_,{id,CallId,MediaId}}) -> {call, [{callid, CallId}, {mediaid, MediaId}]} end, gproc:lookup_global_properties(media)))},
+					JSON = mochijson2:encode({struct, [{callnum, Length}, {calls, Calls}]}),
 					Req:respond({200, [], JSON});
 				_ ->
 					error_logger:warning_msg("UNKNOWN: ~p~n", [Path]),
@@ -42,3 +44,13 @@ dispatch(Req) ->
 			Headers = [{"Allow", "GET"}],
 			Req:respond({405, Headers, "405 Method Not Allowed\r\n"})
 	end.
+
+drop_dupes(List) ->
+	drop_dupes(lists:sort(List), []).
+
+drop_dupes([], List) ->
+	List;
+drop_dupes([{A, B}, {A, B} | Rest], Ret) ->
+	drop_dupes([{A, B} | Rest], Ret);
+drop_dupes([{A, B} | Rest], Ret) ->
+	drop_dupes(Rest, Ret ++ [{A,B}]).
