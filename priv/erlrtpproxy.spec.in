@@ -27,6 +27,7 @@ Requires:	erlang-emmap
 Requires:	erlang-eradius >= 0.8.5
 Requires:	erlang-erlsyslog
 Requires:	erlang-gproc
+Requires:	erlang-mochiweb
 Requires:	erlang-rtplib >= 0.5.17
 Requires(post): /sbin/chkconfig
 Requires(preun): /sbin/chkconfig

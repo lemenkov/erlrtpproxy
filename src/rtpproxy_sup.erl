@@ -53,5 +53,9 @@ init([]) ->
 	end,
 	NotifyBackends = RadiusBackendProcess ++ NotifyBackendProcess,
 
-	{ok, {SupFlags, [ListenerProcess, BackendProcess, StorageProcess, FileWriterProcess | NotifyBackends]}}.
+	% Load stats backend
+	{ok, StatsPort} = application:get_env(rtpproxy, stats_port),
+	StatsProcess = ?CHILD(mochiweb_http, [[{loop, {stats, dispatch}}, {port, StatsPort}, {name, stats}]]),
+
+	{ok, {SupFlags, [ListenerProcess, BackendProcess, StatsProcess, StorageProcess, FileWriterProcess | NotifyBackends]}}.
 
