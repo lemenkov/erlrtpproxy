@@ -157,12 +157,12 @@ handle_cast(#cmd{type = ?CMD_S, callid = C, mediaid = M, to = #party{tag = T}}, 
 	end,
 	{noreply, State#state{hold = false}};
 
-handle_cast({'music-on-hold', Type, Payload, Timestamp}, #state{rtp = Pid, callid = C, mediaid = M, tag = T, copy = Copy} = State) ->
-	gen_server:cast(Pid, {{Type, Payload, Timestamp}, null, null}),
-	Copy andalso gen_server:cast(file_writer, {{Type, Payload, Timestamp}, C, M, T}),
+handle_cast({'music-on-hold', Pkt}, #state{rtp = Pid, callid = C, mediaid = M, tag = T, copy = Copy} = State) ->
+	gen_server:cast(Pid, {Pkt, null, null}),
+	Copy andalso gen_server:cast(file_writer, {Pkt, C, M, T}),
 	{noreply, State};
 
-handle_cast({Pkt, null, null}, #state{rtp = Pid, hold = false, callid = C, mediaid = M, tag = T, copy = Copy} = State) ->
+handle_cast({Pkt, _Ip, _Port}, #state{rtp = Pid, hold = false, callid = C, mediaid = M, tag = T, copy = Copy} = State) ->
 	gen_server:cast(Pid, {Pkt, null, null}),
 	Copy andalso gen_server:cast(file_writer, {Pkt, C, M, T}),
 	{noreply, State};

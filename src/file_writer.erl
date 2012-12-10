@@ -30,6 +30,7 @@
 -export([code_change/3]).
 -export([terminate/2]).
 
+-include_lib("rtplib/include/rtp.hrl").
 
 start_link() ->
 	gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -43,6 +44,8 @@ handle_call(Request, _From, State) ->
 	error_logger:warning_msg("File Writer: strange call [~p]", [Request]),
 	{reply, ok, State}.
 
+handle_cast({#rtp{payload_type = Type, payload = Payload, timestamp = Timestamp}, CallId, MediaId, Tag}, Ets) ->
+	handle_cast({{Type, Payload, Timestamp}, CallId, MediaId, Tag}, Ets);
 handle_cast({{Type, Payload, _}, CallId, MediaId, Tag}, Ets) ->
 	Fd = case ets:lookup(Ets, {CallId, MediaId, Tag}) of
 		[] ->
