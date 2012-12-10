@@ -26,8 +26,18 @@ dispatch(Req) ->
 	case Req:get(method) of
 		'GET' ->
 			% Build JSON
-			JSON = "{hello:\"stats\"}",
-			Req:respond({200, [], JSON});
+			Path = Req:get(path),
+			case string:tokens(Path, "/") of
+				["html" | Rest] ->
+					JSON = "{hello:\"stats\"}",
+					Req:respond({200, [], JSON});
+				["json" | Rest] ->
+					JSON = "{hello:\"stats\"}",
+					Req:respond({200, [], JSON});
+				_ ->
+					error_logger:warning_msg("UNKNOWN: ~p~n", [Path]),
+					Req:respond({404, [], "404 Not found\r\n"})
+			end;
 		_ ->
 			Headers = [{"Allow", "GET"}],
 			Req:respond({405, Headers, "405 Method Not Allowed\r\n"})
