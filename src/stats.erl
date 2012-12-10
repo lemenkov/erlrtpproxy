@@ -33,8 +33,24 @@ dispatch(Req) ->
 					Req:respond({200, [], JSON});
 				["json" | Rest] ->
 					Length = length(gproc:lookup_global_properties(media)) div 2,
-					Calls = {struct,drop_dupes(lists:map(fun({_,{id,CallId,MediaId}}) -> {call, [{callid, CallId}, {mediaid, MediaId}]} end, gproc:lookup_global_properties(media)))},
-					JSON = mochijson2:encode({struct, [{callnum, Length}, {calls, Calls}]}),
+					Calls = {struct,
+						drop_dupes(
+							lists:map(
+							fun({_,{id,CallId,MediaId}}) ->
+								{call, [{callid, CallId}, {mediaid, MediaId}]}
+							end,
+							gproc:lookup_global_properties(media))
+						)
+					},
+					Phys = {struct,
+						lists:map(
+							fun({_,{id, C, M, T, Ip, PortRtp, PortRtcp}}) ->
+								{phy, [{callid, C}, {mediaid, M}, {tag, T}, {localip, list_to_binary(inet_parse:ntoa(Ip))}, {localrtp, PortRtp}, {localrtcp, PortRtcp}]}
+							end,
+							gproc:lookup_global_properties(phy)
+						)
+					},
+					JSON = mochijson2:encode({struct, [{callnum, Length}, {calls, Calls}, {phys, Phys}]}),
 					Req:respond({200, [], JSON});
 				_ ->
 					error_logger:warning_msg("UNKNOWN: ~p~n", [Path]),
