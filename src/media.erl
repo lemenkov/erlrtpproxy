@@ -65,7 +65,7 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, param
 	end,
 
 	{ok, RebuildRtp} = application:get_env(rtpproxy, rebuildrtp),
-	{ok, Pid} = gen_rtp_channel:open(0, Params ++ [{ip, I}, {rebuildrtp, RebuildRtp}]),
+	{ok, Pid} = gen_rtp_channel:open(0, Params ++ [{ip, I}, {rebuildrtp, RebuildRtp}, {timeout, 75000}]),
 
 	NotifyInfo = proplists:get_value(notify, Params, []),
 
