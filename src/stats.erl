@@ -29,7 +29,7 @@ dispatch(Req) ->
 			Path = Req:get(path),
 			case string:tokens(Path, "/") of
 				["html" | Rest] ->
-					JSON = "{hello:\"stats\"}",
+					JSON = "{hello:\"html\"}",
 					Req:respond({200, [], JSON});
 				["json" | Rest] ->
 					JSON = "{hello:\"stats\"}",
