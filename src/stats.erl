@@ -32,41 +32,13 @@ dispatch(Req) ->
 					JSON = "{hello:\"html\"}",
 					Req:respond({200, [], JSON});
 				["json" | Rest] ->
-					Length = length(gproc:lookup_global_properties(media)) div 2,
-					Calls = {struct,
-						drop_dupes(
-							lists:map(
-							fun({_,{id,CallId,MediaId}}) ->
-								{call, [{callid, CallId}, {mediaid, MediaId}]}
-							end,
-							gproc:lookup_global_properties(media))
-						)
-					},
-					LocalPhys = {struct,
-						lists:map(
-							fun({_,{C, M, T, Ip, PortRtp, PortRtcp}}) ->
-								{phy, [{callid, C}, {mediaid, M}, {tag, T}, {ip, list_to_binary(inet_parse:ntoa(Ip))}, {rtp, PortRtp}, {rtcp, PortRtcp}]}
-							end,
-							gproc:lookup_global_properties(local)
-						)
-					},
-					RemotePhys = {struct,
-						lists:map(
-							fun({_,{C, M, T, Ip, PortRtp, PortRtcp}}) ->
-								{phy, [{callid, C}, {mediaid, M}, {tag, T}, {ip, list_to_binary(inet_parse:ntoa(Ip))}, {rtp, PortRtp}, {rtcp, PortRtcp}]}
-							end,
-							gproc:lookup_global_properties(remote)
-						)
-					},
-					Payloads = {struct,
-						lists:map(
-							fun({_,{C, M, T, Type}}) ->
-								{media, [{callid, C}, {mediaid, M}, {tag, T}, {payload_type, Type}]}
-							end,
-							gproc:lookup_global_properties(payload_type)
-						)
-					},
-					JSON = mochijson2:encode({struct, [{callnum, Length}, {calls, Calls}, {remotephys, RemotePhys}, {localphys, LocalPhys}, {payloads, Payloads}]}),
+					JSON = case Req:parse_qs() of
+						[] -> dump_all();
+						Query ->
+							error_logger:warning_msg("Query: ~p~n", [Query]),
+							[]
+					end,
+
 					Req:respond({200, [], JSON});
 				_ ->
 					error_logger:warning_msg("UNKNOWN: ~p~n", [Path]),
@@ -77,9 +49,45 @@ dispatch(Req) ->
 			Req:respond({405, Headers, "405 Method Not Allowed\r\n"})
 	end.
 
+dump_all() ->
+	Length = length(gproc:lookup_global_properties(media)) div 2,
+	Calls = {struct,
+		drop_dupes(
+			lists:map(
+			fun({_,{id,CallId,MediaId}}) ->
+				{call, [{callid, CallId}, {mediaid, MediaId}]}
+			end,
+			gproc:lookup_global_properties(media))
+		)
+	},
+	LocalPhys = {struct,
+		lists:map(
+			fun({_,{C, M, T, Ip, PortRtp, PortRtcp}}) ->
+				{phy, [{callid, C}, {mediaid, M}, {tag, T}, {ip, list_to_binary(inet_parse:ntoa(Ip))}, {rtp, PortRtp}, {rtcp, PortRtcp}]}
+			end,
+			gproc:lookup_global_properties(local)
+		)
+	},
+	RemotePhys = {struct,
+		lists:map(
+			fun({_,{C, M, T, Ip, PortRtp, PortRtcp}}) ->
+				{phy, [{callid, C}, {mediaid, M}, {tag, T}, {ip, list_to_binary(inet_parse:ntoa(Ip))}, {rtp, PortRtp}, {rtcp, PortRtcp}]}
+			end,
+			gproc:lookup_global_properties(remote)
+		)
+	},
+	Payloads = {struct,
+		lists:map(
+			fun({_,{C, M, T, Type}}) ->
+				{media, [{callid, C}, {mediaid, M}, {tag, T}, {payload_type, Type}]}
+			end,
+			gproc:lookup_global_properties(payload_type)
+		)
+	},
+	mochijson2:encode({struct, [{callnum, Length}, {calls, Calls}, {remotephys, RemotePhys}, {localphys, LocalPhys}, {payloads, Payloads}]}).
+
 drop_dupes(List) ->
 	drop_dupes(lists:sort(List), []).
-
 drop_dupes([], List) ->
 	List;
 drop_dupes([{A, B}, {A, B} | Rest], Ret) ->
