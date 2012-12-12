@@ -42,15 +42,31 @@ dispatch(Req) ->
 							gproc:lookup_global_properties(media))
 						)
 					},
-					Phys = {struct,
+					LocalPhys = {struct,
 						lists:map(
-							fun({_,{id, C, M, T, Ip, PortRtp, PortRtcp}}) ->
-								{phy, [{callid, C}, {mediaid, M}, {tag, T}, {localip, list_to_binary(inet_parse:ntoa(Ip))}, {localrtp, PortRtp}, {localrtcp, PortRtcp}]}
+							fun({_,{C, M, T, Ip, PortRtp, PortRtcp}}) ->
+								{phy, [{callid, C}, {mediaid, M}, {tag, T}, {ip, list_to_binary(inet_parse:ntoa(Ip))}, {rtp, PortRtp}, {rtcp, PortRtcp}]}
 							end,
-							gproc:lookup_global_properties(phy)
+							gproc:lookup_global_properties(local)
 						)
 					},
-					JSON = mochijson2:encode({struct, [{callnum, Length}, {calls, Calls}, {phys, Phys}]}),
+					RemotePhys = {struct,
+						lists:map(
+							fun({_,{C, M, T, Ip, PortRtp, PortRtcp}}) ->
+								{phy, [{callid, C}, {mediaid, M}, {tag, T}, {ip, list_to_binary(inet_parse:ntoa(Ip))}, {rtp, PortRtp}, {rtcp, PortRtcp}]}
+							end,
+							gproc:lookup_global_properties(remote)
+						)
+					},
+					Payloads = {struct,
+						lists:map(
+							fun({_,{C, M, T, Type}}) ->
+								{media, [{callid, C}, {mediaid, M}, {tag, T}, {payload_type, Type}]}
+							end,
+							gproc:lookup_global_properties(payload_type)
+						)
+					},
+					JSON = mochijson2:encode({struct, [{callnum, Length}, {calls, Calls}, {remotephys, RemotePhys}, {localphys, LocalPhys}, {payloads, Payloads}]}),
 					Req:respond({200, [], JSON});
 				_ ->
 					error_logger:warning_msg("UNKNOWN: ~p~n", [Path]),
