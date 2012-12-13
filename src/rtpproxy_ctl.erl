@@ -38,25 +38,22 @@ acc(Type, CallId, MediaId, Addr) when Type == start; Type == interim_update; Typ
 	ok.
 
 start() ->
-	% Start our pool
-	ConfigPath = case init:get_argument(config) of
-		error -> "../priv/erlrtpproxy.config"; % for testing
-		{ok,[[CPath]]} -> CPath
-	end,
+	{ok,[[ConfigPath]]} = init:get_argument(config),
 
+	%% Start our pool
 	Nodes = [node()|pool:start(rtpproxy, " -config " ++ ConfigPath ++ " ")],
 
-	% Replace logger with erlsyslog
+	%% Replace logger with erlsyslog
 	rpc:multicall(Nodes, error_logger, add_report_handler, [erlsyslog]),
 
-	% Run gproc on each node
+	%% Run gproc on each node
 	rpc:multicall(Nodes, application, set_env, [gproc, gproc_dist, all]),
 	rpc:multicall(Nodes, application, start, [gproc]),
 
-	% Load necessary config files
+	%% Load necessary config files
 	rpc:multicall(Nodes, application, load, [rtpproxy]),
 
-	% Load main module
+	%% Load main module
 	application:start(rtpproxy).
 
 stop() ->
