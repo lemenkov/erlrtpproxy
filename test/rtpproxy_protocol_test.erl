@@ -64,7 +64,7 @@ rtpproxy_protocol_test_() ->
 				%% Start rtpproxy
 				%%
 
-				rtpproxy_ctl:start()
+				test_utils:start()
 		end,
 		fun (_) ->
 				gen_udp:close(Fd),

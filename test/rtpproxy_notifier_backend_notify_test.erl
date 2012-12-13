@@ -74,7 +74,7 @@ rtpproxy_notifier_backend_notify_udp_test_() ->
 				%% Start rtpproxy
 				%%
 
-				rtpproxy_ctl:start()
+				test_utils:start()
 		end,
 		fun (_) ->
 				gen_udp:close(Fd),
@@ -152,7 +152,7 @@ rtpproxy_notifier_backend_notify_tcp_test_() ->
 				%% Start rtpproxy
 				%%
 
-				rtpproxy_ctl:start()
+				test_utils:start()
 		end,
 		fun (_) ->
 				gen_tcp:close(Fd),
@@ -236,7 +236,7 @@ rtpproxy_notifier_backend_notify_tcp_two_addresses_test_() ->
 				%% Start rtpproxy
 				%%
 
-				rtpproxy_ctl:start()
+				test_utils:start()
 		end,
 		fun (_) ->
 				gen_tcp:close(Fd1),

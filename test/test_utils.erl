@@ -80,5 +80,4 @@ stop() ->
 	gen_server:cast(file_writer, stop),
 	gen_server:cast(storage, stop),
 	application:stop(gproc),
-	pool:stop(),
 	net_kernel:stop().

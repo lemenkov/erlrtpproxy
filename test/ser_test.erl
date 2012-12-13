@@ -113,7 +113,7 @@ ser_udp_test_() ->
 				%% Start real SER frontend
 				%%
 
-				rtpproxy_sup:start_link()
+				test_utils:start()
 		end,
 		fun (_) ->
 				gen_udp:close(Fd),
@@ -260,20 +260,6 @@ ser_tcp_test_() ->
 				net_kernel:start(['ser_tcp_test@localhost', longnames]),
 
 				%%
-				%% Set necessary options
-				%% (normally we'll set them in the /etc/erlrtpproxy.config
-				%%
-
-				test_utils:set_default_opts(),
-				application:set_env(rtpproxy, listen, {tcp, "127.0.0.1", ?RTPPROXY_PORT}),
-
-				%%
-				%% Start real SER frontend
-				%%
-
-				rtpproxy_sup:start_link(),
-
-				%%
 				%% Load fake rtpproxy_ctl module - we'll test it later
 				%%
 
@@ -320,7 +306,21 @@ ser_tcp_test_() ->
 							error_logger:info_msg("UNKNOWN for meck: ~p~n", [Cmd]),
 							exit(1)
 					end
-				)
+				),
+
+				%%
+				%% Set necessary options
+				%% (normally we'll set them in the /etc/erlrtpproxy.config
+				%%
+
+				test_utils:set_default_opts(),
+				application:set_env(rtpproxy, listen, {tcp, "127.0.0.1", ?RTPPROXY_PORT}),
+
+				%%
+				%% Start real SER frontend
+				%%
+
+				test_utils:start()
 		end,
 		fun (_) ->
 				meck:unload(rtpproxy_ctl),

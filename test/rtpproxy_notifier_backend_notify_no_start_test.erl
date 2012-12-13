@@ -72,7 +72,7 @@ rtpproxy_notifier_backend_radius_no_start_test_() ->
 				%% Start rtpproxy
 				%%
 
-				rtpproxy_ctl:start()
+				test_utils:start()
 		end,
 		fun (_) ->
 				gen_udp:close(Fd),

@@ -95,7 +95,7 @@ rtpproxy_rtp_handling_test_() ->
 				%% Start rtpproxy
 				%%
 
-				rtpproxy_ctl:start()
+				test_utils:start()
 		end,
 		fun (_) ->
 				% Close session
