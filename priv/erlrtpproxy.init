@@ -56,7 +56,7 @@ start() {
 
 stop() {
 	echo -n $"Stopping $prog: "
-	daemon --user $USER "erl -noinput $ERL_PARAMETERS -name close@$ERL_NODE -s rtpproxy_ctl stop_sysv -extra $prog@$ERL_NODE"
+	daemon --user $USER "erl -noinput $ERL_PARAMETERS -name close@$ERL_NODE -s rtpproxy_ctl stop -extra $prog@$ERL_NODE"
 	retval=$?
 	echo
 	[ $retval -eq 0 ] && rm -f $lockfile

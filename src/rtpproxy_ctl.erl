@@ -22,7 +22,7 @@
 
 -export([acc/4]).
 -export([start/0]).
--export([stop_sysv/0]).
+-export([stop/0]).
 -export([status_sysv/0]).
 -export([status/0]).
 -export([command/1]).
@@ -59,7 +59,7 @@ start() ->
 	% Load main module
 	application:start(rtpproxy).
 
-stop_sysv() ->
+stop() ->
 	Node = case init:get_plain_arguments() of
 		[NodeStr] ->
 			list_to_atom(NodeStr);
