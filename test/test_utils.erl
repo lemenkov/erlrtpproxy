@@ -28,81 +28,37 @@
 %%%
 %%%----------------------------------------------------------------------
 
--module(rtpproxy_notifier_backend_notify_no_start_test).
-
--include_lib("eunit/include/eunit.hrl").
-
--include("../include/common.hrl").
+-module(test_utils).
+-export([set_default_opts/0]).
 
 -define(RTPPROXY_IP, {127,0,0,1}).
 -define(RTPPROXY_PORT, 33333).
 
-rtpproxy_notifier_backend_radius_no_start_test_() ->
+%%
+%% Set necessary options
+%% (normally we'll set them in the /etc/erlrtpproxy.config
+%%
 
-	%%
-	%% This is the socket which will be used for receiving notifications messages
-	%%
+set_default_opts() ->
+	%% Set up backend's type (SER for now)
+	application:set_env(rtpproxy, backend, ser),
 
-	{ok, Fd} = gen_udp:open(0, [{active, false}, binary]),
-	{ok, {_, Port}} = inet:sockname(Fd),
+	%% Options for SER backend
+	application:set_env(rtpproxy, listen, {udp, "127.0.0.1", ?RTPPROXY_PORT}),
 
-	% Common notification info
-	CallId = <<"dnbrsmaalefzrxxfrqw@localhost.localdomain-0">>,
-	MediaId = <<"1">>,
-	NotifyTag = <<"27124048">>,
-	NotifyInfo = [{addr, {?RTPPROXY_IP, Port}}, {tag, NotifyTag}],
+	%% Options for notification backend
+	application:unset_env(rtpproxy, radacct_servers),
+	application:unset_env(rtpproxy, notify_servers),
+	application:set_env(rtpproxy, ignore_start, false),
+	application:set_env(rtpproxy, ignore_stop, false),
 
-	{setup,
-		fun() ->
-				%%
-				%% Set node name
-				%%
+	%% Options for rtpproxy itself
+	application:set_env(rtpproxy, external, ?RTPPROXY_IP),
+	application:set_env(rtpproxy, ttl, 30),
+	application:set_env(rtpproxy, ttl_early, 30),
+	application:set_env(rtpproxy, rebuildrtp, false),
+	application:set_env(rtpproxy, stats_port, 8442),
 
-				net_kernel:start(['rtpproxy_notifier_no_start_test@localhost', longnames]),
+	ok.
 
-				%%
-				%% Set necessary options
-				%% (normally we'll set them in the /etc/erlrtpproxy.config
-				%%
 
-				test_utils:set_default_opts(),
-				application:set_env(rtpproxy, notify_servers, udp),
-
-				%%
-				%% Start rtpproxy
-				%%
-
-				rtpproxy_ctl:start()
-		end,
-		fun (_) ->
-				gen_udp:close(Fd),
-
-				%%
-				%% Stop rtpproxy
-				%%
-
-				rtpproxy_ctl:stop()
-		end,
-		[
-%			{"Test start notification (should be filtered)",
-%				fun() ->
-%						rtpproxy_ctl:acc(start, CallId, MediaId, NotifyInfo),
-%						?assertEqual({error,timeout}, gen_udp:recv(Fd, 0, 1000))
-%				end
-%			},
-			{"Test interim update notification (no start)",
-				fun() ->
-						rtpproxy_ctl:acc(interim_update, CallId, MediaId, NotifyInfo),
-						{ok, {_, _, Answer}} = gen_udp:recv(Fd, 0, 1000),
-						?assertEqual(NotifyTag, Answer)
-				end
-			},
-			{"Test stop notification (should be filtered) (no start)",
-				fun() ->
-						rtpproxy_ctl:acc(stop, CallId, MediaId, NotifyInfo),
-						{ok, {_, _, Answer}} = gen_udp:recv(Fd, 0, 1000),
-						?assertEqual(NotifyTag, Answer)
-				end
-			}
-		]
-	}.

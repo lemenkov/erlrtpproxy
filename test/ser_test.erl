@@ -107,8 +107,7 @@ ser_udp_test_() ->
 				%% (normally we'll set them in the /etc/erlrtpproxy.config
 				%%
 
-				application:set_env(rtpproxy, listen, {udp, "127.0.0.1", ?RTPPROXY_PORT}),
-				application:set_env(rtpproxy, backend, ser),
+				test_utils:set_default_opts(),
 
 				%%
 				%% Start real SER frontend
@@ -271,8 +270,8 @@ ser_tcp_test_() ->
 				%% (normally we'll set them in the /etc/erlrtpproxy.config
 				%%
 
+				test_utils:set_default_opts(),
 				application:set_env(rtpproxy, listen, {tcp, "127.0.0.1", ?RTPPROXY_PORT}),
-				application:set_env(rtpproxy, backend, ser),
 
 				%%
 				%% Start real SER frontend

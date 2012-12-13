@@ -65,22 +65,10 @@ rtpproxy_notifier_backend_notify_udp_test_() ->
 				%% (normally we'll set them in the /etc/erlrtpproxy.config
 				%%
 
-				%% Set up backend's type (SER for now)
-				application:set_env(rtpproxy, backend, ser),
-
-				%% Options for SER backend
-				application:set_env(rtpproxy, listen, {udp, "127.0.0.1", ?RTPPROXY_PORT}),
-
-				%% Options for notification backend
-				application:unset_env(rtpproxy, radacct_servers),
+				test_utils:set_default_opts(),
 				application:set_env(rtpproxy, notify_servers, udp),
 				application:set_env(rtpproxy, ignore_start, true),
 				application:set_env(rtpproxy, ignore_stop, true),
-
-				%% Options for rtpproxy itself
-				application:set_env(rtpproxy, external, ?RTPPROXY_IP),
-				application:set_env(rtpproxy, ttl, 105000),
-				application:set_env(rtpproxy, rebuildrtp, false),
 
 				%%
 				%% Start rtpproxy
@@ -147,22 +135,9 @@ rtpproxy_notifier_backend_notify_tcp_test_() ->
 				%% (normally we'll set them in the /etc/erlrtpproxy.config
 				%%
 
-				%% Set up backend's type (SER for now)
-				application:set_env(rtpproxy, backend, ser),
-
-				%% Options for SER backend
-				application:set_env(rtpproxy, listen, {udp, "127.0.0.1", ?RTPPROXY_PORT}),
-
-				%% Options for notification backend
-				application:unset_env(rtpproxy, radacct_servers),
+				test_utils:set_default_opts(),
 				application:set_env(rtpproxy, notify_servers, tcp),
 				application:set_env(rtpproxy, ignore_start, true),
-				application:set_env(rtpproxy, ignore_stop, false),
-
-				%% Options for rtpproxy itself
-				application:set_env(rtpproxy, external, ?RTPPROXY_IP),
-				application:set_env(rtpproxy, ttl, 105000),
-				application:set_env(rtpproxy, rebuildrtp, false),
 
 				%%
 				%% Start socket accepting thread
@@ -239,22 +214,9 @@ rtpproxy_notifier_backend_notify_tcp_two_addresses_test_() ->
 				%% (normally we'll set them in the /etc/erlrtpproxy.config
 				%%
 
-				%% Set up backend's type (SER for now)
-				application:set_env(rtpproxy, backend, ser),
-
-				%% Options for SER backend
-				application:set_env(rtpproxy, listen, {udp, "127.0.0.1", ?RTPPROXY_PORT}),
-
-				%% Options for notification backend
-				application:unset_env(rtpproxy, radacct_servers),
+				test_utils:set_default_opts(),
 				application:set_env(rtpproxy, notify_servers, tcp),
 				application:set_env(rtpproxy, ignore_start, true),
-				application:set_env(rtpproxy, ignore_stop, false),
-
-				%% Options for rtpproxy itself
-				application:set_env(rtpproxy, external, ?RTPPROXY_IP),
-				application:set_env(rtpproxy, ttl, 105000),
-				application:set_env(rtpproxy, rebuildrtp, false),
 
 				%%
 				%% Start two simultaneous socket accepting thread
