@@ -30,10 +30,19 @@
 
 -module(test_utils).
 -export([set_default_opts/0]).
+-export([start/0]).
 -export([stop/0]).
 
 -define(RTPPROXY_IP, {127,0,0,1}).
 -define(RTPPROXY_PORT, 33333).
+
+start() ->
+	%% Run gproc
+	application:set_env(gproc, gproc_dist, all),
+	application:start(gproc),
+
+	%% Load main module
+	application:start(rtpproxy).
 
 %%
 %% Set necessary options
