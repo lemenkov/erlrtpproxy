@@ -83,7 +83,7 @@ rtpproxy_notifier_backend_notify_udp_test_() ->
 				%% Stop rtpproxy
 				%%
 
-				rtpproxy_ctl:stop()
+				test_utils:stop()
 		end,
 		[
 			{"Test start notification (should be filtered)",
@@ -161,7 +161,7 @@ rtpproxy_notifier_backend_notify_tcp_test_() ->
 				%% Stop rtpproxy
 				%%
 
-				rtpproxy_ctl:stop()
+				test_utils:stop()
 		end,
 		[
 			{"Test start notification (should be filtered)",
@@ -246,7 +246,7 @@ rtpproxy_notifier_backend_notify_tcp_two_addresses_test_() ->
 				%% Stop rtpproxy
 				%%
 
-				rtpproxy_ctl:stop()
+				test_utils:stop()
 		end,
 		[
 			{"Test stop notification to the first subscriber",

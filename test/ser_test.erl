@@ -118,11 +118,7 @@ ser_udp_test_() ->
 		fun (_) ->
 				gen_udp:close(Fd),
 				meck:unload(rtpproxy_ctl),
-				gen_server:cast(listener, stop),
-				gen_server:cast(backend_ser, stop),
-				gen_server:cast(file_writer, stop),
-				gen_server:cast(storage, stop),
-				net_kernel:stop()
+				test_utils:stop()
 		end,
 		[
 			{"Try to handshake (get magic number back -20040107)",
@@ -328,11 +324,7 @@ ser_tcp_test_() ->
 		end,
 		fun (_) ->
 				meck:unload(rtpproxy_ctl),
-				gen_server:cast(listener, stop),
-				gen_server:cast(backend_ser, stop),
-				gen_server:cast(file_writer, stop),
-				gen_server:cast(storage, stop),
-				net_kernel:stop()
+				test_utils:stop()
 		end,
 		[
 			{"Try to handshake (get magic number back -20040107)",

@@ -113,7 +113,7 @@ rtpproxy_rtp_handling_test_() ->
 				%% Stop rtpproxy
 				%%
 
-				rtpproxy_ctl:stop()
+				test_utils:stop()
 		end,
 		[
 			{"Try to create new session with two media streams (A/V) and exchange RTP packets (with IP:Port and SSRC checking)",

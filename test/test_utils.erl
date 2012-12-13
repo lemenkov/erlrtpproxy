@@ -30,6 +30,7 @@
 
 -module(test_utils).
 -export([set_default_opts/0]).
+-export([stop/0]).
 
 -define(RTPPROXY_IP, {127,0,0,1}).
 -define(RTPPROXY_PORT, 33333).
@@ -61,4 +62,14 @@ set_default_opts() ->
 
 	ok.
 
-
+stop() ->
+	application:stop(rtpproxy),
+	gen_server:cast(listener, stop),
+	gen_server:cast(rtpproxy_notifier_backend_notify, stop),
+	gen_server:cast(rtpproxy_notifier_backend_radius, stop),
+	gen_server:cast(backend_ser, stop),
+	gen_server:cast(file_writer, stop),
+	gen_server:cast(storage, stop),
+	application:stop(gproc),
+	pool:stop(),
+	net_kernel:stop().

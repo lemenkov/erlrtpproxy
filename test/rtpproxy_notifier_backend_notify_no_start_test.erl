@@ -81,7 +81,7 @@ rtpproxy_notifier_backend_radius_no_start_test_() ->
 				%% Stop rtpproxy
 				%%
 
-				rtpproxy_ctl:stop()
+				test_utils:stop()
 		end,
 		[
 %			{"Test start notification (should be filtered)",

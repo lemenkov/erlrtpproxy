@@ -95,7 +95,7 @@ rtpproxy_rtp_handling_test_() ->
 				%% Stop rtpproxy
 				%%
 
-				rtpproxy_ctl:stop()
+				test_utils:stop()
 		end,
 		[
 			{"Try to create new session and exchange RTP packets (with IP:Port and SSRC checking)",

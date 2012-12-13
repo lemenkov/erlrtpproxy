@@ -73,7 +73,7 @@ rtpproxy_protocol_test_() ->
 				%% Stop rtpproxy
 				%%
 
-				rtpproxy_ctl:stop()
+				test_utils:stop()
 		end,
 		[
 			{"Try to handshake (get magic number back -20040107)",

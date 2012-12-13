@@ -22,7 +22,6 @@
 
 -export([acc/4]).
 -export([start/0]).
--export([stop/0]).
 -export([stop_sysv/0]).
 -export([status_sysv/0]).
 -export([status/0]).
@@ -59,18 +58,6 @@ start() ->
 
 	% Load main module
 	application:start(rtpproxy).
-
-stop() ->
-	application:stop(rtpproxy),
-	gen_server:cast(listener, stop),
-	gen_server:cast(rtpproxy_notifier_backend_notify, stop),
-	gen_server:cast(rtpproxy_notifier_backend_radius, stop),
-	gen_server:cast(backend_ser, stop),
-	gen_server:cast(file_writer, stop),
-	gen_server:cast(storage, stop),
-	application:stop(gproc),
-	pool:stop(),
-	net_kernel:stop().
 
 stop_sysv() ->
 	Node = case init:get_plain_arguments() of
