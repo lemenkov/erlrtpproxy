@@ -119,8 +119,6 @@ ser_udp_test_() ->
 				gen_udp:close(Fd),
 				meck:unload(rtpproxy_ctl),
 				gen_server:cast(listener, stop),
-				gen_server:cast(rtpproxy_notifier_backend_notify, stop),
-				gen_server:cast(rtpproxy_notifier_backend_radius, stop),
 				gen_server:cast(backend_ser, stop),
 				gen_server:cast(file_writer, stop),
 				gen_server:cast(storage, stop),
@@ -331,8 +329,6 @@ ser_tcp_test_() ->
 		fun (_) ->
 				meck:unload(rtpproxy_ctl),
 				gen_server:cast(listener, stop),
-				gen_server:cast(rtpproxy_notifier_backend_notify, stop),
-				gen_server:cast(rtpproxy_notifier_backend_radius, stop),
 				gen_server:cast(backend_ser, stop),
 				gen_server:cast(file_writer, stop),
 				gen_server:cast(storage, stop),
