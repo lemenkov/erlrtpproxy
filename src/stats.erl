@@ -62,14 +62,15 @@ dump_all() ->
 	mochijson2:encode([{callnum, Length}, {calls, Result}]).
 
 dump_query(RawQuery) ->
-	Query = [{list_to_existing_atom(X), list_to_binary(Y)} || {X,Y} <- RawQuery],
+	Query = [ decode_kv(KV) || KV <- RawQuery],
 	C = proplists:get_value(callid, Query, '_'),
 	M = proplists:get_value(mediaid, Query, '_'),
 	T = proplists:get_value(tag, Query, '_'),
-	P = safe_to_int(proplists:get_value(payload, Query, '_')),
+	P = proplists:get_value(payload, Query, '_'),
+	I = proplists:get_value(remoteip, Query, '_'),
 
 	%% C M T Payload Local Remote
-	List = gproc:select([{ { {p,g, media} , '_' , {C, M, T, P, '_', '_'} }, [], ['$$']}]),
+	List = gproc:select([{ { {p,g, media} , '_' , {C, M, T, P, '_', {I,'_','_'}} }, [], ['$$']}]),
 	Result = [
 			{media,
 				[
@@ -83,5 +84,14 @@ dump_query(RawQuery) ->
 			} || [{p,g,media}, _, {CallId, MediaId, Tag, Payload, {LocalIp, LocalRtpPort, LocalRtcpPort}, {RemoteIp, RemoteRtpPort, RemoteRtcpPort}}] <- List],
 	mochijson2:encode([{http_query, Query}, {result, Result}]).
 
-safe_to_int('_') -> '_';
-safe_to_int(I) -> list_to_integer(binary_to_list(I)).
+decode_kv({"callid", C}) ->
+	{callid, list_to_binary(C)};
+decode_kv({"mediaid", M}) ->
+	{mediaid, list_to_binary(M)};
+decode_kv({"tag", T}) ->
+	{tag, list_to_binary(T)};
+decode_kv({"payload", P}) ->
+	{payload, list_to_integer(P)};
+decode_kv({"remoteip", I}) ->
+	{ok, Ip} = inet_parse:address(I),
+	{remoteip, Ip}.
