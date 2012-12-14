@@ -116,7 +116,7 @@ handle_cast(
 	#cmd{type = ?CMD_U, from = #party{addr = {IpAddr,_}}, origin = #origin{pid = Pid}, params = Params} = Cmd,
 	#state{callid = C, mediaid = M, tag = T, notify_info = NotifyInfo} = State
 ) ->
-	case gproc:select([{{{p,g,local}, '_', {C, M, T, '$1'}}, [], ['$1']}]) of
+	case gproc:select([{{{p,g,media}, '_', {C, M, T, '_', '$1', '_'}}, [], ['$1']}]) of
 		[{Ip,PortRtp,PortRtcp}] ->
 			case IpAddr of
 				{0,0,0,0} ->
