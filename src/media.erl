@@ -57,7 +57,7 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, param
 	% Register itself
 	gproc:add_global_name({media, C, M, T}),
 	% Register itself for group call and broadcast commands
-	gproc:add_global_property(media, {id, C, M}),
+	gproc:add_global_property(media, {C, M, T, null, null, null}),
 
 	Ip = case {proplists:get_value(local, Params), proplists:get_value(remote, Params)} of
 		{undefined, undefined} ->
@@ -116,8 +116,8 @@ handle_cast(
 	#cmd{type = ?CMD_U, from = #party{addr = {IpAddr,_}}, origin = #origin{pid = Pid}, params = Params} = Cmd,
 	#state{callid = C, mediaid = M, tag = T, notify_info = NotifyInfo} = State
 ) ->
-	case gproc:select([{ { {p,g,local} , '_' , {C, M, T, '$1', '$2', '$3'} }, [], [['$1','$2','$3']]}]) of
-		[[Ip,PortRtp,PortRtcp]] ->
+	case gproc:select([{{{p,g,local}, '_', {C, M, T, '$1'}}, [], ['$1']}]) of
+		[{Ip,PortRtp,PortRtcp}] ->
 			case IpAddr of
 				{0,0,0,0} ->
 					gen_server:cast(Pid, {reply, Cmd, {{{0,0,0,0}, PortRtp}, {{0,0,0,0}, PortRtcp}}});
@@ -222,7 +222,9 @@ handle_info({#rtcp{} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, 
 
 handle_info({phy, {Ip, PortRtp, PortRtcp}}, #state{callid = C, mediaid = M, tag = T, cmd = #cmd{origin = #origin{pid = Pid}} = Cmd} = State) ->
 	% Store info about physical params
-	gproc:add_global_property(local, {C, M, T, Ip, PortRtp, PortRtcp}),
+	[[Payload, Remote]] = gproc:select([{{{p,g,media},'_',{C,M,T,'$1','_','$2'}}, [], [['$1','$2']]}]),
+	gproc:unreg({p,g,media}),
+	gproc:add_global_property(media, {C, M, T, Payload, {Ip, PortRtp, PortRtcp}, Remote}),
 	% Reply to server
 	gen_server:cast(Pid, {reply, Cmd, {{Ip, PortRtp}, {Ip, PortRtcp}}}),
 	% No need to store original Cmd any longer
@@ -237,15 +239,8 @@ handle_info(interim_update, #state{callid = C, mediaid = M, notify_info = Notify
 %%
 
 update_remote_phy(Ip, Port, null, null, RtcpPort, C, M, T, Type) ->
-	case gproc:select([{ { {p,g,remote} , '_' , {C, M, T, '$1', '$2', '$3'} }, [], [['$1','$2','$3']]}]) of
-		[] -> ok;
-		_ -> gproc:unreg({p,g,remote})
-	end,
-	case gproc:select([{ { {p,g,payload_type} , '_' , {C, M, T, '$1'} }, [], [['$1']]}]) of
-		[] -> ok;
-		_ -> gproc:unreg({p,g,payload_type})
-	end,
-	gproc:add_global_property(remote, {C, M, T, Ip, Port, RtcpPort}),
-	gproc:add_global_property(payload_type, {C, M, T, Type});
+	[Local] = gproc:select([{{{p,g,media},'_',{C,M,T,'_','$1','_'}}, [], ['$1']}]),
+	gproc:unreg({p,g,media}),
+	gproc:add_global_property(media, {C, M, T, Type, Local, {Ip, Port, RtcpPort}});
 update_remote_phy(_, _, _, _, _, _, _, _, _) ->
 	ok.
