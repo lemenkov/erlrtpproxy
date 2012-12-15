@@ -24,7 +24,6 @@
 -export([start/0]).
 -export([stop/0]).
 -export([status_sysv/0]).
--export([status/0]).
 -export([command/1]).
 
 -include("../include/common.hrl").
@@ -82,20 +81,6 @@ status_sysv() ->
 			ok = io:format("~n"),
 			halt(3)
 	end.
-
-% FIXME this must be reworked (no preformatted strings - just plain stats)
-status() ->
-	Calls = gproc:lookup_global_properties(media),
-	Header = io_lib:format("Current state - ~p media stream(s):~n", [length(Calls)]),
-	?INFO(Header, []),
-	MediaInfos = lists:map(fun({Pid,{CallId,MediaId,_,_,_,_}}) ->
-			{ok, Reply} = gen_server:call(Pid, ?CMD_Q),
-			MediaInfo = io_lib:format("* CallID: ~s, MediaId: ~p, ~s~n", [CallId, MediaId, Reply]),
-			?INFO(MediaInfo, []),
-			MediaInfo
-		end,
-	Calls),
-	lists:flatten([Header] ++ MediaInfos).
 
 % Simply stop all active sessions
 command(#cmd{type = ?CMD_X}) ->
