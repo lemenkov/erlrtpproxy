@@ -23,7 +23,7 @@
 -export([acc/4]).
 -export([start/0]).
 -export([stop/0]).
--export([status_sysv/0]).
+-export([status/0]).
 -export([command/1]).
 
 -include("../include/common.hrl").
@@ -66,7 +66,7 @@ stop() ->
 	call(Node, init, stop, [], 2),
 	halt(0).
 
-status_sysv() ->
+status() ->
 	Node = case init:get_plain_arguments() of
 		[NodeStr] ->
 			list_to_atom(NodeStr);
