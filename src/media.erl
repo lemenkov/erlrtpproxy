@@ -54,6 +54,9 @@ start(Cmd) ->
 	gen_server:start(?MODULE, [Cmd], []).
 
 init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, params = Params} = Cmd]) ->
+	% Trap timeouts - FIXME switch to supervisor for the God's sake!
+	process_flag(trap_exit, true),
+
 	% Register itself
 	gproc:add_global_name({media, C, M, T}),
 	% Register itself for group call and broadcast commands
@@ -232,7 +235,10 @@ handle_info({phy, {Ip, PortRtp, PortRtcp}}, #state{callid = C, mediaid = M, tag 
 
 handle_info(interim_update, #state{callid = C, mediaid = M, notify_info = NotifyInfo} = State) ->
 	rtpproxy_ctl:acc(interim_update, C, M, NotifyInfo),
-	{noreply, State}.
+	{noreply, State};
+
+handle_info({'EXIT',Pid,timeout}, State) ->
+	{stop, normal, State}.
 
 %%
 %%
