@@ -82,7 +82,7 @@ dump_query(RawQuery) ->
 					{remote,[{ip, list_to_binary(inet_parse:ntoa(RemoteIp))}, {rtp, RemoteRtpPort}, {rtcp, RemoteRtcpPort}]}
 				]
 			} || [{p,g,media}, _, {CallId, MediaId, Tag, Payload, {LocalIp, LocalRtpPort, LocalRtcpPort}, {RemoteIp, RemoteRtpPort, RemoteRtcpPort}}] <- List],
-	mochijson2:encode([{http_query, Query}, {result, Result}]).
+	mochijson2:encode([{http_query,  [ {list_to_existing_atom(K), list_to_binary(V)} || {K,V} <- RawQuery]}, {result, Result}]).
 
 decode_kv({"callid", C}) ->
 	{callid, list_to_binary(C)};
