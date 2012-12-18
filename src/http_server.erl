@@ -37,6 +37,9 @@ dispatch(Req) ->
 						KV -> dump_query(KV)
 					end,
 					Req:respond({200, [], JSON});
+				["params" | _] ->
+					set_params(Req:parse_qs()),
+					Req:respond({200, [], "Done"});
 				_ ->
 					error_logger:warning_msg("UNKNOWN: ~p~n", [Path]),
 					Req:respond({404, [], "404 Not found\r\n"})
@@ -84,6 +87,21 @@ dump_query(RawQuery) ->
 			} || [{p,g,media}, _, {CallId, MediaId, Tag, Payload, {LocalIp, LocalRtpPort, LocalRtcpPort}, {RemoteIp, RemoteRtpPort, RemoteRtcpPort}}] <- List],
 	mochijson2:encode([{http_query,  [ {list_to_existing_atom(K), list_to_binary(V)} || {K,V} <- RawQuery]}, {result, Result}]).
 
+set_params(RawQuery) ->
+	Query = [ decode_kv(KV) || KV <- RawQuery],
+	[ rpc:multicall(pool:get_nodes(), application, set_env, [rtpproxy, K, V]) || {K,V} <- Query ],
+	case proplists:get_value(save, Query) of
+		true ->
+			%% Save current config
+			{ok,[[ConfigPath]]} = init:get_argument(config),
+			error_logger:error_msg("SAVE: [~s]~n", [ConfigPath]),
+			%% Run on all connected nodes
+			rpc:multicall(pool:get_nodes(), rtpproxy_ctl, save_config, [ConfigPath]),
+			ok;
+		_ -> ok
+	end.
+
+%% For query
 decode_kv({"callid", C}) ->
 	{callid, list_to_binary(C)};
 decode_kv({"mediaid", M}) ->
@@ -94,4 +112,33 @@ decode_kv({"payload", P}) ->
 	{payload, list_to_integer(P)};
 decode_kv({"remoteip", I}) ->
 	{ok, Ip} = inet_parse:address(I),
-	{remoteip, Ip}.
+	{remoteip, Ip};
+
+%% For parameter
+decode_kv({"save",_}) ->
+	save;
+%decode_kv({"internal", I}) ->
+%	{ok, Ip} = inet_parse:address(I),
+%	{internal, Ip};
+%decode_kv({"external", I}) ->
+%	{ok, Ip} = inet_parse:address(I),
+%	{external, Ip};
+%decode_kv({"ipv6", I}) ->
+%	{ok, Ip} = inet_parse:address(I),
+%	{ipv6, Ip}.
+decode_kv({"ttl", T}) ->
+	{ttl, list_to_integer(T)};
+decode_kv({"ttl_early", T}) ->
+	{ttl_early, list_to_integer(T)};
+decode_kv({"rebuildrtp", "true"}) ->
+	{rebuildrtp, true};
+decode_kv({"rebuildrtp", "false"}) ->
+	{rebuildrtp, false};
+decode_kv({"ignore_start", "true"}) ->
+	{ignore_start, true};
+decode_kv({"ignore_start", "false"}) ->
+	{ignore_start, false};
+decode_kv({"ignore_stop", "true"}) ->
+	{ignore_stop, true};
+decode_kv({"ignore_stop", "false"}) ->
+	{ignore_stop, false}.
