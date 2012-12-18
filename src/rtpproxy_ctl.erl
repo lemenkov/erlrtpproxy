@@ -56,13 +56,8 @@ start() ->
 	application:start(rtpproxy).
 
 stop() ->
-	%% Get all connected nodes
-	Nodes = [node()|pool:get_nodes()],
 	%% Stop erlrtpproxy gracefully
 	rtpproxy_ctl:command(#cmd{type = ?CMD_X}),
-	%% Save current config
-	{ok,[[ConfigPath]]} = init:get_argument(config),
-	rpc:multicall(Nodes, rtpproxy_ctl, save_config, [ConfigPath]),
 	%% Stop all slave nodes
 	pool:stop(),
 	%% Stop main node
