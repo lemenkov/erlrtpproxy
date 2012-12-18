@@ -93,7 +93,7 @@ make test
 %dir %{_libdir}/erlang/lib/%{realname}-%{version}/ebin
 %{_initrddir}/%{name}
 %{_sbindir}/%{name}ctl
-%config(noreplace) %{_sysconfdir}/%{name}.config
+%config(noreplace) %attr(0640,%{name},%{name}) %{_sysconfdir}/%{name}.config
 %config(noreplace) %{_sysconfdir}/sysconfig/%{name}
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}.app
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_app.beam
