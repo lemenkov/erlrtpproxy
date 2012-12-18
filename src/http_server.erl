@@ -34,7 +34,7 @@ dispatch(Req) ->
 				["json" | _] ->
 					JSON = case Req:parse_qs() of
 						[] -> dump_all();
-						Query -> dump_query(Query)
+						KV -> dump_query(KV)
 					end,
 					Req:respond({200, [], JSON});
 				_ ->
