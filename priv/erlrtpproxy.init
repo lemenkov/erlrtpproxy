@@ -56,7 +56,7 @@ start() {
 
 stop() {
 	echo -n $"Stopping $prog: "
-	daemon --user $USER "erl -noinput $ERL_PARAMETERS -name close@$ERL_NODE -s rtpproxy_ctl stop -extra $prog@$ERL_NODE"
+	daemon --user $USER "/usr/sbin/erlrtpproxyctl stop -node $prog@$ERL_NODE"
 	retval=$?
 	echo
 	[ $retval -eq 0 ] && rm -f $lockfile
@@ -82,7 +82,7 @@ force_reload() {
 }
 
 rh_status_verbose() {
-	/sbin/runuser -s /bin/bash $USER -c "erl -noinput $ERL_PARAMETERS -name status@$ERL_NODE -s rtpproxy_ctl status -extra $prog@$ERL_NODE"
+	daemon --user $USER "/usr/sbin/erlrtpproxyctl status -node $prog@$ERL_NODE"
 	return $?
 }
 
