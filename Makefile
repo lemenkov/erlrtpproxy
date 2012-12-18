@@ -36,6 +36,7 @@ install: all
 	@install -p -m 0644 priv/erlrtpproxy.config $(DESTDIR)$(prefix)/etc/erl$(NAME).config
 	@install -p -m 0644 priv/erlang.cookie $(DESTDIR)$(prefix)/var/lib/erl$(NAME)/.erlang.cookie
 	@install -p -m 0644 priv/hosts.erlang $(DESTDIR)$(prefix)/var/lib/erl$(NAME)/.hosts.erlang
+	@install -p -m 0755 priv/erlrtpproxyctl.escript $(DESTDIR)$(prefix)/usr/sbin/erlrtpproxyctl
 ifeq ($(UNAME), Darwin)
 	@install -p -m 0644 priv/erlrtpproxy.sysconfig $(DESTDIR)$(prefix)/etc/erl$(NAME)
 	@echo "erl$(NAME) installed. \n"

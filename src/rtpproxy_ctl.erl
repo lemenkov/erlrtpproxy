@@ -23,7 +23,7 @@
 -export([acc/4]).
 -export([start/0]).
 -export([stop/0]).
--export([status/0]).
+-export([save_config/1]).
 -export([command/1]).
 
 -include("../include/common.hrl").
@@ -56,31 +56,17 @@ start() ->
 	application:start(rtpproxy).
 
 stop() ->
-	Node = case init:get_plain_arguments() of
-		[NodeStr] ->
-			list_to_atom(NodeStr);
-		_ ->
-			halt(1)
-	end,
-	call(Node, rtpproxy_ctl, command, [#cmd{type = ?CMD_X}], 2),
-	call(Node, init, stop, [], 2),
-	halt(0).
+	%% Stop erlrtpproxy gracefully
+	rtpproxy_ctl:command(#cmd{type = ?CMD_X}),
+	%% Stop all slave nodes
+	pool:stop(),
+	%% Stop main node
+	init:stop().
 
-status() ->
-	Node = case init:get_plain_arguments() of
-		[NodeStr] ->
-			list_to_atom(NodeStr);
-		_ ->
-			halt(1)
-	end,
-	case call(Node, rtpproxy_ctl, command, [#cmd{type = ?CMD_I, params = [brief]}], 4) of
-		{ok, {stats, Number}} ->
-			io:format("active calls: ~p~n", [Number]),
-			halt(0);
-		undefined ->
-			ok = io:format("~n"),
-			halt(3)
-	end.
+save_config(ConfigPath) ->
+	{ok,[Config]} = file:consult(ConfigPath),
+	NewConfig = proplists:delete(rtpproxy, Config) ++ [{rtpproxy, application:get_all_env(rtpproxy)}],
+	file:write_file(ConfigPath, io_lib:format("~p.~n", [NewConfig])).
 
 % Simply stop all active sessions
 command(#cmd{type = ?CMD_X}) ->
@@ -123,18 +109,4 @@ command(#cmd{callid = CallId, mediaid = MediaId} = Cmd) ->
 		MediaThreads when is_list(MediaThreads) ->
 			% Group command - return immediately
 			lists:foreach(fun(Pid) -> gen_server:cast(Pid, Cmd) end, MediaThreads)
-	end.
-
-%%
-%% Private functions
-%%
-
-call(Node, M, F, A, HaltRet) ->
-	try rpc:call(Node, M, F, A, 5000) of
-		{badrpc, _} ->
-			halt(HaltRet);
-		Rest ->
-			Rest
-	catch _:_ ->
-		halt(HaltRet)
 	end.
