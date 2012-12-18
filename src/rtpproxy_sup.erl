@@ -53,10 +53,10 @@ init([]) ->
 	end,
 	NotifyBackends = RadiusBackendProcess ++ NotifyBackendProcess,
 
-	% Load stats backend
-	{ok, StatsPort} = application:get_env(rtpproxy, stats_port),
-	%StatsProcess = ?CHILD(mochiweb_http, [[{loop, {stats, dispatch}}, {port, StatsPort}, {name, stats}]]),
-	StatsProcess = {mochiweb_http, {mochiweb_http, start, [[{loop, {stats, dispatch}}, {port, StatsPort}, {name, stats}]]}, transient, 5000, worker, [mochiweb_http]},
+	% Load http backend
+	{ok, HttpPort} = application:get_env(rtpproxy, http_port),
+	%HttpProcess = ?CHILD(mochiweb_http, [[{loop, {http_server, dispatch}}, {port, HttpPort}, {name, http_server}]]),
+	HttpProcess = {mochiweb_http, {mochiweb_http, start, [[{loop, {http_server, dispatch}}, {port, HttpPort}, {name, http_server}]]}, transient, 5000, worker, [mochiweb_http]},
 
-	{ok, {SupFlags, [ListenerProcess, BackendProcess, StatsProcess, StorageProcess, FileWriterProcess | NotifyBackends]}}.
+	{ok, {SupFlags, [ListenerProcess, BackendProcess, HttpProcess, StorageProcess, FileWriterProcess | NotifyBackends]}}.
 

@@ -17,7 +17,7 @@
 %%%
 %%%----------------------------------------------------------------------
 
--module(stats).
+-module(http_server).
 -author('lemenkov@gmail.com').
 
 -export([dispatch/1]).
