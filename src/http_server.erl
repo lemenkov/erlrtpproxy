@@ -58,10 +58,14 @@ dump_all() ->
 						{mediaid, MediaId},
 						{tag, Tag},
 						{payload, Payload},
+						{rxbytes, gproc:get_value({c, g, {CallId, MediaId, Tag, rxbytes}}, Pid)},
+						{rxpackets, gproc:get_value({c, g, {CallId, MediaId, Tag, rxpackets}}, Pid)},
+						{txbytes, gproc:get_value({c, g, {CallId, MediaId, Tag, txbytes}}, Pid)},
+						{txpackets, gproc:get_value({c, g, {CallId, MediaId, Tag, txpackets}}, Pid)},
 						{local, [{ip, list_to_binary(inet_parse:ntoa(LocalIp))}, {rtp, LocalRtpPort}, {rtcp, LocalRtcpPort}]},
 						{remote,[{ip, list_to_binary(inet_parse:ntoa(RemoteIp))}, {rtp, RemoteRtpPort}, {rtcp, RemoteRtcpPort}]}
 					]
-				} || [{p,g,media}, _, {CallId, MediaId, Tag, Payload, {LocalIp, LocalRtpPort, LocalRtcpPort}, {RemoteIp, RemoteRtpPort, RemoteRtcpPort}}] <- List],
+				} || [{p,g,media}, Pid, {CallId, MediaId, Tag, Payload, {LocalIp, LocalRtpPort, LocalRtcpPort}, {RemoteIp, RemoteRtpPort, RemoteRtcpPort}}] <- List],
 	mochijson2:encode([{callnum, Length}, {calls, Result}]).
 
 dump_query(RawQuery) ->
@@ -81,10 +85,14 @@ dump_query(RawQuery) ->
 					{mediaid, MediaId},
 					{tag, Tag},
 					{payload, Payload},
+					{rxbytes, gproc:get_value({c, g, {CallId, MediaId, Tag, rxbytes}}, Pid)},
+					{rxpackets, gproc:get_value({c, g, {CallId, MediaId, Tag, rxpackets}}, Pid)},
+					{txbytes, gproc:get_value({c, g, {CallId, MediaId, Tag, txbytes}}, Pid)},
+					{txpackets, gproc:get_value({c, g, {CallId, MediaId, Tag, txpackets}}, Pid)},
 					{local, [{ip, list_to_binary(inet_parse:ntoa(LocalIp))}, {rtp, LocalRtpPort}, {rtcp, LocalRtcpPort}]},
 					{remote,[{ip, list_to_binary(inet_parse:ntoa(RemoteIp))}, {rtp, RemoteRtpPort}, {rtcp, RemoteRtcpPort}]}
 				]
-			} || [{p,g,media}, _, {CallId, MediaId, Tag, Payload, {LocalIp, LocalRtpPort, LocalRtcpPort}, {RemoteIp, RemoteRtpPort, RemoteRtcpPort}}] <- List],
+			} || [{p,g,media}, Pid, {CallId, MediaId, Tag, Payload, {LocalIp, LocalRtpPort, LocalRtcpPort}, {RemoteIp, RemoteRtpPort, RemoteRtcpPort}}] <- List],
 	mochijson2:encode([{http_query,  [ {list_to_existing_atom(K), list_to_binary(V)} || {K,V} <- RawQuery]}, {result, Result}]).
 
 set_params(RawQuery) ->

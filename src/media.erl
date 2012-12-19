@@ -62,6 +62,11 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, param
 	% Register itself for group call and broadcast commands
 	gproc:add_global_property(media, {C, M, T, null, null, null}),
 
+	gproc:add_global_counter({C, M, T, rxbytes}, 0),
+	gproc:add_global_counter({C, M, T, rxpackets}, 0),
+	gproc:add_global_counter({C, M, T, txbytes}, 0),
+	gproc:add_global_counter({C, M, T, txpackets}, 0),
+
 	Ip = case {proplists:get_value(local, Params), proplists:get_value(remote, Params)} of
 		{undefined, undefined} ->
 			{ok, I} = application:get_env(rtpproxy, external), I;
@@ -168,11 +173,25 @@ handle_cast(#cmd{type = ?CMD_S, callid = C, mediaid = M, to = #party{tag = T}}, 
 handle_cast({'music-on-hold', Pkt}, #state{rtp = Pid, callid = C, mediaid = M, tag = T, copy = Copy} = State) ->
 	gen_server:cast(Pid, {Pkt, null, null}),
 	Copy andalso gen_server:cast(file_writer, {Pkt, C, M, T}),
+	Incr = case Pkt of
+		#rtp{payload = Payload} -> size(Payload);
+		{_, Payload, _} -> size(Payload);
+		_ -> 0
+	end,
+	gproc:update_counter({c, g, {C, M, T, txbytes}}, Incr),
+	gproc:update_counter({c, g, {C, M, T, txpackets}}, 1),
 	{noreply, State};
 
 handle_cast({Pkt, _Ip, _Port}, #state{rtp = Pid, hold = false, callid = C, mediaid = M, tag = T, copy = Copy} = State) ->
 	gen_server:cast(Pid, {Pkt, null, null}),
 	Copy andalso gen_server:cast(file_writer, {Pkt, C, M, T}),
+	Incr = case Pkt of
+		#rtp{payload = Payload} -> size(Payload);
+		{_, Payload, _} -> size(Payload);
+		_ -> 0
+	end,
+	gproc:update_counter({c, g, {C, M, T, txbytes}}, Incr),
+	gproc:update_counter({c, g, {C, M, T, txpackets}}, 1),
 	{noreply, State};
 
 handle_cast({_Pkt, _Ip, _Port}, #state{hold = true} = State) ->
@@ -204,19 +223,24 @@ handle_info({{Type, Payload, _Timestamp} = Pkt, Ip, Port}, #state{callid = C, me
 		[Pid] -> gen_server:cast(Pid, {Pkt, null, null})
 	end,
 	update_remote_phy(Ip, Port, OldIp, OldRtpPort, OldRtcpPort, C, M, T, Type),
+	gproc:update_counter({c, g, {C, M, T, rxbytes}}, size(Payload)),
+	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
 	{noreply, State#state{type = Type, ip = Ip, rtpport = Port}};
-handle_info({#rtp{payload_type = Type} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtpport = OldRtpPort, rtcpport = OldRtcpPort} = State) ->
+handle_info({#rtp{payload_type = Type, payload = Payload} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtpport = OldRtpPort, rtcpport = OldRtcpPort} = State) ->
 	case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
 		[] -> ok;
 		[Pid] -> gen_server:cast(Pid, {Pkt, null, null})
 	end,
 	update_remote_phy(Ip, Port, OldIp, OldRtpPort, OldRtcpPort, C, M, T, Type),
+	gproc:update_counter({c, g, {C, M, T, rxbytes}}, size(Payload)),
+	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
 	{noreply, State#state{type = Type, ip = Ip, rtpport = Port}};
 handle_info({#rtcp{} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtcpport = OldRtcpPort} = State) ->
 	case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
 		[] -> ok;
 		[Pid] -> gen_server:cast(Pid, {Pkt, null, null})
 	end,
+	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
 	case (Ip /= OldIp) or (Port /= OldRtcpPort) of
 		true -> {noreply, State#state{ip = null, rtpport = null, rtcpport = Port}};
 		false -> {noreply, State#state{rtcpport = Port}}
