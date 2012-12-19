@@ -175,7 +175,7 @@ handle_cast({'music-on-hold', Pkt}, #state{rtp = Pid, callid = C, mediaid = M, t
 	Copy andalso gen_server:cast(file_writer, {Pkt, C, M, T}),
 	Incr = case Pkt of
 		#rtp{payload = Payload} -> size(Payload);
-		{_, Payload, _} -> size(Payload);
+		{_, Payload, _} when is_binary(Payload) -> size(Payload);
 		_ -> 0
 	end,
 	gproc:update_counter({c, g, {C, M, T, txbytes}}, Incr),
@@ -187,7 +187,7 @@ handle_cast({Pkt, _Ip, _Port}, #state{rtp = Pid, hold = false, callid = C, media
 	Copy andalso gen_server:cast(file_writer, {Pkt, C, M, T}),
 	Incr = case Pkt of
 		#rtp{payload = Payload} -> size(Payload);
-		{_, Payload, _} -> size(Payload);
+		{_, Payload, _} when is_binary(Payload) -> size(Payload);
 		_ -> 0
 	end,
 	gproc:update_counter({c, g, {C, M, T, txbytes}}, Incr),
