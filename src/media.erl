@@ -262,6 +262,10 @@ handle_info(interim_update, #state{callid = C, mediaid = M, notify_info = Notify
 	{noreply, State};
 
 handle_info({'EXIT', Pid, timeout}, #state{rtp = Pid} = State) ->
+	case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
+		[] -> ok;
+		[Pid] -> gen_server:cast(Pid, stop)
+	end,
 	{stop, normal, State}.
 
 %%
