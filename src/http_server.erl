@@ -50,7 +50,7 @@ dispatch(Req) ->
 	end.
 
 dump_all() ->
-	Length = length(gproc:lookup_global_properties(media)) div 2,
+	Length = count_w_o_dupes(gproc:select([{ { {p,g, media} , '_' , {'$1', '_', '_', '_', '_', '_'} }, [], ['$1']}])),
 	List = gproc:select([{ { {p,g, media} , '_' , {'_', '_', '_', '_', '_', '_'} }, [], ['$$']}]),
 	Result =  [	{media,
 					[
@@ -142,3 +142,14 @@ decode_kv({"ignore_stop", "true"}) ->
 	{ignore_stop, true};
 decode_kv({"ignore_stop", "false"}) ->
 	{ignore_stop, false}.
+
+% See 99 prolog problems
+% 1.08 (**) Eliminate consecutive duplicates of list elements.
+count_w_o_dupes(List) when is_list(List) ->
+        count_w_o_dupes(lists:sort(List), 0).
+count_w_o_dupes([], Len) ->
+        Len;
+count_w_o_dupes([Elem, Elem | Rest], Len) ->
+        count_w_o_dupes([Elem | Rest], Len);
+count_w_o_dupes([Elem | Rest], Len) ->
+        count_w_o_dupes(Rest, Len+1).
