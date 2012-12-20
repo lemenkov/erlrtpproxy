@@ -68,8 +68,10 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, param
 	gproc:add_global_counter({C, M, T, txbytes}, 0),
 	gproc:add_global_counter({C, M, T, txpackets}, 0),
 
-	Ip = case {proplists:get_value(local, Params), proplists:get_value(remote, Params)} of
-		{undefined, undefined} ->
+	Ip = case {proplists:get_value(local, Params), proplists:get_value(remote, Params), proplists:get_value(ipv6, Params)} of
+		{_, _, true} ->
+			{ok, I} = application:get_env(rtpproxy, ipv6), I;
+		{undefined, undefined, _} ->
 			{ok, I} = application:get_env(rtpproxy, external), I;
 		{undefined, {_,_,_,_}} ->
 			{ok, I} = application:get_env(rtpproxy, external), I;
