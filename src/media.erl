@@ -45,6 +45,7 @@
 		rtcpport = null,
 		type,
 		hold = false,
+		sibling = null,
 		copy,
 		notify_info
 	}
@@ -91,6 +92,11 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, param
 		Acc -> rtpproxy_ctl:acc(Acc, C, M, NotifyInfo)
 	end,
 
+	case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
+		[] -> ok;
+		[Sibling] -> gen_server:cast(Sibling, {sibling, self()})
+	end,
+
 	{ok, #state{
 			cmd	= Cmd,
 			callid	= C,
@@ -119,6 +125,10 @@ handle_cast(#cmd{type = ?CMD_D, callid = C, mediaid = 0, to = null}, #state{call
 	{stop, normal, State};
 handle_cast(#cmd{type = ?CMD_D, callid = C, mediaid = 0}, #state{callid = C} = State) ->
 	{stop, normal, State};
+
+% Set sibling
+handle_cast({sibling, Sibling}, State) ->
+	{noreply, State#state{sibling = Sibling}};
 
 handle_cast(
 	#cmd{type = ?CMD_U, from = #party{addr = {IpAddr,_}}, origin = #origin{pid = Pid}, params = Params} = Cmd,
@@ -217,29 +227,20 @@ terminate(Reason, #state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	?ERR("terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
-handle_info({{Type, Payload, _Timestamp} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtpport = OldRtpPort, rtcpport = OldRtcpPort} = State) when is_binary(Payload) ->
-	case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
-		[] -> ok;
-		[Pid] -> gen_server:cast(Pid, {Pkt, null, null})
-	end,
+handle_info({{Type, Payload, _Timestamp} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtpport = OldRtpPort, rtcpport = OldRtcpPort, sibling = Sibling} = State) when is_binary(Payload) ->
+	gen_server:cast(Sibling, {Pkt, null, null}),
 	update_remote_phy(Ip, Port, OldIp, OldRtpPort, OldRtcpPort, C, M, T, Type),
 	gproc:update_counter({c, g, {C, M, T, rxbytes}}, size(Payload)),
 	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
 	{noreply, State#state{type = Type, ip = Ip, rtpport = Port}};
-handle_info({#rtp{payload_type = Type, payload = Payload} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtpport = OldRtpPort, rtcpport = OldRtcpPort} = State) ->
-	case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
-		[] -> ok;
-		[Pid] -> gen_server:cast(Pid, {Pkt, null, null})
-	end,
+handle_info({#rtp{payload_type = Type, payload = Payload} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtpport = OldRtpPort, rtcpport = OldRtcpPort, sibling = Sibling} = State) ->
+	gen_server:cast(Sibling, {Pkt, null, null}),
 	update_remote_phy(Ip, Port, OldIp, OldRtpPort, OldRtcpPort, C, M, T, Type),
 	gproc:update_counter({c, g, {C, M, T, rxbytes}}, size(Payload)),
 	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
 	{noreply, State#state{type = Type, ip = Ip, rtpport = Port}};
-handle_info({#rtcp{} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtcpport = OldRtcpPort} = State) ->
-	case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
-		[] -> ok;
-		[Pid] -> gen_server:cast(Pid, {Pkt, null, null})
-	end,
+handle_info({#rtcp{} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtcpport = OldRtcpPort, sibling = Sibling} = State) ->
+	gen_server:cast(Sibling, {Pkt, null, null}),
 	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
 	case (Ip /= OldIp) or (Port /= OldRtcpPort) of
 		true -> {noreply, State#state{ip = null, rtpport = null, rtcpport = Port}};
@@ -261,11 +262,8 @@ handle_info(interim_update, #state{callid = C, mediaid = M, notify_info = Notify
 	rtpproxy_ctl:acc(interim_update, C, M, NotifyInfo),
 	{noreply, State};
 
-handle_info({'EXIT', Pid, timeout}, #state{callid = C, mediaid = M, tag = T, rtp = Pid} = State) ->
-	case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
-		[] -> ok;
-		[Pid] -> gen_server:cast(Pid, stop)
-	end,
+handle_info({'EXIT', Pid, timeout}, #state{callid = C, mediaid = M, tag = T, rtp = Pid, sibling = Sibling} = State) ->
+	gen_server:cast(Sibling, stop),
 	{stop, normal, State}.
 
 %%
