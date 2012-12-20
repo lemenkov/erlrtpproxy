@@ -92,9 +92,11 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, param
 		Acc -> rtpproxy_ctl:acc(Acc, C, M, NotifyInfo)
 	end,
 
-	case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
-		[] -> ok;
-		[Sibling] -> gen_server:cast(Sibling, {sibling, self()})
+	Sibling = case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
+		[] -> null;
+		[S] ->
+			gen_server:cast(S, {sibling, self()}),
+			S
 	end,
 
 	{ok, #state{
@@ -104,6 +106,7 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, param
 			tag	= T,
 			rtp	= Pid,
 			copy	= Copy,
+			sibling = Sibling,
 			notify_info = NotifyInfo
 		}
 	}.
