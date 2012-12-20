@@ -67,7 +67,7 @@ set_default_opts() ->
 	application:set_env(rtpproxy, ttl, 30),
 	application:set_env(rtpproxy, ttl_early, 30),
 	application:set_env(rtpproxy, rebuildrtp, false),
-	application:set_env(rtpproxy, stats_port, 8442),
+	application:set_env(rtpproxy, http_port, 8442),
 
 	ok.
 
