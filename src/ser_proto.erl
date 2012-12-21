@@ -631,6 +631,18 @@ decode_params([$V, $1 |Rest], Result) ->
 	decode_params(Rest, ensure_alone(Result, acc, interim_update));
 decode_params([$V, $2 |Rest], Result) ->
 	decode_params(Rest, ensure_alone(Result, acc, stop));
+% DTMF mapping
+decode_params([$D|Rest], Result) ->
+	case string:span(Rest, "0123456789") of
+		0 ->
+			% Bogus - skip incomplete modifier
+			error_logger:error_msg("Found T parameter w/o necessary values - skipping~n"),
+			decode_params(Rest, Result);
+		Ret ->
+			Rest1 = string:substr(Rest, Ret + 1),
+			{Value, _} = string:to_integer(string:substr(Rest, 1, Ret)),
+			decode_params(Rest1, ensure_alone(Result, dtmf, Value))
+	end;
 
 % Unknown parameter - just skip it
 decode_params([Unknown|Rest], Result) ->
