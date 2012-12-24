@@ -558,7 +558,7 @@ decode_params([$I, $I|Rest], Result) ->
 % Internal to Internal (single I)
 decode_params([$I|Rest], Result) ->
 	decode_params(Rest, ensure_alone(Result, direction, {internal, internal}));
-% l - local address (?)
+% l - local address
 decode_params([$L|Rest], Result) ->
 	case string:span(Rest, "0123456789.") of
 		0 ->
@@ -570,7 +570,7 @@ decode_params([$L|Rest], Result) ->
 			{IpAddr, _} = parse_addr(string:substr(Rest, 1, Ret), "0"),
 			decode_params(Rest1, ensure_alone(Result, local, IpAddr))
 	end;
-% r - remote address (?)
+% r - remote address
 decode_params([$R|Rest], Result) ->
 	case string:span(Rest, "0123456789.") of
 		0 ->
