@@ -592,14 +592,12 @@ decode_params([$W|Rest], Result) ->
 %       in 10ms increments, however for some codecs the increment could differ
 %       (e.g. 30ms for GSM or 20ms for G.723).
 decode_params([$Z|Rest], Result) ->
-	case string:span(Rest, "0123456789") of
-		0 ->
+	case cut_number(Rest) of
+		{error, _} ->
 			% Bogus - skip incomplete modifier
 			error_logger:error_msg("Found Z parameter w/o necessary values - skipping~n"),
 			decode_params(Rest, Result);
-		Ret ->
-			Rest1 = string:substr(Rest, Ret + 1),
-			{Value, _} = string:to_integer(string:substr(Rest, 1, Ret)),
+		{Value, Rest1} ->
 			decode_params(Rest1, ensure_alone(Result, repacketize, Value))
 	end;
 
@@ -614,14 +612,12 @@ decode_params([$P, $2 |Rest], Result) ->
 	decode_params(Rest, ensure_alone(Result, proto, sctp));
 % Transcode - unofficial extension
 decode_params([$T|Rest], Result) ->
-	case string:span(Rest, "0123456789") of
-		0 ->
+	case cut_number(Rest) of
+		{error, _} ->
 			% Bogus - skip incomplete modifier
 			error_logger:error_msg("Found T parameter w/o necessary values - skipping~n"),
 			decode_params(Rest, Result);
-		Ret ->
-			Rest1 = string:substr(Rest, Ret + 1),
-			{Value, _} = string:to_integer(string:substr(Rest, 1, Ret)),
+		{Value, Rest1} ->
 			decode_params(Rest1, ensure_alone(Result, transcode, guess_codec(Value)))
 	end;
 % Accounting - unofficial extension
@@ -633,16 +629,19 @@ decode_params([$V, $2 |Rest], Result) ->
 	decode_params(Rest, ensure_alone(Result, acc, stop));
 % DTMF mapping
 decode_params([$D|Rest], Result) ->
-	case string:span(Rest, "0123456789") of
-		0 ->
+	case cut_number(Rest) of
+		{error, _} ->
 			% Bogus - skip incomplete modifier
 			error_logger:error_msg("Found T parameter w/o necessary values - skipping~n"),
 			decode_params(Rest, Result);
-		Ret ->
-			Rest1 = string:substr(Rest, Ret + 1),
-			{Value, _} = string:to_integer(string:substr(Rest, 1, Ret)),
+		{Value, Rest1} ->
 			decode_params(Rest1, ensure_alone(Result, dtmf, Value))
 	end;
+% Codec mapping
+% M<payloadid>=<internal type>
+decode_params([$M|Rest], Result) ->
+	{ok, KVs, Rest1} = cut_kv(Rest),
+	decode_params(Rest1, ensure_alone(Result, cmap, KVs));
 
 % Unknown parameter - just skip it
 decode_params([Unknown|Rest], Result) ->
@@ -811,3 +810,20 @@ binary_print_addr({Ip, Port}) ->
 	<<BinIp/binary, <<" ">>/binary, BinPort/binary>>;
 binary_print_addr(null) ->
 	<<"127.0.0.1 10000">>.
+
+cut_number(String) ->
+	Ret = string:span(String, "0123456789"),
+	Rest = string:substr(String, Ret + 1),
+	{Value, _} = string:to_integer(string:substr(String, 1, Ret)),
+	{Value, Rest}.
+
+cut_kv(String) ->
+	cut_kv(String, []).
+cut_kv(String, Ret) ->
+	{Key, [ $= | Rest0]} = cut_number(String),
+	case cut_number(Rest0) of
+		{Val, [ $, | Rest1]} ->
+			cut_kv(Rest1, Ret ++ [{Key, Val}]);
+		{Val, Rest2} ->
+			{ok, Ret ++ [{Key, Val}], Rest2}
+	end.
