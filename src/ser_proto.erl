@@ -632,7 +632,7 @@ decode_params([$D|Rest], Result) ->
 	case cut_number(Rest) of
 		{error, _} ->
 			% Bogus - skip incomplete modifier
-			error_logger:error_msg("Found T parameter w/o necessary values - skipping~n"),
+			error_logger:error_msg("Found D parameter w/o necessary values - skipping~n"),
 			decode_params(Rest, Result);
 		{Value, Rest1} ->
 			decode_params(Rest1, ensure_alone(Result, dtmf, Value))
