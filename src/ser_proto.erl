@@ -638,7 +638,7 @@ decode_params([$D|Rest], Result) ->
 			decode_params(Rest1, ensure_alone(Result, dtmf, Value))
 	end;
 % Codec mapping
-% M<payloadid>=<internal type>
+% M<RTP payload ID>=<internal type>
 decode_params([$M|Rest], Result) ->
 	{ok, KVs, Rest1} = cut_kv(Rest),
 	decode_params(Rest1, ensure_alone(Result, cmap, KVs));
