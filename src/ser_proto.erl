@@ -640,8 +640,14 @@ decode_params([$D|Rest], Result) ->
 % Codec mapping
 % M<RTP payload ID>=<internal type>
 decode_params([$M|Rest], Result) ->
-	{ok, KVs, Rest1} = cut_kv(Rest),
-	decode_params(Rest1, ensure_alone(Result, cmap, KVs));
+	{ok, KV, Rest1} = cut_kv(Rest),
+	KV1 = lists:map(fun
+			({K,0}) -> {K, {'ILBC',8000,1}};
+			({K,10}) -> {K, {'OPUS',8000,1}};
+			({K,20}) -> {K, {'SPEEX',8000,1}};
+			({K,V}) -> {K,V}
+		end, KV),
+	decode_params(Rest1, ensure_alone(Result, cmap, KV1));
 
 % Unknown parameter - just skip it
 decode_params([Unknown|Rest], Result) ->

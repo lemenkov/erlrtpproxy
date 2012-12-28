@@ -846,7 +846,7 @@ parse_cmd_u_25_codec_mapping_test() ->
 			from = #party{tag = <<"gQpjBN9QKZSBQ">>, addr = {{192,0,43,10},16834}, rtcpaddr = {{192,0,43,10},16835}},
 			to = #party{tag = <<>>},
 			params = [
-				{cmap,[{101,0},{102,5},{96,4}]},
+				{cmap,[{101,{'ILBC',8000,1}},{102,{'OPUS',8000,1}},{103,{'SPEEX',8000,1}}]},
 				{codecs,[{'PCMA',8000,1},101,{'CN',8000,1}]},
 				{direction, {external, external}},
 				{dtmf,96},
@@ -855,7 +855,7 @@ parse_cmd_u_25_codec_mapping_test() ->
 				{symmetric, true},
 				{transcode,{'G729',8000,1}}
 			]
-		}, ser_proto:decode(<<"15312_107 Ut18R10.200.200.13c8,101,13m101=0,102=5,96=4d96 cd74de9d-b4e5-1230-a7a2-000c29a5a46b 192.0.43.10 16834 gQpjBN9QKZSBQ;1 ;1 192.168.14.25:9999 632.180216664">>)).
+		}, ser_proto:decode(<<"15312_107 Ut18R10.200.200.13c8,101,13m101=0,102=10,103=20d96 cd74de9d-b4e5-1230-a7a2-000c29a5a46b 192.0.43.10 16834 gQpjBN9QKZSBQ;1 ;1 192.168.14.25:9999 632.180216664">>)).
 
 cmd_l_test_() ->
 	Cmd1 = #cmd{
