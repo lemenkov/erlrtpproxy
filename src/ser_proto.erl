@@ -723,13 +723,7 @@ print_codec(Codec) ->
 %%
 
 drop_zeroes(Binary) when is_binary(Binary) ->
-	drop_zeroes(<<>>, Binary).
-drop_zeroes(Result, <<>>) ->
-	Result;
-drop_zeroes(Result, <<0:8, Rest/binary>>) ->
-	drop_zeroes(Result, Rest);
-drop_zeroes(Result, <<Symbol:8, Rest/binary>>) ->
-	drop_zeroes(<<Result/binary, Symbol:8>>, Rest).
+	<< <<X>> || <<X>> <= Binary, X /= 0 >>.
 
 cut_newline(Binary) when is_binary(Binary) ->
 	Size = size(Binary) - 1,
