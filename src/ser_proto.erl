@@ -497,7 +497,7 @@ parse_codecs("session") ->
 	% A very special case - we don't know what codec is used so rtpproxy must use the same as client uses
 	[session];
 parse_codecs(CodecStr) ->
-	[ begin {Y, []} = string:to_integer(X), guess_codec(Y) end || X <- string:tokens(CodecStr, ",")].
+	[ begin {Y, []} = string:to_integer(X), rtp_utils:get_codec_from_payload(Y) end || X <- string:tokens(CodecStr, ",")].
 
 decode_params(A) ->
 	decode_params(binary_to_list(A), []).
@@ -618,7 +618,7 @@ decode_params([$T|Rest], Result) ->
 			error_logger:error_msg("Found T parameter w/o necessary values - skipping~n"),
 			decode_params(Rest, Result);
 		{Value, Rest1} ->
-			decode_params(Rest1, ensure_alone(Result, transcode, guess_codec(Value)))
+			decode_params(Rest1, ensure_alone(Result, transcode, rtp_utils:get_codec_from_payload(Value)))
 	end;
 % Accounting - unofficial extension
 decode_params([$V, $0 |Rest], Result) ->
@@ -715,34 +715,6 @@ print_tag_mediaid(Tag, <<"0">>) ->
 	Tag;
 print_tag_mediaid(Tag, MediaId) ->
 	<<Tag/binary, ";", MediaId/binary>>.
-
-% FIXME use more atoms instead of numbers where possible
-% grep "a=rtpmap:" /var/log/messages | sed -e 's,.*a=rtpmap:,,g' | sort | uniq | sort -n
-% http://www.iana.org/assignments/rtp-parameters
-% http://www.iana.org/assignments/media-types/audio/index.html
-guess_codec(0) -> {'PCMU',8000,1};
-% 1 and 2 are reserved
-guess_codec(3) -> {'GSM',8000,1};
-guess_codec(4) -> {'G723',8000,1};
-guess_codec(5) -> {'DVI4',8000,1};
-guess_codec(6) -> {'DVI4',16000,1};
-guess_codec(7) -> {'LPC',8000,1};
-guess_codec(8) -> {'PCMA',8000,1};
-guess_codec(9) -> {'G722',8000,1};
-guess_codec(10) -> {'L16',8000,2}; % FIXME 44100 according to RFC3551
-guess_codec(11) -> {'L16',8000,1}; % FIXME 44100 according to RFC3551
-guess_codec(12) -> {'QCELP',8000,1};
-guess_codec(13) -> {'CN',8000,1};
-guess_codec(14) -> {'MPA',90000,0}; % FIXME 90000 Hz?
-guess_codec(15) -> {'G728',8000,1};
-guess_codec(16) -> {'DVI4',11025,1};
-guess_codec(17) -> {'DVI4',22050,1};
-guess_codec(18) -> {'G729',8000,1}; % FIXME the same as G.729a?
-
-guess_codec(31) -> {'H261',90000,0};
-guess_codec(34) -> {'H263',90000,0};
-
-guess_codec(C) -> C.
 
 guess_payload({'PCMU',8000,1}) -> 0;
 guess_payload({'GSM',8000,1}) -> 3;
