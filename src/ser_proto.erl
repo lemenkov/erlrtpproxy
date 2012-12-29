@@ -31,7 +31,7 @@ decode(Msg) when is_binary(Msg) ->
 	% Cut last \n if it is exist and
 	% Drop accidental zeroes - OpenSIPs inserts them sometimes
 	% FIXME bug in OpenSIPS?
-	[Cookie,C|Rest] = binary_split(cut_newline(drop_zeroes(Msg)), $ ),
+	[Cookie,C|Rest] = binary_split(cut_newline(<< <<X>> || <<X>> <= Msg, X /= 0 >>), $ ),
 	case parse_splitted([binary_to_upper(C)|Rest]) of
 		#cmd{} = Cmd ->
 			Cmd#cmd{
@@ -721,9 +721,6 @@ print_codec(Codec) ->
 %%
 %% Binary helper functions
 %%
-
-drop_zeroes(Binary) when is_binary(Binary) ->
-	<< <<X>> || <<X>> <= Binary, X /= 0 >>.
 
 cut_newline(Binary) when is_binary(Binary) ->
 	Size = size(Binary) - 1,
