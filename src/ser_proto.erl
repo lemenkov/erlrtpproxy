@@ -765,10 +765,15 @@ binary_print_addr({Ip, Port}) ->
 binary_print_addr(null) ->
 	<<"127.0.0.1 10000">>.
 
-cut_number(String) ->
+cut(String, Span) ->
 	Ret = string:span(String, "0123456789"),
 	Rest = string:substr(String, Ret + 1),
-	{Value, _} = string:to_integer(string:substr(String, 1, Ret)),
+	Value = string:substr(String, 1, Ret),
+	{Value, Rest}.
+
+cut_number(String) ->
+	{V, Rest} = cut(String, "0123456789"),
+	{Value, _} = string:to_integer(V),
 	{Value, Rest}.
 
 cut_kv(String) ->
