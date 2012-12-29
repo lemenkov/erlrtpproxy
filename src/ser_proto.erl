@@ -28,10 +28,9 @@
 -define(SAFE_PARTY(Val0), case Val0 of null -> null; _ -> [Val, _] = ensure_mediaid(binary_split(Val0, $;)), #party{tag = Val} end).
 
 decode(Msg) when is_binary(Msg) ->
-	% Cut last \n if it is exist and
-	% Drop accidental zeroes - OpenSIPs inserts them sometimes
-	% FIXME bug in OpenSIPS?
-	[Cookie,C|Rest] = binary_split(cut_newline(<< <<X>> || <<X>> <= Msg, X /= 0 >>), $ ),
+	% Cut last \n (if exist) and drop accidental zeroes - OpenSIPs inserts
+	% them sometimes (bug in OpenSIPS)
+	[Cookie,C|Rest] = binary_split(<< <<X>> || <<X>> <= Msg, X /= 0, X /= $\n>>, $ ),
 	case parse_splitted([binary_to_upper(C)|Rest]) of
 		#cmd{} = Cmd ->
 			Cmd#cmd{
@@ -721,13 +720,6 @@ print_codec(Codec) ->
 %%
 %% Binary helper functions
 %%
-
-cut_newline(Binary) when is_binary(Binary) ->
-	Size = size(Binary) - 1,
-	case Binary of
-		<<Ret:Size/binary, $\n:8>> -> Ret;
-		_ -> Binary
-	end.
 
 binary_to_upper(Binary) when is_binary(Binary) ->
 	binary_to_upper(<<>>, Binary).
