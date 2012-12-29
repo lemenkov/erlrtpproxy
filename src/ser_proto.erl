@@ -716,29 +716,8 @@ print_tag_mediaid(Tag, <<"0">>) ->
 print_tag_mediaid(Tag, MediaId) ->
 	<<Tag/binary, ";", MediaId/binary>>.
 
-guess_payload({'PCMU',8000,1}) -> 0;
-guess_payload({'GSM',8000,1}) -> 3;
-guess_payload({'G723',8000,1}) -> 4;
-guess_payload({'DVI4',8000,1}) -> 5;
-guess_payload({'DVI4',16000,1}) -> 6;
-guess_payload({'LPC',8000,1}) -> 7;
-guess_payload({'PCMA',8000,1}) -> 8;
-guess_payload({'G722',8000,1}) -> 9;
-guess_payload({'L16',8000,2}) -> 10;
-guess_payload({'L16',8000,1}) -> 11;
-guess_payload({'QCELP',8000,1}) -> 12;
-guess_payload({'CN',8000,1}) -> 13;
-guess_payload({'MPA',90000,0}) -> 14;
-guess_payload({'G728',8000,1}) -> 15;
-guess_payload({'DVI4',11025,1}) -> 16;
-guess_payload({'DVI4',22050,1}) -> 17;
-guess_payload({'G729',8000,1}) -> 18;
-guess_payload({'H261',90000,0}) -> 31;
-guess_payload({'H263',90000,0}) -> 34;
-guess_payload(Number) when is_integer(Number) -> Number.
-
 print_codec(Codec) ->
-	Num = guess_payload(Codec),
+	Num = rtp_utils:get_payload_from_codec(Codec),
 	[Str] = io_lib:format("~b", [Num]),
 	Str.
 
