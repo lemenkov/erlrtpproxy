@@ -53,10 +53,7 @@ decode(Msg) when is_binary(Msg) ->
 						cookie=Cookie
 					}
 			end
-	end;
-
-decode(Msg) when is_list(Msg) ->
-	decode(list_to_binary(Msg)).
+	end.
 
 encode({error, syntax, Msg}) when is_binary(Msg) ->
 	[Cookie|_] = binary_split(Msg, $ ),
