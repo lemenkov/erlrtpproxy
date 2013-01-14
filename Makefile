@@ -24,6 +24,7 @@ rel: compile
 
 check: test
 test: all
+	epmd -daemon
 	$(REBAR) eunit $(REBAR_FLAGS)
 
 install: all
