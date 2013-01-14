@@ -159,5 +159,5 @@ count_w_o_dupes([], Len) ->
         Len;
 count_w_o_dupes([Elem, Elem | Rest], Len) ->
         count_w_o_dupes([Elem | Rest], Len);
-count_w_o_dupes([Elem | Rest], Len) ->
+count_w_o_dupes([_ | Rest], Len) ->
         count_w_o_dupes(Rest, Len+1).
