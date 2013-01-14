@@ -1,16 +1,43 @@
-#!/bin/bash
-. /usr/lib64/nagios/plugins/utils.sh
+#!/usr/bin/python
 
-RAWSTATUS=`/etc/init.d/erlrtpproxy status_verbose 2>/dev/null`
-STATUS=$?
+import urllib
+import json
+import getopt
+import os
+import sys
 
-[ $STATUS = 0 ] && CALLS=`echo $RAWSTATUS | cut -d " " -f 4` || CALLS="0"
+# Nagios return codes
+# https://github.com/nagios-plugins/nagios-plugins/blob/master/plugins-scripts/utils.sh.in#L3
 
-if [ $STATUS = 0 ]
-then
-	echo "rtpproxy is up and ready. Serves $CALLS calls now.|calls=$CALLS"
-	exit 0
-fi
+STATE_OK	= 0
+STATE_WARNING	= 1
+STATE_CRITICAL	= 2
+STATE_UNKNOWN	= 3
+STATE_DEPENDENT	= 4
 
-echo "rtpproxy DOES NOT WORKING properly.|calls=$CALLS"
-exit 1
+if __name__ == '__main__':
+	HOST = "localhost"
+	PORT = "8442"
+	JSON = {}
+
+	try:
+		opts, args = getopt.getopt(sys.argv[1:], 'u:p:')
+	except getopt.GetoptError:
+		print('usage: %s -u url') % sys.argv[0]
+		sys.exit(STATE_CRITICAL)
+
+	for o, a in opts:
+		if o == "-u":
+			HOST = a
+		elif o == "-p":
+			PORT = a
+
+	ADDR = "http://%s:%s/json/" % (HOST, PORT)
+
+	try:
+		JSON = json.load(urllib.urlopen(ADDR))
+	except Exception:
+		sys.exit(STATE_CRITICAL)
+
+	print ("Alive. Calls: %s") % JSON["callnum"]
+	sys.exit(STATE_OK)
