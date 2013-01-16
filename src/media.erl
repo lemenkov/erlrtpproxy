@@ -135,7 +135,7 @@ handle_cast({sibling, Sibling}, State) ->
 
 handle_cast(
 	#cmd{type = ?CMD_U, from = #party{addr = {IpAddr,_}}, origin = #origin{pid = Pid}, params = Params} = Cmd,
-	#state{callid = C, mediaid = M, tag = T, notify_info = NotifyInfo} = State
+	#state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_info = NotifyInfo} = State
 ) ->
 	case gproc:select([{{{p,g,media}, '_', {C, M, T, '_', '$1', '_'}}, [], ['$1']}]) of
 		[{Ip,PortRtp,PortRtcp}] ->
@@ -149,6 +149,7 @@ handle_cast(
 			% FIXME potential race condition on a client
 			ok
 	end,
+	gen_server:cast(RtpPid, {update, Params}),
 	case proplists:get_value(acc, Params, none) of
 		none -> ok;
 		Acc -> rtpproxy_ctl:acc(Acc, C, M, NotifyInfo)
