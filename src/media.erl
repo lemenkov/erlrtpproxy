@@ -81,7 +81,8 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, param
 	{ok, RebuildRtp} = application:get_env(rtpproxy, rebuildrtp),
 	{ok, TimeoutEarly} = application:get_env(rtpproxy, ttl_early),
 	{ok, Timeout} = application:get_env(rtpproxy, ttl),
-	{ok, Pid} = gen_rtp_channel:open(0, Params ++ [{ip, Ip}, {rebuildrtp, RebuildRtp}, {timeout_early, TimeoutEarly*1000}, {timeout, Timeout*1000}]),
+	{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
+	{ok, Pid} = gen_rtp_channel:open(0, Params ++ [{ip, Ip}, {rebuildrtp, RebuildRtp}, {timeout_early, TimeoutEarly*1000}, {timeout, Timeout*1000}, {sendrecv, SendRecvStrategy}]),
 
 	NotifyInfo = proplists:get_value(notify, Params, []),
 
@@ -149,7 +150,8 @@ handle_cast(
 			% FIXME potential race condition on a client
 			ok
 	end,
-	gen_server:cast(RtpPid, {update, Params}),
+	{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
+	gen_server:cast(RtpPid, {update, Params ++ [{sendrecv, SendRecvStrategy}]}),
 	case proplists:get_value(acc, Params, none) of
 		none -> ok;
 		Acc -> rtpproxy_ctl:acc(Acc, C, M, NotifyInfo)

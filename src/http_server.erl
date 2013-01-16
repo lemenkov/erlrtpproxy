@@ -149,7 +149,13 @@ decode_kv({"ignore_start", "false"}) ->
 decode_kv({"ignore_stop", "true"}) ->
 	{ignore_stop, true};
 decode_kv({"ignore_stop", "false"}) ->
-	{ignore_stop, false}.
+	{ignore_stop, false};
+decode_kv({"sendrecv", "weak"}) ->
+	{sendrecv, weak};
+decode_kv({"sendrecv", "roaming"}) ->
+	{sendrecv, roaming};
+decode_kv({"sendrecv", "enforcing"}) ->
+	{sendrecv, enforcing}.
 
 % See 99 prolog problems
 % 1.08 (**) Eliminate consecutive duplicates of list elements.
