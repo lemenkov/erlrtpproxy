@@ -254,6 +254,7 @@ handle_info({#rtp{payload_type = Type, payload = Payload} = Pkt, Ip, Port}, #sta
 handle_info({#rtcp{} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtcpport = OldRtcpPort, sibling = Sibling} = State) ->
 	gen_server:cast(Sibling, {Pkt, null, null}),
 	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
+	error_logger:warning_msg("RTCP: ~p from C[~p] T[~p]~n", [Pkt, C, T]),
 	case (Ip /= OldIp) or (Port /= OldRtcpPort) of
 		true -> {noreply, State#state{ip = null, rtpport = null, rtcpport = Port}};
 		false -> {noreply, State#state{rtcpport = Port}}
