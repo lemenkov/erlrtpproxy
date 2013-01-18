@@ -267,7 +267,7 @@ handle_info(interim_update, #state{callid = C, mediaid = M, notify_info = Notify
 	rtpproxy_ctl:acc(interim_update, C, M, NotifyInfo),
 	{noreply, State};
 
-handle_info({'EXIT', Pid, timeout}, #state{callid = C, mediaid = M, tag = T, rtp = Pid, sibling = Sibling} = State) ->
+handle_info({'EXIT', Pid, timeout}, #state{rtp = Pid, sibling = Sibling} = State) ->
 	gen_server:cast(Sibling, stop),
 	{stop, normal, State}.
 
