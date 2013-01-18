@@ -73,19 +73,9 @@ command(#cmd{type = ?CMD_X}) ->
 	Calls = gproc:lookup_global_properties(media),
 	lists:foreach(fun({Pid,{_,_,_,_,_,_}}) -> gen_server:cast(Pid, stop) end, Calls);
 
-command(#cmd{type = ?CMD_I, params = [brief]}) ->
-	Length = length(gproc:lookup_global_properties(media)) div 2,
-	{ok, {stats, Length}};
-
-% TODO show information about calls
+% DEPRECATED. Use HTTP-JSON
 command(#cmd{type = ?CMD_I}) ->
-	% Calls = gproc:lookup_global_properties(media),
-	% Stats = lists:map(fun(Pid) -> gen_server:call(Pid, ?CMD_Q) end, Calls),
-	% "sessions created: %llu\nactive sessions: %d\n active streams: %d\n"
-	% foreach session "%s/%s: caller = %s:%d/%s, callee = %s:%d/%s, stats = %lu/%lu/%lu/%lu, ttl = %d/%d\n"
-	Length = length(gproc:lookup_global_properties(media)) div 2,
-	% FIXME - provide real stats here
-	{ok, {stats, Length, Length}};
+	ok;
 
 command(#cmd{type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{tag = Tag}} = Cmd) ->
 	case gproc:lookup_global_name({media, CallId, MediaId, Tag}) of
