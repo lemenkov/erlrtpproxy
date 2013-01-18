@@ -74,8 +74,7 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, param
 		{undefined, _, _} ->
 			{ok, I} = application:get_env(rtpproxy, external), I;
 		{{_,_,_,_}, undefined, _} ->
-%			{ok, I} = application:get_env(rtpproxy, internal), I <- FIXME
-			{ok, I} = application:get_env(rtpproxy, external), I
+			{ok, I} = application:get_env(rtpproxy, internal), I
 	end,
 
 	{ok, RebuildRtp} = application:get_env(rtpproxy, rebuildrtp),
