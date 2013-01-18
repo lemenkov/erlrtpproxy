@@ -133,13 +133,13 @@ handle_cast({sibling, Sibling}, State) ->
 	{noreply, State#state{sibling = Sibling}};
 
 handle_cast(
-	#cmd{type = ?CMD_U, from = #party{addr = {IpAddr,_}}, origin = #origin{pid = Pid}, params = Params} = Cmd,
+	#cmd{type = ?CMD_U, from = #party{addr = Addr}, origin = #origin{pid = Pid}, params = Params} = Cmd,
 	#state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_info = NotifyInfo} = State
 ) ->
 	case gproc:select([{{{p,g,media}, '_', {C, M, T, '_', '$1', '_'}}, [], ['$1']}]) of
 		[{Ip,PortRtp,PortRtcp}] ->
-			case IpAddr of
-				{0,0,0,0} ->
+			case Addr of
+				{{0,0,0,0}, _} ->
 					gen_server:cast(Pid, {reply, Cmd, {{{0,0,0,0}, PortRtp}, {{0,0,0,0}, PortRtcp}}});
 				_ ->
 					gen_server:cast(Pid, {reply, Cmd, {{Ip, PortRtp}, {Ip, PortRtcp}}})
