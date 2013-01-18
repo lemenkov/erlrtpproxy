@@ -59,7 +59,7 @@ init([]) ->
 	HttpProcess = {mochiweb_http, {mochiweb_http, start, [[{loop, {http_server, dispatch}}, {port, HttpPort}, {name, http_server}]]}, transient, 5000, worker, [mochiweb_http]},
 
 	% Set up stats
-	% FIXME this should be moved somewhere and switched to {a,g.calls}
+	% FIXME this should be moved somewhere and switched to {a,g,calls}
 	gproc:reg_shared({c,g,calls}),
 
 	{ok, {SupFlags, [ListenerProcess, BackendProcess, HttpProcess, StorageProcess, FileWriterProcess | NotifyBackends]}}.
