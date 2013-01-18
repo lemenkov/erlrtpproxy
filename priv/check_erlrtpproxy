@@ -32,7 +32,7 @@ if __name__ == '__main__':
 		elif o == "-p":
 			PORT = a
 
-	ADDR = "http://%s:%s/json/" % (HOST, PORT)
+	ADDR = "http://%s:%s/json/?callnum" % (HOST, PORT)
 
 	try:
 		JSON = json.load(urllib.urlopen(ADDR))

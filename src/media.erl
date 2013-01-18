@@ -47,7 +47,8 @@
 		hold = false,
 		sibling = null,
 		copy,
-		notify_info
+		notify_info,
+		role
 	}
 ).
 
@@ -92,11 +93,15 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, param
 		Acc -> rtpproxy_ctl:acc(Acc, C, M, NotifyInfo)
 	end,
 
-	Sibling = case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
-		[] -> null;
+	{Role, Sibling} = case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
+		[] ->
+			% initial call creation.
+%			gproc:update_counter(calls, 1),
+			gproc:update_shared_counter({c,g,calls},1),
+			{master, null};
 		[S] ->
 			gen_server:cast(S, {sibling, self()}),
-			S
+			{slave, S}
 	end,
 
 	{ok, #state{
@@ -107,7 +112,8 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, param
 			rtp	= Pid,
 			copy	= Copy,
 			sibling = Sibling,
-			notify_info = NotifyInfo
+			notify_info = NotifyInfo,
+			role = Role
 		}
 	}.
 
@@ -212,7 +218,7 @@ handle_cast(Other, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, #state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_info = NotifyInfo, copy = Copy}) ->
+terminate(Reason, #state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_info = NotifyInfo, copy = Copy, role = Role}) ->
 	rtpproxy_ctl:acc(stop, C, M, NotifyInfo),
 	case gproc:select({global,names}, [{{{n, g, {player, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
 		[] -> ok;
@@ -220,6 +226,7 @@ terminate(Reason, #state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_
 	end,
 	gen_rtp_channel:close(RtpPid),
 	Copy andalso gen_server:cast(file_writer, {eof, C, M, T}),
+	Role == master andalso gproc:update_shared_counter({c,g,calls}, -1),
 	% No need to explicitly unregister from gproc - it does so automatically
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	?ERR("terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).

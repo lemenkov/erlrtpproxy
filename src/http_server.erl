@@ -50,7 +50,7 @@ dispatch(Req) ->
 	end.
 
 dump_all() ->
-	Length = count_w_o_dupes(gproc:select([{ { {p,g, media} , '_' , {'$1', '_', '_', '_', '_', '_'} }, [], ['$1']}])),
+	Length = gproc:get_value({c, g, calls}, shared),
 	List = gproc:select([{ { {p,g, media} , '_' , {'_', '_', '_', '_', '_', '_'} }, [], ['$$']}]),
 	Result =  [	{media,
 					[
@@ -68,6 +68,9 @@ dump_all() ->
 				} || [{p,g,media}, Pid, {CallId, MediaId, Tag, Payload, {LocalIp, LocalRtpPort, LocalRtcpPort}, {RemoteIp, RemoteRtpPort, RemoteRtcpPort}}] <- List],
 	mochijson2:encode([{callnum, Length}, {calls, Result}]).
 
+dump_query([{"callnum",_}]) ->
+	Length = gproc:get_value({c, g, calls}, shared),
+	mochijson2:encode([{callnum, Length}]);
 dump_query(RawQuery) ->
 	Query = [ decode_kv(KV) || KV <- RawQuery],
 	C = proplists:get_value(callid, Query, '_'),
@@ -156,14 +159,3 @@ decode_kv({"sendrecv", "roaming"}) ->
 	{sendrecv, roaming};
 decode_kv({"sendrecv", "enforcing"}) ->
 	{sendrecv, enforcing}.
-
-% See 99 prolog problems
-% 1.08 (**) Eliminate consecutive duplicates of list elements.
-count_w_o_dupes(List) when is_list(List) ->
-        count_w_o_dupes(lists:sort(List), 0).
-count_w_o_dupes([], Len) ->
-        Len;
-count_w_o_dupes([Elem, Elem | Rest], Len) ->
-        count_w_o_dupes([Elem | Rest], Len);
-count_w_o_dupes([_ | Rest], Len) ->
-        count_w_o_dupes(Rest, Len+1).
