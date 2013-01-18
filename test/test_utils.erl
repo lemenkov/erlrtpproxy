@@ -64,6 +64,7 @@ set_default_opts() ->
 
 	%% Options for rtpproxy itself
 	application:set_env(rtpproxy, external, ?RTPPROXY_IP),
+	application:set_env(rtpproxy, sendrecv, roaming),
 	application:unset_env(rtpproxy, internal),
 	application:unset_env(rtpproxy, ipv6),
 	application:set_env(rtpproxy, ttl, 30),
