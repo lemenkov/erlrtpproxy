@@ -96,7 +96,6 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, param
 	{Role, Sibling} = case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
 		[] ->
 			% initial call creation.
-%			gproc:update_counter(calls, 1),
 			gproc:update_shared_counter({c,g,calls},1),
 			{master, null};
 		[S] ->
