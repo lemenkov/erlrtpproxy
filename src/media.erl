@@ -48,6 +48,7 @@
 		sibling = null,
 		copy,
 		notify_info,
+		prefill,
 		role
 	}
 ).
@@ -82,7 +83,7 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 	{ok, TimeoutEarly} = application:get_env(rtpproxy, ttl_early),
 	{ok, Timeout} = application:get_env(rtpproxy, ttl),
 	{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
-	{ok, Pid} = gen_rtp_channel:open(0, Params ++ [{ip, Ip}, {rebuildrtp, RebuildRtp}, {timeout_early, TimeoutEarly*1000}, {timeout, Timeout*1000}, {sendrecv, SendRecvStrategy}, {prefill, Addr}]),
+	{ok, Pid} = gen_rtp_channel:open(0, Params ++ [{ip, Ip}, {rebuildrtp, RebuildRtp}, {timeout_early, TimeoutEarly*1000}, {timeout, Timeout*1000}, {sendrecv, SendRecvStrategy}]),
 
 	NotifyInfo = proplists:get_value(notify, Params, []),
 
@@ -100,6 +101,7 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 			{master, null};
 		[S] ->
 			gen_server:cast(S, {sibling, self()}),
+			gen_server:cast(S, {prefill, Addr}),
 			{slave, S}
 	end,
 
@@ -112,6 +114,7 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 			copy	= Copy,
 			sibling = Sibling,
 			notify_info = NotifyInfo,
+			prefill	= Addr,
 			role = Role
 		}
 	}.
@@ -130,6 +133,17 @@ handle_cast(#cmd{type = ?CMD_D, callid = C, mediaid = 0}, #state{callid = C} = S
 % Set sibling
 handle_cast({sibling, Sibling}, State) ->
 	{noreply, State#state{sibling = Sibling}};
+handle_cast({prefill, null}, State) ->
+	{noreply, State};
+handle_cast({prefill, {Ip, Addr}}, #state{rtp = RtpPid, role = slave} = State) ->
+	{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
+	gen_server:cast(RtpPid, {update, [{sendrecv, SendRecvStrategy}, {prefill, {Ip, Addr}}]}),
+	{noreply, State};
+handle_cast({prefill, {Ip, Addr}}, #state{rtp = RtpPid, role = master, prefill = Addr2, sibling = Sibling} = State) ->
+	{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
+	gen_server:cast(RtpPid, {update, [{sendrecv, SendRecvStrategy}, {prefill, {Ip, Addr}}]}),
+	gen_server:cast(Sibling, {prefill, Addr2}),
+	{noreply, State};
 
 handle_cast(
 	#cmd{type = ?CMD_U, from = #party{addr = Addr}, origin = #origin{pid = Pid}, params = Params} = Cmd,
