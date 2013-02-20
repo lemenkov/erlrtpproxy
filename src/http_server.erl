@@ -38,8 +38,14 @@ dispatch(Req) ->
 					end,
 					Req:respond({200, [], JSON});
 				["params" | _] ->
-					set_params(Req:parse_qs()),
-					Req:respond({200, [], "Done"});
+					Qs = Req:parse_qs(),
+					case Qs of
+						[] ->
+							Req:respond({200, [], get_params()});
+						_ ->
+							set_params(Qs),
+							Req:respond({200, [], "Done"})
+					end;
 				_ ->
 					error_logger:warning_msg("UNKNOWN: ~p~n", [Path]),
 					Req:respond({404, [], "404 Not found\r\n"})
@@ -100,6 +106,15 @@ dump_query(RawQuery) ->
 				]
 			}] || [{p,g,media}, Pid, {CallId, MediaId, Tag, Payload, {LocalIp, LocalRtpPort, LocalRtcpPort}, {RemoteIp, RemoteRtpPort, RemoteRtcpPort}}] <- List],
 	mochijson2:encode([{http_query,  [ {list_to_existing_atom(K), list_to_binary(V)} || {K,V} <- RawQuery]}, {result, Result}]).
+
+get_params() ->
+	Params = [ttl, ttl_early, rebuildrtp, ignore_start, ignore_stop, sendrecv],
+	Nodes = pool:get_nodes(),
+	JSON = lists:map(fun(Node) ->
+				[{node, Node}, {params, lists:map(fun(X) -> {ok, Y} = rpc:call(Node, application, get_env, [rtpproxy, X]), {X, Y} end, Params)}]
+			end, Nodes),
+
+	mochijson2:encode(JSON).
 
 set_params(RawQuery) ->
 	Query = [ decode_kv(KV) || KV <- RawQuery],
