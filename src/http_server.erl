@@ -69,7 +69,7 @@ dump_all() ->
 					]
 				}
 			] || [{p,g,media}, Pid, {CallId, MediaId, Tag, Payload, {LocalIp, LocalRtpPort, LocalRtcpPort}, {RemoteIp, RemoteRtpPort, RemoteRtcpPort}}] <- List],
-	mochijson2:encode([{callnum, Length}, {calls, Result}]).
+	mochijson2:encode([{callnum, Length}, {calllegs, Result}]).
 
 dump_query([{"callnum",_}]) ->
 	Length = gproc:get_value({c, g, calls}, shared),
