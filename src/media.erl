@@ -49,6 +49,7 @@
 		copy,
 		notify_info,
 		prefill,
+		remoteip,
 		role
 	}
 ).
@@ -115,6 +116,7 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 			sibling = Sibling,
 			notify_info = NotifyInfo,
 			prefill	= Addr,
+			remoteip= proplists:get_value(remote, Params),
 			role = Role
 		}
 	}.
@@ -133,16 +135,19 @@ handle_cast(#cmd{type = ?CMD_D, callid = C, mediaid = 0}, #state{callid = C} = S
 % Set sibling
 handle_cast({sibling, Sibling}, State) ->
 	{noreply, State#state{sibling = Sibling}};
-handle_cast({prefill, null}, State) ->
-	{noreply, State};
+
+%handle_cast({prefill, {Ip, Addr}}, #state{rtp = RtpPid, role = slave, remoteip = Ip} = State) ->
 handle_cast({prefill, {Ip, Addr}}, #state{rtp = RtpPid, role = slave} = State) ->
 	{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
 	gen_server:cast(RtpPid, {update, [{sendrecv, SendRecvStrategy}, {prefill, {Ip, Addr}}]}),
 	{noreply, State};
+%handle_cast({prefill, {Ip, Addr}}, #state{rtp = RtpPid, role = master, remoteip = Ip, prefill = Addr2, sibling = Sibling} = State) ->
 handle_cast({prefill, {Ip, Addr}}, #state{rtp = RtpPid, role = master, prefill = Addr2, sibling = Sibling} = State) ->
 	{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
 	gen_server:cast(RtpPid, {update, [{sendrecv, SendRecvStrategy}, {prefill, {Ip, Addr}}]}),
 	gen_server:cast(Sibling, {prefill, Addr2}),
+	{noreply, State};
+handle_cast({prefill, _}, State) ->
 	{noreply, State};
 
 handle_cast(
