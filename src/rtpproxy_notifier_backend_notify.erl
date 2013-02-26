@@ -31,18 +31,20 @@ handle_call(Message, From, State) ->
 handle_cast({Type, _, _, [{addr,{Ip,Port}},{tag,NotifyTag}]}, {tcp, FdSet}) ->
 	{Fd, NewFdSet} = case proplists:get_value({Ip,Port}, FdSet, null) of
 		null ->
-			{ok, F} = gen_tcp:connect(Ip, Port, [binary, {active, true}]),
-			{F, FdSet ++ [{{Ip,Port}, F}]};
+			case gen_tcp:connect(Ip, Port, [binary, {active, true}]) of
+				{ok, F} -> {F, FdSet ++ [{{Ip,Port}, F}]};
+				{error, Err} -> {{error, Err}, FdSet}
+			end;
 		F ->
 			{F, FdSet}
 	end,
-	case gen_tcp:send(Fd, NotifyTag) of
+	case tcp_send(Fd, NotifyTag) of
 		ok ->
 			error_logger:info_msg("Message (~p) delivered from ~p to ~s:~b~n", [Type, node(), inet_parse:ntoa(Ip), Port]),
 			{noreply, {tcp, NewFdSet}};
 		{error, E} ->
 			error_logger:info_msg("Message (~p) delivered from ~p CANNOT be sent to ~s:~b due to ~p~n", [Type, node(), inet_parse:ntoa(Ip), Port, E]),
-			gen_tcp:close(Fd),
+			tcp_close(Fd),
 			{noreply, {tcp, lists:delete({{Ip,Port}, Fd}, NewFdSet)}}
 	end;
 
@@ -73,3 +75,13 @@ terminate(Reason, {udp, Fd}) ->
 	gen_udp:close(Fd),
 	error_logger:error_msg("Terminated: ~p at ~p~n", [Reason, node()]),
 	ok.
+
+%%
+%% Internal functions
+%%
+
+tcp_send({error, E}, _) -> {error, E};
+tcp_send(Fd, Msg) -> gen_tcp:send(Fd, Msg).
+
+tcp_close({error, _}) -> ok;
+tcp_close(Fd) -> gen_tcp:close(Fd).
