@@ -28,7 +28,13 @@ handle_call(Message, From, State) ->
 	error_logger:warning_msg("Bogus call: ~p from ~p at ~p~n", [Message, From, node()]),
 	{reply, {error, unknown_call}, State}.
 
-handle_cast({Type, _, _, [{addr,{Ip,Port}},{tag,NotifyTag}]}, {tcp, FdSet}) ->
+% Don't send "start" via TCP notification - incompatible with OpenSER
+handle_cast({start, _, _, _}, {tcp, _} = State) ->
+	{noreply, State};
+% Don't send "interim_update" via TCP notification - incompatible with OpenSER
+handle_cast({interim_update, _, _, _}, {tcp, _} = State) ->
+	{noreply, State};
+handle_cast({stop, _, _, [{addr,{Ip,Port}},{tag,NotifyTag}]}, {tcp, FdSet}) ->
 	{Fd, NewFdSet} = case proplists:get_value({Ip,Port}, FdSet, null) of
 		null ->
 			case gen_tcp:connect(Ip, Port, [binary, {active, true}]) of
@@ -40,17 +46,17 @@ handle_cast({Type, _, _, [{addr,{Ip,Port}},{tag,NotifyTag}]}, {tcp, FdSet}) ->
 	end,
 	case tcp_send(Fd, NotifyTag) of
 		ok ->
-			error_logger:info_msg("Message (~p) delivered from ~p to ~s:~b~n", [Type, node(), inet_parse:ntoa(Ip), Port]),
+			error_logger:info_msg("Notification (stop) from ~p sent to tcp:~s:~b~n", [node(), inet_parse:ntoa(Ip), Port]),
 			{noreply, {tcp, NewFdSet}};
 		{error, E} ->
-			error_logger:info_msg("Message (~p) delivered from ~p CANNOT be sent to ~s:~b due to ~p~n", [Type, node(), inet_parse:ntoa(Ip), Port, E]),
+			error_logger:info_msg("Notification (stop) from ~p CANNOT be sent to tcp:~s:~b due to ~p~n", [node(), inet_parse:ntoa(Ip), Port, E]),
 			tcp_close(Fd),
 			{noreply, {tcp, lists:delete({{Ip,Port}, Fd}, NewFdSet)}}
 	end;
 
 handle_cast({Type, _, _, [{addr,{Ip,Port}},{tag,NotifyTag}]}, {udp, Fd}) ->
 	gen_udp:send(Fd, Ip, Port, NotifyTag),
-	error_logger:info_msg("Message (~p) delivered from ~p to ~s:~b~n", [Type, node(), inet_parse:ntoa(Ip), Port]),
+	error_logger:info_msg("Notification (~p) from ~p sent to udp:~s:~b~n", [Type, node(), inet_parse:ntoa(Ip), Port]),
 	{noreply, {udp, Fd}};
 
 handle_cast(stop, State) ->
