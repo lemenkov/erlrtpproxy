@@ -108,7 +108,7 @@ dump_query(RawQuery) ->
 	mochijson2:encode([{http_query,  [ {list_to_existing_atom(K), list_to_binary(V)} || {K,V} <- RawQuery]}, {result, Result}]).
 
 get_params() ->
-	Params = [ttl, ttl_early, rebuildrtp, ignore_start, ignore_stop, sendrecv],
+	Params = [ttl, ttl_early, rebuildrtp, ignore_start, ignore_stop, sendrecv, active],
 	Nodes = pool:get_nodes(),
 	JSON = lists:map(fun(Node) ->
 				[{node, Node}, {params, lists:map(fun(X) -> {ok, Y} = rpc:call(Node, application, get_env, [rtpproxy, X]), {X, Y} end, Params)}]
@@ -176,4 +176,8 @@ decode_kv({"sendrecv", "weak"}) ->
 decode_kv({"sendrecv", "roaming"}) ->
 	{sendrecv, roaming};
 decode_kv({"sendrecv", "enforcing"}) ->
-	{sendrecv, enforcing}.
+	{sendrecv, enforcing};
+decode_kv({"active", "once"}) ->
+	{active, once};
+decode_kv({"active", "true"}) ->
+	{active, true}.
