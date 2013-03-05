@@ -63,6 +63,13 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 
 	% Register itself
 	gproc:add_global_name({media, C, M, T}),
+
+	% For RTCP storing
+	gproc:add_global_name({rr, C, M, T}),
+	gproc:add_global_name({sr, C, M, T}),
+	gproc:set_value({n, g, {rr, C, M, T}}, null),
+	gproc:set_value({n, g, {sr, C, M, T}}, null),
+
 	% Register itself for group call and broadcast commands
 	gproc:add_global_property(media, {C, M, T, null, null, null}),
 
@@ -268,9 +275,14 @@ handle_info({#rtp{payload_type = Type, payload = Payload} = Pkt, Ip, Port}, #sta
 	gproc:update_counter({c, g, {C, M, T, rxbytes}}, size(Payload)),
 	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
 	{noreply, State#state{type = Type, ip = Ip, rtpport = Port}};
-handle_info({#rtcp{} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtcpport = OldRtcpPort, sibling = Sibling} = State) ->
+handle_info({#rtcp{payloads = Rtcps} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtcpport = OldRtcpPort, sibling = Sibling} = State) ->
 	gen_server:cast(Sibling, {Pkt, null, null}),
 	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
+	% FIXME accumulate info from the RTCP
+	Sr = rtp_utils:take(Rtcps, sr),
+	Rr = rtp_utils:take(Rtcps, rr),
+	Rr /= false andalso gproc:set_value({n, g, {rr, C, M, T}}, rtp_utils:to_proplist(Rr)),
+	Sr /= false andalso gproc:set_value({n, g, {sr, C, M, T}}, rtp_utils:to_proplist(Sr)),
 	error_logger:warning_msg("RTCP: ~p from C[~p] T[~p]~n", [rtp_utils:pp(Pkt), C, T]),
 	case (Ip /= OldIp) or (Port /= OldRtcpPort) of
 		true -> {noreply, State#state{ip = null, rtpport = null, rtcpport = Port}};
