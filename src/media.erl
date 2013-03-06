@@ -133,6 +133,34 @@ handle_call(Call, _From,  State) ->
 	?ERR("Unmatched call [~p]", [Call]),
 	{stop,{error,unknown_call},State}.
 
+handle_cast({Pkt, _Ip, _Port}, #state{rtp = Pid, hold = false, callid = C, mediaid = M, tag = T, copy = Copy} = State) ->
+	gen_server:cast(Pid, {Pkt, null, null}),
+	Copy andalso gen_server:cast(file_writer, {Pkt, C, M, T}),
+	Incr = case Pkt of
+		#rtp{payload = Payload} when is_binary(Payload) -> size(Payload)+12;
+		_ when is_binary(Pkt) -> size(Pkt);
+		_ -> 0
+	end,
+	gproc:update_counter({c, g, {C, M, T, txbytes}}, Incr),
+	gproc:update_counter({c, g, {C, M, T, txpackets}}, 1),
+	{noreply, State};
+
+handle_cast({_Pkt, _Ip, _Port}, #state{hold = true} = State) ->
+	% Music on Hold / Mute
+	{noreply, State};
+
+handle_cast({'music-on-hold', Pkt}, #state{rtp = Pid, callid = C, mediaid = M, tag = T, copy = Copy} = State) ->
+	gen_server:cast(Pid, {Pkt, null, null}),
+	Copy andalso gen_server:cast(file_writer, {Pkt, C, M, T}),
+	Incr = case Pkt of
+		#rtp{payload = Payload} -> size(Payload);
+		{_, Payload, _} when is_binary(Payload) -> size(Payload);
+		_ -> 0
+	end,
+	gproc:update_counter({c, g, {C, M, T, txbytes}}, Incr),
+	gproc:update_counter({c, g, {C, M, T, txpackets}}, 1),
+	{noreply, State};
+
 handle_cast(stop, State) ->
 	{stop, normal, State};
 handle_cast(#cmd{type = ?CMD_D, callid = C, mediaid = 0, to = null}, #state{callid = C} = State) ->
@@ -209,34 +237,6 @@ handle_cast(#cmd{type = ?CMD_S, callid = C, mediaid = M, from = #party{tag = T}}
 	gen_server:cast(RtpPid, {keepalive, enable}),
 	{noreply, State};
 
-handle_cast({'music-on-hold', Pkt}, #state{rtp = Pid, callid = C, mediaid = M, tag = T, copy = Copy} = State) ->
-	gen_server:cast(Pid, {Pkt, null, null}),
-	Copy andalso gen_server:cast(file_writer, {Pkt, C, M, T}),
-	Incr = case Pkt of
-		#rtp{payload = Payload} -> size(Payload);
-		{_, Payload, _} when is_binary(Payload) -> size(Payload);
-		_ -> 0
-	end,
-	gproc:update_counter({c, g, {C, M, T, txbytes}}, Incr),
-	gproc:update_counter({c, g, {C, M, T, txpackets}}, 1),
-	{noreply, State};
-
-handle_cast({Pkt, _Ip, _Port}, #state{rtp = Pid, hold = false, callid = C, mediaid = M, tag = T, copy = Copy} = State) ->
-	gen_server:cast(Pid, {Pkt, null, null}),
-	Copy andalso gen_server:cast(file_writer, {Pkt, C, M, T}),
-	Incr = case Pkt of
-		#rtp{payload = Payload} -> size(Payload);
-		{_, Payload, _} when is_binary(Payload) -> size(Payload);
-		_ -> 0
-	end,
-	gproc:update_counter({c, g, {C, M, T, txbytes}}, Incr),
-	gproc:update_counter({c, g, {C, M, T, txpackets}}, 1),
-	{noreply, State};
-
-handle_cast({_Pkt, _Ip, _Port}, #state{hold = true} = State) ->
-	% Music on Hold / Mute
-	{noreply, State};
-
 handle_cast(Other, State) ->
 	?ERR("Unmatched cast [~p]", [Other]),
 	{noreply, State}.
@@ -257,22 +257,25 @@ terminate(Reason, #state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	?ERR("terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
-handle_info({{Type, Payload, _Timestamp} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtpport = OldRtpPort, rtcpport = OldRtcpPort, sibling = Sibling} = State) when is_binary(Payload) ->
+handle_info({Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = null, rtpport = null, rtcpport = OldRtcpPort, sibling = Sibling} = State) when is_binary(Pkt) ->
+	<<_:9, Type:7, _/binary>> = Pkt,
+	update_remote_phy(Ip, Port, null, null, OldRtcpPort, C, M, T, Type),
+	handle_info({Pkt, Ip, Port}, State#state{type = Type, ip = Ip, rtpport = Port});
+handle_info({Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtpport = OldRtpPort, rtcpport = OldRtcpPort, sibling = Sibling} = State) when is_binary(Pkt) ->
 	gen_server:cast(Sibling, {Pkt, null, null}),
-	update_remote_phy(Ip, Port, OldIp, OldRtpPort, OldRtcpPort, C, M, T, Type),
-	gproc:update_counter({c, g, {C, M, T, rxbytes}}, size(Payload)),
+	gproc:update_counter({c, g, {C, M, T, rxbytes}}, size(Pkt)),
 	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
-	{noreply, State#state{type = Type, ip = Ip, rtpport = Port}};
-handle_info({{Type, #dtmf{} = Payload, _Timestamp} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtpport = OldRtpPort, rtcpport = OldRtcpPort, sibling = Sibling} = State) ->
-	gen_server:cast(Sibling, {Pkt, null, null}),
-	update_remote_phy(Ip, Port, OldIp, OldRtpPort, OldRtcpPort, C, M, T, Type),
-	error_logger:warning_msg("DTMF: ~p from C[~p] T[~p]~n", [Payload, C, T]),
-	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
-	{noreply, State#state{type = Type, ip = Ip, rtpport = Port}};
+	{noreply, State#state{ip = Ip, rtpport = Port}};
+%handle_info({{Type, #dtmf{} = Payload, _Timestamp} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtpport = OldRtpPort, rtcpport = OldRtcpPort, sibling = Sibling} = State) ->
+%	gen_server:cast(Sibling, {Pkt, null, null}),
+%	update_remote_phy(Ip, Port, OldIp, OldRtpPort, OldRtcpPort, C, M, T, Type),
+%	error_logger:warning_msg("DTMF: ~p from C[~p] T[~p]~n", [Payload, C, T]),
+%	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
+%	{noreply, State#state{type = Type, ip = Ip, rtpport = Port}};
 handle_info({#rtp{payload_type = Type, payload = Payload} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtpport = OldRtpPort, rtcpport = OldRtcpPort, sibling = Sibling} = State) ->
 	gen_server:cast(Sibling, {Pkt, null, null}),
 	update_remote_phy(Ip, Port, OldIp, OldRtpPort, OldRtcpPort, C, M, T, Type),
-	gproc:update_counter({c, g, {C, M, T, rxbytes}}, size(Payload)),
+	gproc:update_counter({c, g, {C, M, T, rxbytes}}, size(Payload) + 12),
 	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
 	{noreply, State#state{type = Type, ip = Ip, rtpport = Port}};
 handle_info({#rtcp{payloads = Rtcps} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtcpport = OldRtcpPort, sibling = Sibling} = State) ->
