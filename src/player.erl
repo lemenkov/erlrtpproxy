@@ -72,7 +72,6 @@ init([CallId, MediaId, Tag, PayloadInfo]) ->
 
 	{ok, TRef} = timer:send_interval(Clock, send),
 	{ok, {Fd, Size}} = gen_server:call(storage, {get, "/tmp/" ++ Filename ++ FileExt}),
-	{ok, RebuildRtp} = application:get_env(rtpproxy, rebuildrtp),
 	{ok, #state{
 			callid	= CallId,
 			mediaid = MediaId,
@@ -83,7 +82,6 @@ init([CallId, MediaId, Tag, PayloadInfo]) ->
 			type	= Type,
 			ssize	= FrameLength,
 			repeats = Playcount,
-			rebuildrtp = RebuildRtp,
 			starttime = begin {MegaSecs, Secs, _} = os:timestamp(), MegaSecs*1000000000 + Secs*1000  end
 		}
 	}.
@@ -107,7 +105,7 @@ terminate(Reason, #state{tref = TRef}) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	?ERR("player terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
-handle_info(send, #state{callid = C, mediaid = M, tag = T, sn = SequenceNumber, type = Type, ssize = FrameLength, ssrc = SSRC, data = {Fd, Size}, rebuildrtp = RebuildRtp, starttime = ST} = State) ->
+handle_info(send, #state{callid = C, mediaid = M, tag = T, sn = SequenceNumber, type = Type, ssize = FrameLength, ssrc = SSRC, data = {Fd, Size}, starttime = ST} = State) ->
 	case gproc:select({global,names}, [{{{n,g,{media, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
 		[] ->
 			{noreply, State};
@@ -120,22 +118,17 @@ handle_info(send, #state{callid = C, mediaid = M, tag = T, sn = SequenceNumber, 
 			end,
 			{ok, Payload} = file:pread(Fd, Position, FrameLength),
 			Timestamp = rtp_utils:mktimestamp(Type, ST),
-			Pkt = case RebuildRtp of
-				true ->
-					{Type, Payload, Timestamp};
-				false ->
-					#rtp{
-						padding = 0,
-						marker = case SequenceNumber of 0 -> 1; _ -> 0 end,
-						payload_type = Type,
-						sequence_number = SequenceNumber,
-						timestamp = Timestamp,
-						ssrc = SSRC,
-						csrcs = [],
-						extension = null,
-						payload = Payload
-					}
-			end,
+			Pkt = #rtp{
+					padding = 0,
+					marker = case SequenceNumber of 0 -> 1; _ -> 0 end,
+					payload_type = Type,
+					sequence_number = SequenceNumber,
+					timestamp = Timestamp,
+					ssrc = SSRC,
+					csrcs = [],
+					extension = null,
+					payload = Payload
+				},
 			gen_server:cast(Pid, {'music-on-hold', Pkt}),
 			{noreply, State#state{sn = SequenceNumber + 1}}
 	end;
