@@ -257,12 +257,9 @@ terminate(Reason, #state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	?ERR("terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
-handle_info({Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = null, rtpport = null, rtcpport = OldRtcpPort, sibling = Sibling} = State) when is_binary(Pkt) ->
-	<<_:9, Type:7, _/binary>> = Pkt,
-	update_remote_phy(Ip, Port, null, null, OldRtcpPort, C, M, T, Type),
-	handle_info({Pkt, Ip, Port}, State#state{type = Type, ip = Ip, rtpport = Port});
-handle_info({Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtpport = OldRtpPort, rtcpport = OldRtcpPort, sibling = Sibling} = State) when is_binary(Pkt) ->
+handle_info({ <<_:9, Type:7, _/binary>> = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, type = OldType, ip = OldIp, rtpport = OldRtpPort, rtcpport = OldRtcpPort, sibling = Sibling} = State) when is_binary(Pkt) ->
 	gen_server:cast(Sibling, {Pkt, null, null}),
+	(Type == OldType) orelse update_remote_phy(Ip, Port, OldIp, OldRtpPort, OldRtcpPort, C, M, T, Type),
 	gproc:update_counter({c, g, {C, M, T, rxbytes}}, size(Pkt)),
 	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
 	{noreply, State#state{ip = Ip, rtpport = Port}};
