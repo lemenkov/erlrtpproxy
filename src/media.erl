@@ -44,6 +44,11 @@
 		rtpport = null,
 		rtcpport = null,
 		type,
+		rxbytes = 0,
+		rxpackets = 0,
+		txbytes = 0,
+		txpackets = 0,
+		tref = null,
 		hold = false,
 		sibling = null,
 		copy,
@@ -57,7 +62,6 @@ start(Cmd) ->
 	gen_server:start(?MODULE, [Cmd], []).
 
 init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr = Addr}, params = Params} = Cmd]) ->
-	% Trap timeouts - FIXME switch to supervisor for the God's sake!
 	process_flag(trap_exit, true),
 
 	% Register itself
@@ -118,6 +122,7 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 			callid	= C,
 			mediaid	= M,
 			tag	= T,
+			tref	= timer:send_interval(1000, stats),
 			rtp	= Pid,
 			copy	= Copy,
 			sibling = Sibling,
@@ -128,10 +133,13 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 	}.
 
 handle_call(Call, _From,  State) ->
-	?ERR("Unmatched call [~p]", [Call]),
+	error_logger:error_msg("media ~p: Unmatched call [~p]", [self(), Call]),
 	{stop,{error,unknown_call},State}.
 
-handle_cast({Pkt, _Ip, _Port}, #state{rtp = Pid, hold = false, callid = C, mediaid = M, tag = T, copy = Copy} = State) ->
+handle_cast(
+	{Pkt, _Ip, _Port},
+	#state{rtp = Pid, hold = false, callid = C, mediaid = M, tag = T, txbytes = TxBytes, txpackets = TxPackets, copy = Copy} = State
+) ->
 	gen_server:cast(Pid, {Pkt, null, null}),
 	Copy andalso gen_server:cast(file_writer, {Pkt, C, M, T}),
 	{Incr, IncrSize} = case Pkt of
@@ -140,20 +148,19 @@ handle_cast({Pkt, _Ip, _Port}, #state{rtp = Pid, hold = false, callid = C, media
 %		_ -> {1, 0}
 		_ -> {0, 0}
 	end,
-	gproc:update_counter({c, g, {C, M, T, txbytes}}, IncrSize),
-	gproc:update_counter({c, g, {C, M, T, txpackets}}, Incr),
-	{noreply, State};
+	{noreply, State#state{txbytes = TxBytes + IncrSize, txpackets = TxPackets + Incr}};
 
 handle_cast({_Pkt, _Ip, _Port}, #state{hold = true} = State) ->
 	% Music on Hold / Mute
 	{noreply, State};
 
-handle_cast({'music-on-hold', #rtp{payload = Payload} = Pkt}, #state{rtp = Pid, callid = C, mediaid = M, tag = T, copy = Copy} = State) ->
+handle_cast(
+	{'music-on-hold', #rtp{payload = Payload} = Pkt},
+	#state{rtp = Pid, callid = C, mediaid = M, tag = T, txbytes = TxBytes, txpackets = TxPackets, copy = Copy} = State
+) ->
 	gen_server:cast(Pid, {Pkt, null, null}),
 	Copy andalso gen_server:cast(file_writer, {Pkt, C, M, T}),
-	gproc:update_counter({c, g, {C, M, T, txbytes}}, size(Payload)+12),
-	gproc:update_counter({c, g, {C, M, T, txpackets}}, 1),
-	{noreply, State};
+	{noreply, State#state{txbytes = TxBytes + size(Payload) + 12, txpackets = TxPackets + 1}};
 
 handle_cast(stop, State) ->
 	{stop, normal, State};
@@ -230,7 +237,7 @@ handle_cast(#cmd{type = ?CMD_S, callid = C, mediaid = M, from = #party{tag = T}}
 	{noreply, State};
 
 handle_cast(Other, State) ->
-	?ERR("Unmatched cast [~p]", [Other]),
+	error_logger:error_msg("media ~p: Unmatched cast [~p]", [self(), Other]),
 	{noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -247,13 +254,14 @@ terminate(Reason, #state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_
 	Role == master andalso gproc:update_shared_counter({c,g,calls}, -1),
 	% No need to explicitly unregister from gproc - it does so automatically
 	{memory, Bytes} = erlang:process_info(self(), memory),
-	?ERR("terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
+	error_logger:error_msg("media ~p: terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
 
-handle_info({ <<_:9, Type:7, _/binary>> = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, type = Type, ip = Ip, rtpport = Port, sibling = Sibling} = State) when is_binary(Pkt) ->
+handle_info(
+	{ <<_:9, Type:7, _/binary>> = Pkt, Ip, Port},
+	#state{callid = C, mediaid = M, tag = T, type = Type, ip = Ip, rtpport = Port, rxbytes = RxBytes, rxpackets = RxPackets, sibling = Sibling} = State
+) when is_binary(Pkt) ->
 	gen_server:cast(Sibling, {Pkt, null, null}),
-	gproc:update_counter({c, g, {C, M, T, rxbytes}}, size(Pkt)),
-	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
-	{noreply, State};
+	{noreply, State#state{rxbytes = RxBytes + size(Pkt), rxpackets = RxPackets + 1}};
 handle_info({ <<_:9, Type:7, _/binary>> = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, rtcpport = RtcpPort} = State) when is_binary(Pkt) ->
 	update_remote_phy(Ip, Port, RtcpPort, C, M, T, Type),
 	handle_info({Pkt, Ip, Port}, State#state{type = Type, ip = Ip, rtpport = Port});
@@ -263,11 +271,12 @@ handle_info({ <<_:9, Type:7, _/binary>> = Pkt, Ip, Port}, #state{callid = C, med
 %	error_logger:warning_msg("DTMF: ~p from C[~p] T[~p]~n", [Payload, C, T]),
 %	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
 %	{noreply, State#state{type = Type, ip = Ip, rtpport = Port}};
-handle_info({#rtp{payload_type = Type, payload = Payload} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, type = Type, ip = Ip, rtpport = Port, sibling = Sibling} = State) ->
+handle_info(
+	{#rtp{payload_type = Type, payload = Payload} = Pkt, Ip, Port},
+	#state{callid = C, mediaid = M, tag = T, type = Type, ip = Ip, rtpport = Port, rxbytes = RxBytes, rxpackets = RxPackets, sibling = Sibling} = State
+) ->
 	gen_server:cast(Sibling, {Pkt, null, null}),
-	gproc:update_counter({c, g, {C, M, T, rxbytes}}, size(Payload) + 12),
-	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
-	{noreply, State};
+	{noreply, State#state{rxbytes = RxBytes + size(Payload) + 12, rxpackets = RxPackets + 1}};
 handle_info({#rtp{payload_type = Type} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, rtcpport = RtcpPort} = State) ->
 	update_remote_phy(Ip, Port, RtcpPort, C, M, T, Type),
 	handle_info({Pkt, Ip, Port}, State#state{type = Type, ip = Ip, rtpport = Port});
@@ -299,8 +308,17 @@ handle_info(interim_update, #state{callid = C, mediaid = M, notify_info = Notify
 	rtpproxy_ctl:acc(interim_update, C, M, NotifyInfo),
 	{noreply, State};
 
-handle_info({'EXIT', Pid, timeout}, #state{rtp = Pid, sibling = Sibling} = State) ->
+handle_info(stats, #state{callid = C, mediaid = M, tag = T, rxbytes = RxBytes, rxpackets = RxPackets, txbytes = TxBytes, txpackets = TxPackets, tref = TRef} = State) ->
+	timer:cancel(TRef),
+	gproc:update_counter({c, g, {C, M, T, rxbytes}}, RxBytes),
+	gproc:update_counter({c, g, {C, M, T, rxpackets}}, RxPackets),
+	gproc:update_counter({c, g, {C, M, T, txbytes}}, TxBytes),
+	gproc:update_counter({c, g, {C, M, T, txpackets}}, TxPackets),
+	{noreply, State#state{tref = timer:send_interval(1000, stats),  rxbytes = 0, rxpackets = 0, txbytes = 0, txpackets = 0}};
+
+handle_info({'EXIT', Pid, _}, #state{rtp = Pid, sibling = Sibling, tref = TRef} = State) ->
 	gen_server:cast(Sibling, stop),
+	timer:cancel(TRef),
 	{stop, normal, State}.
 
 %%
