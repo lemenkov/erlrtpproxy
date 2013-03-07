@@ -136,28 +136,24 @@ handle_call(Call, _From,  State) ->
 handle_cast({Pkt, _Ip, _Port}, #state{rtp = Pid, hold = false, callid = C, mediaid = M, tag = T, copy = Copy} = State) ->
 	gen_server:cast(Pid, {Pkt, null, null}),
 	Copy andalso gen_server:cast(file_writer, {Pkt, C, M, T}),
-	Incr = case Pkt of
-		#rtp{payload = Payload} when is_binary(Payload) -> size(Payload)+12;
-		_ when is_binary(Pkt) -> size(Pkt);
-		_ -> 0
+	{Incr, IncrSize} = case Pkt of
+		#rtp{payload = Payload} when is_binary(Payload) -> {1, size(Payload)+12};
+		_ when is_binary(Pkt) -> {1, size(Pkt)};
+%		_ -> {1, 0}
+		_ -> {0, 0}
 	end,
-	gproc:update_counter({c, g, {C, M, T, txbytes}}, Incr),
-	gproc:update_counter({c, g, {C, M, T, txpackets}}, 1),
+	gproc:update_counter({c, g, {C, M, T, txbytes}}, IncrSize),
+	gproc:update_counter({c, g, {C, M, T, txpackets}}, Incr),
 	{noreply, State};
 
 handle_cast({_Pkt, _Ip, _Port}, #state{hold = true} = State) ->
 	% Music on Hold / Mute
 	{noreply, State};
 
-handle_cast({'music-on-hold', Pkt}, #state{rtp = Pid, callid = C, mediaid = M, tag = T, copy = Copy} = State) ->
+handle_cast({'music-on-hold', #rtp{payload = Payload} = Pkt}, #state{rtp = Pid, callid = C, mediaid = M, tag = T, copy = Copy} = State) ->
 	gen_server:cast(Pid, {Pkt, null, null}),
 	Copy andalso gen_server:cast(file_writer, {Pkt, C, M, T}),
-	Incr = case Pkt of
-		#rtp{payload = Payload} -> size(Payload);
-		{_, Payload, _} when is_binary(Payload) -> size(Payload);
-		_ -> 0
-	end,
-	gproc:update_counter({c, g, {C, M, T, txbytes}}, Incr),
+	gproc:update_counter({c, g, {C, M, T, txbytes}}, size(Payload)+12),
 	gproc:update_counter({c, g, {C, M, T, txpackets}}, 1),
 	{noreply, State};
 
@@ -281,7 +277,7 @@ handle_info({#rtp{payload_type = Type} = Pkt, Ip, Port}, #state{callid = C, medi
 	handle_info({Pkt, Ip, Port}, State#state{type = Type, ip = Ip, rtpport = Port});
 handle_info({#rtcp{payloads = Rtcps} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtcpport = OldRtcpPort, sibling = Sibling} = State) ->
 	gen_server:cast(Sibling, {Pkt, null, null}),
-	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
+%	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
 	% FIXME accumulate info from the RTCP
 	Sr = rtp_utils:take(Rtcps, sr),
 	Rr = rtp_utils:take(Rtcps, rr),
