@@ -72,8 +72,8 @@ dump_all() ->
 						{txpackets, gproc:get_value({c, g, {CallId, MediaId, Tag, txpackets}}, Pid)},
 						{local, [{ip, list_to_binary(inet_parse:ntoa(LocalIp))}, {rtp, LocalRtpPort}, {rtcp, LocalRtcpPort}]},
 						{remote,[{ip, list_to_binary(inet_parse:ntoa(RemoteIp))}, {rtp, RemoteRtpPort}, {rtcp, RemoteRtcpPort}]},
-						{rr, [gproc:get_value({n, g, {rr, CallId, MediaId, Tag}}, Pid)]},
-						{sr, [gproc:get_value({n, g, {sr, CallId, MediaId, Tag}}, Pid)]}
+						gproc:get_value({n, g, {rr, CallId, MediaId, Tag}}, Pid),
+						gproc:get_value({n, g, {sr, CallId, MediaId, Tag}}, Pid)
 					]
 				}
 			] || [{p,g,media}, Pid, {CallId, MediaId, Tag, Payload, {LocalIp, LocalRtpPort, LocalRtcpPort}, {RemoteIp, RemoteRtpPort, RemoteRtcpPort}}] <- List],
@@ -106,8 +106,8 @@ dump_query(RawQuery) ->
 					{txpackets, gproc:get_value({c, g, {CallId, MediaId, Tag, txpackets}}, Pid)},
 					{local, [{ip, list_to_binary(inet_parse:ntoa(LocalIp))}, {rtp, LocalRtpPort}, {rtcp, LocalRtcpPort}]},
 					{remote,[{ip, list_to_binary(inet_parse:ntoa(RemoteIp))}, {rtp, RemoteRtpPort}, {rtcp, RemoteRtcpPort}]},
-					{rr, [gproc:get_value({n, g, {rr, CallId, MediaId, Tag}}, Pid)]},
-					{sr, [gproc:get_value({n, g, {sr, CallId, MediaId, Tag}}, Pid)]}
+					gproc:get_value({n, g, {rr, CallId, MediaId, Tag}}, Pid),
+					gproc:get_value({n, g, {sr, CallId, MediaId, Tag}}, Pid)
 				]
 			}] || [{p,g,media}, Pid, {CallId, MediaId, Tag, Payload, {LocalIp, LocalRtpPort, LocalRtcpPort}, {RemoteIp, RemoteRtpPort, RemoteRtcpPort}}] <- List],
 	mochijson2:encode([{http_query,  [ {list_to_existing_atom(K), list_to_binary(V)} || {K,V} <- RawQuery]}, {result, Result}]).

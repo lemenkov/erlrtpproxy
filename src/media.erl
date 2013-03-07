@@ -67,8 +67,8 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 	% For RTCP storing
 	gproc:add_global_name({rr, C, M, T}),
 	gproc:add_global_name({sr, C, M, T}),
-	gproc:set_value({n, g, {rr, C, M, T}}, null),
-	gproc:set_value({n, g, {sr, C, M, T}}, null),
+	gproc:set_value({n, g, {rr, C, M, T}}, {rr, null}),
+	gproc:set_value({n, g, {sr, C, M, T}}, {sr, null}),
 
 	% Register itself for group call and broadcast commands
 	gproc:add_global_property(media, {C, M, T, null, null, null}),
