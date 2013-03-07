@@ -77,7 +77,6 @@ dump_all() ->
 					]
 				}
 			] || [{p,g,media}, Pid, {CallId, MediaId, Tag, Payload, {LocalIp, LocalRtpPort, LocalRtcpPort}, {RemoteIp, RemoteRtpPort, RemoteRtcpPort}}] <- List],
-	error_logger:error_msg("[~p]", [[{callnum, Length}, {calllegs, Result}]]),
 	mochijson2:encode([{callnum, Length}, {calllegs, Result}]).
 
 dump_query([{"callnum",_}]) ->
