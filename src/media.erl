@@ -257,24 +257,28 @@ terminate(Reason, #state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	?ERR("terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
-handle_info({ <<_:9, Type:7, _/binary>> = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, type = OldType, ip = OldIp, rtpport = OldRtpPort, rtcpport = OldRtcpPort, sibling = Sibling} = State) when is_binary(Pkt) ->
+handle_info({ <<_:9, Type:7, _/binary>> = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, type = Type, ip = Ip, rtpport = Port, sibling = Sibling} = State) when is_binary(Pkt) ->
 	gen_server:cast(Sibling, {Pkt, null, null}),
-	(Type == OldType) orelse update_remote_phy(Ip, Port, OldIp, OldRtpPort, OldRtcpPort, C, M, T, Type),
 	gproc:update_counter({c, g, {C, M, T, rxbytes}}, size(Pkt)),
 	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
-	{noreply, State#state{ip = Ip, rtpport = Port}};
-%handle_info({{Type, #dtmf{} = Payload, _Timestamp} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtpport = OldRtpPort, rtcpport = OldRtcpPort, sibling = Sibling} = State) ->
+	{noreply, State};
+handle_info({ <<_:9, Type:7, _/binary>> = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, rtcpport = RtcpPort} = State) when is_binary(Pkt) ->
+	update_remote_phy(Ip, Port, RtcpPort, C, M, T, Type),
+	handle_info({Pkt, Ip, Port}, State#state{type = Type, ip = Ip, rtpport = Port});
+%handle_info({{Type, #dtmf{} = Payload, _Timestamp} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, rtcpport = RtcpPort, sibling = Sibling} = State) ->
 %	gen_server:cast(Sibling, {Pkt, null, null}),
-%	update_remote_phy(Ip, Port, OldIp, OldRtpPort, OldRtcpPort, C, M, T, Type),
+%	update_remote_phy(Ip, Port, RtcpPort, C, M, T, Type),
 %	error_logger:warning_msg("DTMF: ~p from C[~p] T[~p]~n", [Payload, C, T]),
 %	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
 %	{noreply, State#state{type = Type, ip = Ip, rtpport = Port}};
-handle_info({#rtp{payload_type = Type, payload = Payload} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtpport = OldRtpPort, rtcpport = OldRtcpPort, sibling = Sibling} = State) ->
+handle_info({#rtp{payload_type = Type, payload = Payload} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, type = Type, ip = Ip, rtpport = Port, sibling = Sibling} = State) ->
 	gen_server:cast(Sibling, {Pkt, null, null}),
-	update_remote_phy(Ip, Port, OldIp, OldRtpPort, OldRtcpPort, C, M, T, Type),
 	gproc:update_counter({c, g, {C, M, T, rxbytes}}, size(Payload) + 12),
 	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
-	{noreply, State#state{type = Type, ip = Ip, rtpport = Port}};
+	{noreply, State};
+handle_info({#rtp{payload_type = Type} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, rtcpport = RtcpPort} = State) ->
+	update_remote_phy(Ip, Port, RtcpPort, C, M, T, Type),
+	handle_info({Pkt, Ip, Port}, State#state{type = Type, ip = Ip, rtpport = Port});
 handle_info({#rtcp{payloads = Rtcps} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtcpport = OldRtcpPort, sibling = Sibling} = State) ->
 	gen_server:cast(Sibling, {Pkt, null, null}),
 	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
@@ -288,7 +292,6 @@ handle_info({#rtcp{payloads = Rtcps} = Pkt, Ip, Port}, #state{callid = C, mediai
 		true -> {noreply, State#state{ip = null, rtpport = null, rtcpport = Port}};
 		false -> {noreply, State#state{rtcpport = Port}}
 	end;
-
 
 handle_info({phy, {Ip, PortRtp, PortRtcp}}, #state{callid = C, mediaid = M, tag = T, cmd = #cmd{origin = #origin{pid = Pid}} = Cmd} = State) ->
 	% Store info about physical params
@@ -312,9 +315,7 @@ handle_info({'EXIT', Pid, timeout}, #state{rtp = Pid, sibling = Sibling} = State
 %%
 %%
 
-update_remote_phy(Ip, Port, null, null, RtcpPort, C, M, T, Type) ->
+update_remote_phy(Ip, Port, RtcpPort, C, M, T, Type) ->
 	[Local] = gproc:select([{{{p,g,media},'_',{C,M,T,'_','$1','_'}}, [], ['$1']}]),
 	gproc:unreg({p,g,media}),
-	gproc:add_global_property(media, {C, M, T, Type, Local, {Ip, Port, RtcpPort}});
-update_remote_phy(_, _, _, _, _, _, _, _, _) ->
-	ok.
+	gproc:add_global_property(media, {C, M, T, Type, Local, {Ip, Port, RtcpPort}}).
