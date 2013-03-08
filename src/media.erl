@@ -117,12 +117,15 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 			{slave, S}
 	end,
 
+	% Set stats timer
+	{ok, TRef} = timer:send_interval(1000, stats),
+
 	{ok, #state{
 			cmd	= Cmd,
 			callid	= C,
 			mediaid	= M,
 			tag	= T,
-			tref	= timer:send_interval(1000, stats),
+			tref	= TRef,
 			rtp	= Pid,
 			copy	= Copy,
 			sibling = Sibling,
@@ -307,12 +310,11 @@ handle_info(interim_update, #state{callid = C, mediaid = M, notify_info = Notify
 	{noreply, State};
 
 handle_info(stats, #state{callid = C, mediaid = M, tag = T, rxbytes = RxBytes, rxpackets = RxPackets, txbytes = TxBytes, txpackets = TxPackets, tref = TRef} = State) ->
-	timer:cancel(TRef),
 	gproc:update_counter({c, g, {C, M, T, rxbytes}}, RxBytes),
 	gproc:update_counter({c, g, {C, M, T, rxpackets}}, RxPackets),
 	gproc:update_counter({c, g, {C, M, T, txbytes}}, TxBytes),
 	gproc:update_counter({c, g, {C, M, T, txpackets}}, TxPackets),
-	{noreply, State#state{tref = timer:send_interval(1000, stats),  rxbytes = 0, rxpackets = 0, txbytes = 0, txpackets = 0}};
+	{noreply, State#state{rxbytes = 0, rxpackets = 0, txbytes = 0, txpackets = 0}};
 
 handle_info({'EXIT', Pid, _}, #state{rtp = Pid, sibling = Sibling, tref = TRef} = State) ->
 	gen_server:cast(Sibling, stop),
