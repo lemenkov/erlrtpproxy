@@ -143,9 +143,8 @@ handle_cast(
 	gen_server:cast(Pid, {Pkt, null, null}),
 	Copy andalso gen_server:cast(file_writer, {Pkt, C, M, T}),
 	{Incr, IncrSize} = case Pkt of
-		#rtp{payload = Payload} when is_binary(Payload) -> {1, size(Payload)+12};
-		_ when is_binary(Pkt) -> {1, size(Pkt)};
-%		_ -> {1, 0}
+		#rtp{payload = Payload} when is_binary(Payload) -> {1, size(Payload)};
+		_ when is_binary(Pkt) -> {1, size(Pkt) - 12};
 		_ -> {0, 0}
 	end,
 	{noreply, State#state{txbytes = TxBytes + IncrSize, txpackets = TxPackets + Incr}};
@@ -160,7 +159,7 @@ handle_cast(
 ) ->
 	gen_server:cast(Pid, {Pkt, null, null}),
 	Copy andalso gen_server:cast(file_writer, {Pkt, C, M, T}),
-	{noreply, State#state{txbytes = TxBytes + size(Payload) + 12, txpackets = TxPackets + 1}};
+	{noreply, State#state{txbytes = TxBytes + size(Payload), txpackets = TxPackets + 1}};
 
 handle_cast(stop, State) ->
 	{stop, normal, State};
@@ -261,7 +260,7 @@ handle_info(
 	#state{callid = C, mediaid = M, tag = T, type = Type, ip = Ip, rtpport = Port, rxbytes = RxBytes, rxpackets = RxPackets, sibling = Sibling} = State
 ) when is_binary(Pkt) ->
 	gen_server:cast(Sibling, {Pkt, null, null}),
-	{noreply, State#state{rxbytes = RxBytes + size(Pkt), rxpackets = RxPackets + 1}};
+	{noreply, State#state{rxbytes = RxBytes + size(Pkt) - 12, rxpackets = RxPackets + 1}};
 handle_info({ <<_:9, Type:7, _/binary>> = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, rtcpport = RtcpPort} = State) when is_binary(Pkt) ->
 	update_remote_phy(Ip, Port, RtcpPort, C, M, T, Type),
 	handle_info({Pkt, Ip, Port}, State#state{type = Type, ip = Ip, rtpport = Port});
@@ -276,13 +275,12 @@ handle_info(
 	#state{callid = C, mediaid = M, tag = T, type = Type, ip = Ip, rtpport = Port, rxbytes = RxBytes, rxpackets = RxPackets, sibling = Sibling} = State
 ) ->
 	gen_server:cast(Sibling, {Pkt, null, null}),
-	{noreply, State#state{rxbytes = RxBytes + size(Payload) + 12, rxpackets = RxPackets + 1}};
+	{noreply, State#state{rxbytes = RxBytes + size(Payload), rxpackets = RxPackets + 1}};
 handle_info({#rtp{payload_type = Type} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, rtcpport = RtcpPort} = State) ->
 	update_remote_phy(Ip, Port, RtcpPort, C, M, T, Type),
 	handle_info({Pkt, Ip, Port}, State#state{type = Type, ip = Ip, rtpport = Port});
 handle_info({#rtcp{payloads = Rtcps} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtcpport = OldRtcpPort, sibling = Sibling} = State) ->
 	gen_server:cast(Sibling, {Pkt, null, null}),
-%	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
 	% FIXME accumulate info from the RTCP
 	Sr = rtp_utils:take(Rtcps, sr),
 	Rr = rtp_utils:take(Rtcps, rr),
