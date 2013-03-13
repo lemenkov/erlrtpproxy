@@ -70,8 +70,8 @@ dump_all() ->
 						{rxpackets, gproc:get_value({c, g, {CallId, MediaId, Tag, rxpackets}}, Pid)},
 						{txbytes, gproc:get_value({c, g, {CallId, MediaId, Tag, txbytes}}, Pid)},
 						{txpackets, gproc:get_value({c, g, {CallId, MediaId, Tag, txpackets}}, Pid)},
-						{local, [{ip, list_to_binary(inet_parse:ntoa(LocalIp))}, {rtp, LocalRtpPort}, {rtcp, LocalRtcpPort}]},
-						{remote,[{ip, list_to_binary(inet_parse:ntoa(RemoteIp))}, {rtp, RemoteRtpPort}, {rtcp, RemoteRtcpPort}]},
+						{local, [{ip, make_ip(LocalIp)}, {rtp, LocalRtpPort}, {rtcp, LocalRtcpPort}]},
+						{remote,[{ip, make_ip(RemoteIp)}, {rtp, RemoteRtpPort}, {rtcp, RemoteRtcpPort}]},
 						gproc:get_value({n, g, {rr, CallId, MediaId, Tag}}, Pid),
 						gproc:get_value({n, g, {sr, CallId, MediaId, Tag}}, Pid)
 					]
@@ -103,8 +103,8 @@ dump_query(RawQuery) ->
 					{rxpackets, gproc:get_value({c, g, {CallId, MediaId, Tag, rxpackets}}, Pid)},
 					{txbytes, gproc:get_value({c, g, {CallId, MediaId, Tag, txbytes}}, Pid)},
 					{txpackets, gproc:get_value({c, g, {CallId, MediaId, Tag, txpackets}}, Pid)},
-					{local, [{ip, list_to_binary(inet_parse:ntoa(LocalIp))}, {rtp, LocalRtpPort}, {rtcp, LocalRtcpPort}]},
-					{remote,[{ip, list_to_binary(inet_parse:ntoa(RemoteIp))}, {rtp, RemoteRtpPort}, {rtcp, RemoteRtcpPort}]},
+					{local, [{ip, make_ip(LocalIp)}, {rtp, LocalRtpPort}, {rtcp, LocalRtcpPort}]},
+					{remote,[{ip, make_ip(RemoteIp)}, {rtp, RemoteRtpPort}, {rtcp, RemoteRtcpPort}]},
 					gproc:get_value({n, g, {rr, CallId, MediaId, Tag}}, Pid),
 					gproc:get_value({n, g, {sr, CallId, MediaId, Tag}}, Pid)
 				]
@@ -185,3 +185,8 @@ decode_kv({"active", "once"}) ->
 	{active, once};
 decode_kv({"active", "true"}) ->
 	{active, true}.
+
+make_ip(null) ->
+	<<"null">>;
+make_ip(Ip) ->
+	list_to_binary(inet_parse:ntoa(Ip)).
