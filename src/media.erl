@@ -40,14 +40,8 @@
 		mediaid,
 		tag,
 		rtp,
-		ip = null,
-		rtpport = null,
-		rtcpport = null,
-		type,
-		rxbytes = 0,
-		rxpackets = 0,
-		txbytes = 0,
-		txpackets = 0,
+		other_rtp = null,
+		type = 0, % PCMU by default - required for Music-on-Hold/early media
 		tref = null,
 		hold = false,
 		sibling = null,
@@ -95,7 +89,7 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 	{ok, Timeout} = application:get_env(rtpproxy, ttl),
 	{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
 	{ok, ActiveStrategy} = application:get_env(rtpproxy, active),
-	{ok, Pid} = gen_rtp_channel:open(0, Params ++ [{ip, Ip}, {rebuildrtp, RebuildRtp}, {timeout_early, TimeoutEarly*1000}, {timeout, Timeout*1000}, {sendrecv, SendRecvStrategy}, {active, ActiveStrategy}]),
+	{ok, RtpPid} = gen_rtp_channel:open(0, Params ++ [{ip, Ip}, {rebuildrtp, RebuildRtp}, {timeout_early, TimeoutEarly*1000}, {timeout, Timeout*1000}, {sendrecv, SendRecvStrategy}, {active, ActiveStrategy}]),
 
 	NotifyInfo = proplists:get_value(notify, Params, []),
 
@@ -106,15 +100,15 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 		Acc -> rtpproxy_ctl:acc(Acc, C, M, NotifyInfo)
 	end,
 
-	{Role, Sibling} = case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
+	{Role, Sibling, OtherRtpPid} = case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
 		[] ->
 			% initial call creation.
 			gproc:update_shared_counter({c,g,calls},1),
-			{master, null};
+			{master, null, null};
 		[S] ->
-			gen_server:cast(S, {sibling, self()}),
+			OtherRtpPid0 = gen_server:call(S, {sibling, self(), RtpPid}),
 			gen_server:cast(S, {prefill, Addr}),
-			{slave, S}
+			{slave, S, OtherRtpPid0}
 	end,
 
 	% Set stats timer
@@ -126,7 +120,8 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 			mediaid	= M,
 			tag	= T,
 			tref	= TRef,
-			rtp	= Pid,
+			rtp	= RtpPid,
+			other_rtp = OtherRtpPid,
 			copy	= Copy,
 			sibling = Sibling,
 			notify_info = NotifyInfo,
@@ -135,34 +130,36 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 		}
 	}.
 
+% Set sibling
+handle_call({sibling, Sibling, OtherRtpPid}, _From, #state{rtp = RtpPid} = State) ->
+	% Let's short circuit RTP
+	gen_server:call(RtpPid, {rtp_subscriber, OtherRtpPid}),
+	gen_server:call(OtherRtpPid, {rtp_subscriber, RtpPid}),
+	{reply, RtpPid, State#state{other_rtp = OtherRtpPid, sibling = Sibling}};
+
 handle_call(Call, _From,  State) ->
 	error_logger:error_msg("media ~p: Unmatched call [~p]", [self(), Call]),
 	{stop,{error,unknown_call},State}.
 
 handle_cast(
 	{Pkt, _Ip, _Port},
-	#state{rtp = Pid, hold = false, callid = C, mediaid = M, tag = T, txbytes = TxBytes, txpackets = TxPackets, copy = Copy} = State
+	#state{rtp = Pid, hold = false, callid = C, mediaid = M, tag = T, copy = Copy} = State
 ) ->
 	gen_server:cast(Pid, {Pkt, null, null}),
 	Copy andalso gen_server:cast(file_writer, {Pkt, C, M, T}),
-	{Incr, IncrSize} = case Pkt of
-		#rtp{payload = Payload} when is_binary(Payload) -> {1, size(Payload)};
-		_ when is_binary(Pkt) -> {1, size(Pkt) - 12};
-		_ -> {0, 0}
-	end,
-	{noreply, State#state{txbytes = TxBytes + IncrSize, txpackets = TxPackets + Incr}};
+	{noreply, State};
 
 handle_cast({_Pkt, _Ip, _Port}, #state{hold = true} = State) ->
 	% Music on Hold / Mute
 	{noreply, State};
 
 handle_cast(
-	{'music-on-hold', #rtp{payload = Payload} = Pkt},
-	#state{rtp = Pid, callid = C, mediaid = M, tag = T, txbytes = TxBytes, txpackets = TxPackets, copy = Copy} = State
+	{'music-on-hold', Pkt},
+	#state{rtp = Pid, callid = C, mediaid = M, tag = T, copy = Copy} = State
 ) ->
 	gen_server:cast(Pid, {Pkt, null, null}),
 	Copy andalso gen_server:cast(file_writer, {Pkt, C, M, T}),
-	{noreply, State#state{txbytes = TxBytes + size(Payload), txpackets = TxPackets + 1}};
+	{noreply, State};
 
 handle_cast(stop, State) ->
 	{stop, normal, State};
@@ -170,10 +167,6 @@ handle_cast(#cmd{type = ?CMD_D, callid = C, mediaid = 0, to = null}, #state{call
 	{stop, normal, State};
 handle_cast(#cmd{type = ?CMD_D, callid = C, mediaid = 0}, #state{callid = C} = State) ->
 	{stop, normal, State};
-
-% Set sibling
-handle_cast({sibling, Sibling}, State) ->
-	{noreply, State#state{sibling = Sibling}};
 
 handle_cast({prefill, {Ip, Addr}}, #state{rtp = RtpPid, role = slave} = State) ->
 	{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
@@ -211,7 +204,7 @@ handle_cast(
 	end,
 	{noreply, State};
 
-handle_cast(#cmd{type = ?CMD_P, callid = C, mediaid = M, to = #party{tag = T}, params = P}, #state{callid = C, mediaid = M, tag = T, type = Type, rtp = RtpPid} = State) ->
+handle_cast(#cmd{type = ?CMD_P, callid = C, mediaid = M, to = #party{tag = T}, params = P}, #state{callid = C, mediaid = M, tag = T, type = Type, rtp = RtpPid, other_rtp = OtherRtpPid, sibling = Sibling} = State) ->
 	case gproc:select({global,names}, [{{{n, g, {player, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
 		[] ->
 			CodecType = rtp_utils:get_codec_from_payload(Type),
@@ -221,18 +214,22 @@ handle_cast(#cmd{type = ?CMD_P, callid = C, mediaid = M, to = #party{tag = T}, p
 			gen_server:cast(RtpPid, {keepalive, disable});
 		[_] -> ok
 	end,
+	gen_server:call(RtpPid, {rtp_subscriber, self()}),
+	gen_server:call(OtherRtpPid, {rtp_subscriber, Sibling}),
 	{noreply, State#state{hold = true}};
 handle_cast(#cmd{type = ?CMD_P, callid = C, mediaid = M, from = #party{tag = T}}, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid} = State) ->
 	gen_server:cast(RtpPid, {keepalive, disable}),
 	{noreply, State};
 
-handle_cast(#cmd{type = ?CMD_S, callid = C, mediaid = M, to = #party{tag = T}}, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid} = State) ->
+handle_cast(#cmd{type = ?CMD_S, callid = C, mediaid = M, to = #party{tag = T}}, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid, other_rtp = OtherRtpPid} = State) ->
 	case gproc:select({global,names}, [{{{n, g, {player, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
 		[] -> ok;
 		[Pid] ->
 			gen_server:cast(Pid, stop),
 			gen_server:cast(RtpPid, {keepalive, enable})
 	end,
+	gen_server:call(RtpPid, {rtp_subscriber, OtherRtpPid}),
+	gen_server:call(OtherRtpPid, {rtp_subscriber, RtpPid}),
 	{noreply, State#state{hold = false}};
 handle_cast(#cmd{type = ?CMD_S, callid = C, mediaid = M, from = #party{tag = T}}, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid} = State) ->
 	gen_server:cast(RtpPid, {keepalive, enable}),
@@ -258,31 +255,17 @@ terminate(Reason, #state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	error_logger:error_msg("media ~p: terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
 
-handle_info(
-	{ <<_:9, Type:7, _/binary>> = Pkt, Ip, Port},
-	#state{callid = C, mediaid = M, tag = T, type = Type, ip = Ip, rtpport = Port, rxbytes = RxBytes, rxpackets = RxPackets, sibling = Sibling} = State
-) when is_binary(Pkt) ->
+handle_info({Pkt, _, _}, #state{sibling = Sibling} = State) when is_binary(Pkt) ->
 	gen_server:cast(Sibling, {Pkt, null, null}),
-	{noreply, State#state{rxbytes = RxBytes + size(Pkt) - 12, rxpackets = RxPackets + 1}};
-handle_info({ <<_:9, Type:7, _/binary>> = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, rtcpport = RtcpPort} = State) when is_binary(Pkt) ->
-	update_remote_phy(Ip, Port, RtcpPort, C, M, T, Type),
-	handle_info({Pkt, Ip, Port}, State#state{type = Type, ip = Ip, rtpport = Port});
-%handle_info({{Type, #dtmf{} = Payload, _Timestamp} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, rtcpport = RtcpPort, sibling = Sibling} = State) ->
-%	gen_server:cast(Sibling, {Pkt, null, null}),
-%	update_remote_phy(Ip, Port, RtcpPort, C, M, T, Type),
-%	error_logger:warning_msg("DTMF: ~p from C[~p] T[~p]~n", [Payload, C, T]),
-%	gproc:update_counter({c, g, {C, M, T, rxpackets}}, 1),
-%	{noreply, State#state{type = Type, ip = Ip, rtpport = Port}};
-handle_info(
-	{#rtp{payload_type = Type, payload = Payload} = Pkt, Ip, Port},
-	#state{callid = C, mediaid = M, tag = T, type = Type, ip = Ip, rtpport = Port, rxbytes = RxBytes, rxpackets = RxPackets, sibling = Sibling} = State
-) ->
+	{noreply, State};
+handle_info({#rtp{payload = Payload} = Pkt, _, _}, #state{sibling = Sibling} = State) when is_binary(Payload) ->
 	gen_server:cast(Sibling, {Pkt, null, null}),
-	{noreply, State#state{rxbytes = RxBytes + size(Payload), rxpackets = RxPackets + 1}};
-handle_info({#rtp{payload_type = Type} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, rtcpport = RtcpPort} = State) ->
-	update_remote_phy(Ip, Port, RtcpPort, C, M, T, Type),
-	handle_info({Pkt, Ip, Port}, State#state{type = Type, ip = Ip, rtpport = Port});
-handle_info({#rtcp{payloads = Rtcps} = Pkt, Ip, Port}, #state{callid = C, mediaid = M, tag = T, ip = OldIp, rtcpport = OldRtcpPort, sibling = Sibling} = State) ->
+	{noreply, State};
+handle_info({#rtp{payload = #dtmf{} = Payload} = Pkt, _, _}, #state{callid = C, mediaid = M, tag = T, sibling = Sibling} = State) ->
+	gen_server:cast(Sibling, {Pkt, null, null}),
+	error_logger:warning_msg("DTMF: ~p from C[~p] M[~p] T[~p]~n", [Payload, C, M, T]),
+	{noreply, State};
+handle_info({#rtcp{payloads = Rtcps} = Pkt, _, _}, #state{callid = C, mediaid = M, tag = T, sibling = Sibling} = State) ->
 	gen_server:cast(Sibling, {Pkt, null, null}),
 	% FIXME accumulate info from the RTCP
 	Sr = rtp_utils:take(Rtcps, sr),
@@ -290,10 +273,7 @@ handle_info({#rtcp{payloads = Rtcps} = Pkt, Ip, Port}, #state{callid = C, mediai
 	Rr /= false andalso gproc:set_value({n, g, {rr, C, M, T}}, rtp_utils:to_proplist(Rr)),
 	Sr /= false andalso gproc:set_value({n, g, {sr, C, M, T}}, rtp_utils:to_proplist(Sr)),
 	error_logger:warning_msg("RTCP: ~p from C[~p] T[~p]~n", [rtp_utils:pp(Pkt), C, T]),
-	case (Ip /= OldIp) or (Port /= OldRtcpPort) of
-		true -> {noreply, State#state{ip = null, rtpport = null, rtcpport = Port}};
-		false -> {noreply, State#state{rtcpport = Port}}
-	end;
+	{noreply, State};
 
 handle_info({phy, {Ip, PortRtp, PortRtcp}}, #state{callid = C, mediaid = M, tag = T, cmd = #cmd{origin = #origin{pid = Pid}} = Cmd} = State) ->
 	% Store info about physical params
@@ -309,23 +289,18 @@ handle_info(interim_update, #state{callid = C, mediaid = M, notify_info = Notify
 	rtpproxy_ctl:acc(interim_update, C, M, NotifyInfo),
 	{noreply, State};
 
-handle_info(stats, #state{callid = C, mediaid = M, tag = T, rxbytes = RxBytes, rxpackets = RxPackets, txbytes = TxBytes, txpackets = TxPackets, tref = TRef} = State) ->
+handle_info(stats, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid} = State) ->
+	{Ip, RtpPort, RtcpPort, SSRC, Type, RxBytes, RxPackets, TxBytes, TxPackets} = gen_server:call(RtpPid, get_stats),
+	[Local] = gproc:select([{{{p,g,media},'_',{C,M,T,'_','$1','_'}}, [], ['$1']}]),
+	gproc:unreg({p,g,media}),
+	gproc:add_global_property(media, {C, M, T, Type, Local, {Ip, RtpPort, RtcpPort}}),
 	gproc:update_counter({c, g, {C, M, T, rxbytes}}, RxBytes),
 	gproc:update_counter({c, g, {C, M, T, rxpackets}}, RxPackets),
 	gproc:update_counter({c, g, {C, M, T, txbytes}}, TxBytes),
 	gproc:update_counter({c, g, {C, M, T, txpackets}}, TxPackets),
-	{noreply, State#state{rxbytes = 0, rxpackets = 0, txbytes = 0, txpackets = 0}};
+	{noreply, State#state{type = Type}};
 
 handle_info({'EXIT', Pid, _}, #state{rtp = Pid, sibling = Sibling, tref = TRef} = State) ->
 	gen_server:cast(Sibling, stop),
 	timer:cancel(TRef),
 	{stop, normal, State}.
-
-%%
-%%
-%%
-
-update_remote_phy(Ip, Port, RtcpPort, C, M, T, Type) ->
-	[Local] = gproc:select([{{{p,g,media},'_',{C,M,T,'_','$1','_'}}, [], ['$1']}]),
-	gproc:unreg({p,g,media}),
-	gproc:add_global_property(media, {C, M, T, Type, Local, {Ip, Port, RtcpPort}}).
