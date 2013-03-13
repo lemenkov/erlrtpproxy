@@ -257,7 +257,7 @@ terminate(Reason, #state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_
 	{_, GprocMem0} = erlang:process_info(whereis(gproc_dist), memory),
 	erlang:garbage_collect(whereis(gproc_dist)),
 	{_, GprocMem1} = erlang:process_info(whereis(gproc_dist), memory),
-	error_logger:error_msg("media ~p: terminated due to reason [~p] (allocated ~b bytes, Gproc allocated ~b bytes)", [self(), Reason, Bytes, GprocMem1 - GprocMem0]).
+	error_logger:error_msg("media ~p: terminated due to reason [~p] (allocated ~b bytes, Gproc allocated ~b bytes)", [self(), Reason, Bytes, GprocMem0 - GprocMem1]).
 
 handle_info({Pkt, _, _}, #state{sibling = Sibling} = State) when is_binary(Pkt) ->
 	gen_server:cast(Sibling, {Pkt, null, null}),
