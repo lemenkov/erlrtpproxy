@@ -97,7 +97,7 @@ rtpproxy_coherence_test_() ->
 							% Create session
 							gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<Cookie/binary, " Uc0,8,18,101 ", CallId/binary, " ", "192.0.43.10 12345 ", TagFrom/binary, ";1", "\n">>),
 							{ok, {?RTPPROXY_IP, ?RTPPROXY_PORT, _}} = gen_udp:recv(Fd, 0),
-							
+
 							% Lookup session
 							gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<Cookie/binary, " Lc0,8,18,101 ", CallId/binary, " ", "192.0.43.11 54321 ", TagFrom/binary, ";1", " ", TagTo/binary, ";1", "\n">>),
 							{ok, {?RTPPROXY_IP, ?RTPPROXY_PORT, _}} = gen_udp:recv(Fd, 0),
@@ -105,7 +105,7 @@ rtpproxy_coherence_test_() ->
 							% Select two Pids
 							Ret0 = gproc:select([{ { {p,g, media} , '$1' , {CallId, '_', '_', '_', '_', '_'} }, [], ['$1']}]),
 
-							% Wait enough for triggering timeout 
+							% Wait enough for triggering timeout
 							timer:sleep(3000),
 
 							% This must return empty list
