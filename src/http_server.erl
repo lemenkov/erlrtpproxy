@@ -32,11 +32,7 @@ dispatch(Req) ->
 					JSON = "{hello:\"html\"}",
 					Req:respond({200, [], JSON});
 				["json" | _] ->
-					JSON = case Req:parse_qs() of
-						[] -> dump_all();
-						KV -> dump_query(KV)
-					end,
-					Req:respond({200, [], JSON});
+					Req:respond({200, [], dump_query(Req:parse_qs())});
 				["params" | _] ->
 					Qs = Req:parse_qs(),
 					case Qs of
@@ -55,33 +51,8 @@ dispatch(Req) ->
 			Req:respond({405, Headers, "405 Method Not Allowed\r\n"})
 	end.
 
-dump_all() ->
-	Length = gproc:get_value({c, g, calls}, shared),
-	List = gproc:select([{ { {p,g, media} , '_' , {'_', '_', '_', '_', '_', '_'} }, [], ['$$']}]),
-	Result =  [
-			[
-				{media,
-					[
-						{callid, CallId},
-						{mediaid, MediaId},
-						{tag, Tag},
-						{payload, Payload},
-						{rxbytes, gproc:get_value({c, g, {CallId, MediaId, Tag, rxbytes}}, Pid)},
-						{rxpackets, gproc:get_value({c, g, {CallId, MediaId, Tag, rxpackets}}, Pid)},
-						{txbytes, gproc:get_value({c, g, {CallId, MediaId, Tag, txbytes}}, Pid)},
-						{txpackets, gproc:get_value({c, g, {CallId, MediaId, Tag, txpackets}}, Pid)},
-						{local, [{ip, make_ip(LocalIp)}, {rtp, LocalRtpPort}, {rtcp, LocalRtcpPort}]},
-						{remote,[{ip, make_ip(RemoteIp)}, {rtp, RemoteRtpPort}, {rtcp, RemoteRtcpPort}]},
-						gproc:get_value({n, g, {rr, CallId, MediaId, Tag}}, Pid),
-						gproc:get_value({n, g, {sr, CallId, MediaId, Tag}}, Pid)
-					]
-				}
-			] || [{p,g,media}, Pid, {CallId, MediaId, Tag, Payload, {LocalIp, LocalRtpPort, LocalRtcpPort}, {RemoteIp, RemoteRtpPort, RemoteRtcpPort}}] <- List],
-	mochijson2:encode([{callnum, Length}, {calllegs, Result}]).
-
 dump_query([{"callnum",_}]) ->
-	Length = gproc:get_value({c, g, calls}, shared),
-	mochijson2:encode([{callnum, Length}]);
+	mochijson2:encode([{callnum, gproc:get_value({c, g, calls}, shared)}]);
 dump_query(RawQuery) ->
 	Query = [ decode_kv(KV) || KV <- RawQuery],
 	C = proplists:get_value(callid, Query, '_'),
@@ -92,24 +63,33 @@ dump_query(RawQuery) ->
 
 	%% C M T Payload Local Remote
 	List = gproc:select([{ { {p,g, media} , '_' , {C, M, T, P, '_', {I,'_','_'}} }, [], ['$$']}]),
+
 	Result = [
+			begin
+			{RemoteIp, RemoteRtpPort, RemoteRtcpPort, SSRC, Payload, RxBytes, RxPackets, TxBytes, TxPackets, Rr0, Sr0} = gen_server:call(Pid, get_stats),
+			Rr = case Rr0 of null -> {rr, null}; false -> {rr, null}; _ ->  rtp_utils:to_proplist(Rr0) end,
+			Sr = case Sr0 of null -> {sr, null}; false -> {sr, null}; _ ->  rtp_utils:to_proplist(Sr0) end,
 			[{media,
 				[
 					{callid, CallId},
 					{mediaid, MediaId},
 					{tag, Tag},
 					{payload, Payload},
-					{rxbytes, gproc:get_value({c, g, {CallId, MediaId, Tag, rxbytes}}, Pid)},
-					{rxpackets, gproc:get_value({c, g, {CallId, MediaId, Tag, rxpackets}}, Pid)},
-					{txbytes, gproc:get_value({c, g, {CallId, MediaId, Tag, txbytes}}, Pid)},
-					{txpackets, gproc:get_value({c, g, {CallId, MediaId, Tag, txpackets}}, Pid)},
+					{rxbytes, RxBytes},
+					{rxpackets, RxPackets},
+					{txbytes, TxBytes},
+					{txpackets, TxPackets},
+					{ssrc, SSRC},
 					{local, [{ip, make_ip(LocalIp)}, {rtp, LocalRtpPort}, {rtcp, LocalRtcpPort}]},
 					{remote,[{ip, make_ip(RemoteIp)}, {rtp, RemoteRtpPort}, {rtcp, RemoteRtcpPort}]},
-					gproc:get_value({n, g, {rr, CallId, MediaId, Tag}}, Pid),
-					gproc:get_value({n, g, {sr, CallId, MediaId, Tag}}, Pid)
+					Rr,
+					Sr
 				]
-			}] || [{p,g,media}, Pid, {CallId, MediaId, Tag, Payload, {LocalIp, LocalRtpPort, LocalRtcpPort}, {RemoteIp, RemoteRtpPort, RemoteRtcpPort}}] <- List],
-	mochijson2:encode([{http_query,  [ {list_to_existing_atom(K), list_to_binary(V)} || {K,V} <- RawQuery]}, {result, Result}]).
+			}]
+			end
+	|| [{p,g,media}, Pid, {CallId, MediaId, Tag, _, {LocalIp, LocalRtpPort, LocalRtcpPort}, {_, _, _}}] <- List],
+
+	mochijson2:encode([{http_query,  Query}, {num, length(List)}, {calllegs, Result}]).
 
 get_params() ->
 	Params = [ttl, ttl_early, rebuildrtp, ignore_start, ignore_stop, sendrecv, active],
