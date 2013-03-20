@@ -182,7 +182,7 @@ handle_cast(
 	#state{rtp = RtpPid, callid = C, mediaid = M, local = Local, notify_info = NotifyInfo} = State
 ) ->
 	case Local of
-		[{Ip,PortRtp,PortRtcp}] ->
+		{Ip,PortRtp,PortRtcp} ->
 			case Addr of
 				{{0,0,0,0}, _} ->
 					gen_server:cast(Pid, {reply, Cmd, {{{0,0,0,0}, PortRtp}, {{0,0,0,0}, PortRtcp}}});
