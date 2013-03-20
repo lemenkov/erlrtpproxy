@@ -288,10 +288,13 @@ handle_info(interim_update, #state{callid = C, mediaid = M, notify_info = Notify
 	rtpproxy_ctl:acc(interim_update, C, M, NotifyInfo),
 	{noreply, State};
 
-handle_info(get_stats, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid, local = Local, global = Global} = State) ->
+handle_info(get_stats, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid, other_rtp = OtherRtpPid, local = Local, global = Global} = State) ->
 	{Ip, RtpPort, RtcpPort, _SSRC, Type, _, _, _, _} = gen_server:call(RtpPid, get_stats),
 	(Global == {Ip, RtpPort, RtcpPort}) andalso
 	begin
+		% FIXME what if I actually want to receive all RTPs?
+		% This also ruins ZRTP/SRTP
+		(OtherRtpPid /= null) andalso gen_server:call(OtherRtpPid, {rtp_subscriber, gen_server:call(RtpPid, get_rtp_phy)}),
 		gproc:unreg({p,g,media}),
 		gproc:add_global_property(media, {C, M, T, Type, Local, {Ip, RtpPort, RtcpPort}})
 	end,
