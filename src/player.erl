@@ -55,7 +55,7 @@ start(CallId, MediaId, Tag, PayloadInfo) ->
 
 init([CallId, MediaId, Tag, PayloadInfo]) ->
 	% Register itself
-	gproc:add_global_name({player, CallId, MediaId, Tag}),
+	gproc:reg({n,l,{player, CallId, MediaId, Tag}}),
 
 	% How many times we should playbak (FIXME not used for now)
 	Playcount = proplists:get_value(playcount, PayloadInfo, 0),
@@ -106,7 +106,7 @@ terminate(Reason, #state{tref = TRef}) ->
 	?ERR("player terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
 handle_info(send, #state{callid = C, mediaid = M, tag = T, sn = SequenceNumber, type = Type, ssize = FrameLength, ssrc = SSRC, data = {Fd, Size}, starttime = ST} = State) ->
-	case gproc:select({global,names}, [{{{n,g,{media, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
+	case gproc:select([{{{n,l,{media, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
 		[] ->
 			{noreply, State};
 		[Pid] ->

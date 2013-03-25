@@ -38,7 +38,6 @@
 
 start() ->
 	%% Run gproc
-	application:set_env(gproc, gproc_dist, all),
 	application:start(gproc),
 
 	%% Load main module

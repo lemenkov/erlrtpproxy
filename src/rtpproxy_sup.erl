@@ -60,7 +60,7 @@ init([]) ->
 
 	% Set up stats
 	% FIXME this should be moved somewhere and switched to {a,g,calls}
-	gproc:reg_shared({c,g,calls}),
+	gproc:reg_shared({c,l,calls}),
 
 	{ok, {SupFlags, [ListenerProcess, BackendProcess, HttpProcess, StorageProcess, FileWriterProcess | NotifyBackends]}}.
 

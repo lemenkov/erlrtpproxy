@@ -52,7 +52,7 @@ dispatch(Req) ->
 	end.
 
 dump_query([{"callnum",_}]) ->
-	mochijson2:encode([{callnum, gproc:get_value({c, g, calls}, shared)}]);
+	mochijson2:encode([{callnum, gproc:get_value({c,l,calls}, shared)}]);
 dump_query(RawQuery) ->
 	Query = [ decode_kv(KV) || KV <- RawQuery],
 	C = proplists:get_value(callid, Query, '_'),
@@ -62,7 +62,7 @@ dump_query(RawQuery) ->
 	I = proplists:get_value(remoteip, Query, '_'),
 
 	%% C M T Payload Local Remote
-	List = gproc:select([{ { {p,g, media} , '_' , {C, M, T, P, '_', {I,'_','_'}} }, [], ['$$']}]),
+	List = gproc:select([{ { {p,l, media} , '_' , {C, M, T, P, '_', {I,'_','_'}} }, [], ['$$']}]),
 
 	Result = [
 			begin

@@ -46,7 +46,6 @@ start() ->
 	rpc:multicall(Nodes, error_logger, add_report_handler, [erlsyslog]),
 
 	%% Run gproc on each node
-	rpc:multicall(Nodes, application, set_env, [gproc, gproc_dist, all]),
 	rpc:multicall(Nodes, application, start, [gproc]),
 
 	%% Load necessary config files
@@ -70,16 +69,16 @@ save_config(ConfigPath) ->
 
 % Simply stop all active sessions
 command(#cmd{type = ?CMD_X}) ->
-	Calls = gproc:lookup_global_properties(media),
+	Calls = gproc:lookup_values({p,l,media}),
 	lists:foreach(fun({Pid,{_,_,_,_,_,_}}) -> gen_server:cast(Pid, stop) end, Calls);
 
 % DEPRECATED. Use HTTP-JSON.
 command(#cmd{type = ?CMD_I}) ->
-	Length = gproc:get_value({c, g, calls}, shared),
+	Length = gproc:get_value({c,l,calls}, shared),
 	{ok, {stats, Length}};
 
 command(#cmd{type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{tag = Tag}} = Cmd) ->
-	case gproc:lookup_global_name({media, CallId, MediaId, Tag}) of
+	case gproc:where({n,l,{media, CallId, MediaId, Tag}}) of
 		undefined ->
 			media:start(Cmd);
 		MediaThread ->
@@ -93,7 +92,7 @@ command(#cmd{callid = CallId, mediaid = MediaId} = Cmd) ->
 		_ -> MediaId
 	end,
 
-	case gproc:select([{{{p,g,media},'$1',{CallId,MID,'_','_','_','_'}}, [], ['$1']}]) of
+	case gproc:select([{{{p,l,media},'$1',{CallId,MID,'_','_','_','_'}}, [], ['$1']}]) of
 		[] ->
 			error_logger:warning_msg("Media stream does not exist. Do nothing."),
 			{error, notfound};

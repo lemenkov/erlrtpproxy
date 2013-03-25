@@ -63,10 +63,10 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 	process_flag(trap_exit, true),
 
 	% Register itself
-	gproc:add_global_name({media, C, M, T}),
+	gproc:reg({n,l,{media, C, M, T}}),
 
 	% Register itself for group call and broadcast commands
-	gproc:add_global_property(media, {C, M, T, null, null, null}),
+	gproc:reg({p,l,media}, {C, M, T, null, null, null}),
 
 	Ip = case {proplists:get_value(local, Params), proplists:get_value(remote, Params), proplists:get_value(ipv6, Params)} of
 		{_, _, true} ->
@@ -93,10 +93,10 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 		Acc -> rtpproxy_ctl:acc(Acc, C, M, NotifyInfo)
 	end,
 
-	{Role, Sibling, OtherRtpPid} = case gproc:select({global,names}, [{ {{n,g,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
+	{Role, Sibling, OtherRtpPid} = case gproc:select([{ {{n,l,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
 		[] ->
 			% initial call creation.
-			gproc:update_shared_counter({c,g,calls},1),
+			gproc:update_shared_counter({c,l,calls},1),
 			{master, null, null};
 		[S] ->
 			OtherRtpPid0 = gen_server:call(S, {sibling, self(), RtpPid}),
@@ -202,7 +202,7 @@ handle_cast(
 	{noreply, State};
 
 handle_cast(#cmd{type = ?CMD_P, callid = C, mediaid = M, to = #party{tag = T}, params = P}, #state{callid = C, mediaid = M, tag = T, type = Type, rtp = RtpPid, other_rtp = OtherRtpPid, sibling = Sibling} = State) ->
-	case gproc:select({global,names}, [{{{n, g, {player, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
+	case gproc:select([{{{n,l,{player, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
 		[] ->
 			CodecType = rtp_utils:get_codec_from_payload(Type),
 			% FIXME we just ignore payload type sent by OpenSIPS/B2BUA and append
@@ -219,7 +219,7 @@ handle_cast(#cmd{type = ?CMD_P, callid = C, mediaid = M, from = #party{tag = T}}
 	{noreply, State};
 
 handle_cast(#cmd{type = ?CMD_S, callid = C, mediaid = M, to = #party{tag = T}}, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid, other_rtp = OtherRtpPid} = State) ->
-	case gproc:select({global,names}, [{{{n, g, {player, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
+	case gproc:select([{{{n,l,{player, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
 		[] -> ok;
 		[Pid] ->
 			gen_server:cast(Pid, stop),
@@ -241,20 +241,16 @@ code_change(_OldVsn, State, _Extra) ->
 
 terminate(Reason, #state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_info = NotifyInfo, copy = Copy, role = Role}) ->
 	rtpproxy_ctl:acc(stop, C, M, NotifyInfo),
-	case gproc:select({global,names}, [{{{n, g, {player, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
+	case gproc:select([{{{n,l,{player, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
 		[] -> ok;
 		[PlayerPid] -> gen_server:cast(PlayerPid, stop)
 	end,
 	gen_rtp_channel:close(RtpPid),
 	Copy andalso gen_server:cast(file_writer, {eof, C, M, T}),
-	Role == master andalso gproc:update_shared_counter({c,g,calls}, -1),
+	Role == master andalso gproc:update_shared_counter({c,l,calls}, -1),
 	% No need to explicitly unregister from gproc - it does so automatically
 	{memory, Bytes} = erlang:process_info(self(), memory),
-	% FIXME - this is REALLY HORRIBLE but helps to reduce memory consumption in gproc
-	{_, GprocMem0} = erlang:process_info(whereis(gproc_dist), memory),
-	erlang:garbage_collect(whereis(gproc_dist)),
-	{_, GprocMem1} = erlang:process_info(whereis(gproc_dist), memory),
-	error_logger:error_msg("media ~p: terminated due to reason [~p] (allocated ~b bytes, Gproc allocated ~b bytes)", [self(), Reason, Bytes, GprocMem0 - GprocMem1]).
+	error_logger:error_msg("media ~p: terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
 
 handle_info({Pkt, _, _}, #state{sibling = Sibling} = State) when is_binary(Pkt) ->
 	gen_server:cast(Sibling, {Pkt, null, null}),
@@ -276,9 +272,9 @@ handle_info({#rtcp{payloads = Rtcps} = Pkt, _, _}, #state{callid = C, mediaid = 
 
 handle_info({phy, {Ip, PortRtp, PortRtcp}}, #state{callid = C, mediaid = M, tag = T, cmd = #cmd{origin = #origin{pid = Pid}} = Cmd} = State) ->
 	% Store info about physical params
-	[[Payload, Remote]] = gproc:select([{{{p,g,media},'_',{C,M,T,'$1','_','$2'}}, [], [['$1','$2']]}]),
-	gproc:unreg({p,g,media}),
-	gproc:add_global_property(media, {C, M, T, Payload, {Ip, PortRtp, PortRtcp}, Remote}),
+	[[Payload, Remote]] = gproc:select([{{{p,l,media},'_',{C,M,T,'$1','_','$2'}}, [], [['$1','$2']]}]),
+	gproc:unreg({p,l,media}),
+	gproc:reg({p,l,media}, {C, M, T, Payload, {Ip, PortRtp, PortRtcp}, Remote}),
 	% Reply to server
 	gen_server:cast(Pid, {reply, Cmd, {{Ip, PortRtp}, {Ip, PortRtcp}}}),
 	% No need to store original Cmd any longer
@@ -295,8 +291,8 @@ handle_info(get_stats, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid, ot
 		% FIXME what if I actually want to receive all RTPs?
 		% This also ruins ZRTP/SRTP
 		(OtherRtpPid /= null) andalso gen_server:call(OtherRtpPid, {rtp_subscriber, gen_server:call(RtpPid, get_rtp_phy)}),
-		gproc:unreg({p,g,media}),
-		gproc:add_global_property(media, {C, M, T, Type, Local, {Ip, RtpPort, RtcpPort}})
+		gproc:unreg({p,l,media}),
+		gproc:reg({p,l,media}, {C, M, T, Type, Local, {Ip, RtpPort, RtcpPort}})
 	end,
 	{noreply, State#state{type = Type, global = {Ip, RtpPort, RtcpPort}}};
 
