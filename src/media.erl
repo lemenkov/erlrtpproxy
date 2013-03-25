@@ -88,11 +88,6 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 
 	Copy = proplists:get_value(copy, Params, false),
 
-	case proplists:get_value(acc, Params, none) of
-		none -> ok;
-		Acc -> rtpproxy_ctl:acc(Acc, C, M, NotifyInfo)
-	end,
-
 	{Role, Sibling, OtherRtpPid} = case gproc:select([{ {{n,l,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
 		[] ->
 			% initial call creation.
@@ -103,6 +98,10 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 			gen_server:cast(S, {prefill, Addr}),
 			{slave, S, OtherRtpPid0}
 	end,
+
+	% Should we send start here?
+	Acc = proplists:get_value(acc, Params, null),
+	(Acc /= null) and (Role == master) andalso   rtpproxy_ctl:acc(Acc, C, M, NotifyInfo),
 
 	% Set stats timer
 	{ok, TRef} = timer:send_interval(1000, get_stats),
@@ -179,7 +178,7 @@ handle_cast({prefill, _}, State) ->
 
 handle_cast(
 	#cmd{type = ?CMD_U, from = #party{addr = Addr}, origin = #origin{pid = Pid}, params = Params} = Cmd,
-	#state{rtp = RtpPid, callid = C, mediaid = M, local = Local, notify_info = NotifyInfo} = State
+	#state{rtp = RtpPid, callid = C, mediaid = M, local = Local, notify_info = NotifyInfo, role = Role} = State
 ) ->
 	case Local of
 		{Ip,PortRtp,PortRtcp} ->
@@ -195,10 +194,11 @@ handle_cast(
 	end,
 	{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
 	gen_server:cast(RtpPid, {update, Params ++ [{sendrecv, SendRecvStrategy}]}),
-	case proplists:get_value(acc, Params, none) of
-		none -> ok;
-		Acc -> rtpproxy_ctl:acc(Acc, C, M, NotifyInfo)
-	end,
+
+	% Should we send start here?
+	Acc = proplists:get_value(acc, Params, null),
+	(Acc /= null) and (Role == master) andalso   rtpproxy_ctl:acc(Acc, C, M, NotifyInfo),
+
 	{noreply, State};
 
 handle_cast(#cmd{type = ?CMD_P, callid = C, mediaid = M, to = #party{tag = T}, params = P}, #state{callid = C, mediaid = M, tag = T, type = Type, rtp = RtpPid, other_rtp = OtherRtpPid, sibling = Sibling} = State) ->
@@ -240,14 +240,17 @@ code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 terminate(Reason, #state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_info = NotifyInfo, copy = Copy, role = Role}) ->
-	rtpproxy_ctl:acc(stop, C, M, NotifyInfo),
 	case gproc:select([{{{n,l,{player, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
 		[] -> ok;
 		[PlayerPid] -> gen_server:cast(PlayerPid, stop)
 	end,
 	gen_rtp_channel:close(RtpPid),
 	Copy andalso gen_server:cast(file_writer, {eof, C, M, T}),
-	Role == master andalso gproc:update_shared_counter({c,l,calls}, -1),
+	Role == master andalso
+	begin
+		rtpproxy_ctl:acc(stop, C, M, NotifyInfo),
+		gproc:update_shared_counter({c,l,calls}, -1)
+	end,
 	% No need to explicitly unregister from gproc - it does so automatically
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	error_logger:error_msg("media ~p: terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
@@ -280,8 +283,10 @@ handle_info({phy, {Ip, PortRtp, PortRtcp}}, #state{callid = C, mediaid = M, tag 
 	% No need to store original Cmd any longer
 	{noreply, State#state{cmd = null, local = {Ip, PortRtp, PortRtcp}}};
 
-handle_info(interim_update, #state{callid = C, mediaid = M, notify_info = NotifyInfo} = State) ->
+handle_info(interim_update, #state{callid = C, mediaid = M, notify_info = NotifyInfo, role = master} = State) ->
 	rtpproxy_ctl:acc(interim_update, C, M, NotifyInfo),
+	{noreply, State};
+handle_info(interim_update, #state{callid = C, mediaid = M, notify_info = NotifyInfo, role = slave} = State) ->
 	{noreply, State};
 
 handle_info(get_stats, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid, other_rtp = OtherRtpPid, local = Local, global = Global} = State) ->
