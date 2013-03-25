@@ -30,7 +30,6 @@
 -export([code_change/3]).
 -export([terminate/2]).
 
--include("../include/common.hrl").
 -include_lib("rtplib/include/rtp.hrl").
 
 -record(state, {
@@ -87,14 +86,14 @@ init([CallId, MediaId, Tag, PayloadInfo]) ->
 	}.
 
 handle_call(Call, _From,  State) ->
-	?ERR("Unmatched call [~p]", [Call]),
-	{stop,{error,unknown_call},State}.
+	error_logger:warning_msg("Unmatched call [~p]", [Call]),
+	{reply,{error,unknown_call},State}.
 
 handle_cast(stop, State) ->
 	{stop, normal, State};
 
 handle_cast(Other, State) ->
-	?ERR("Unmatched cast [~p]", [Other]),
+	error_logger:warning_msg("Unmatched cast [~p]", [Other]),
 	{noreply, State}.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -103,7 +102,7 @@ code_change(_OldVsn, State, _Extra) ->
 terminate(Reason, #state{tref = TRef}) ->
 	timer:cancel(TRef),
 	{memory, Bytes} = erlang:process_info(self(), memory),
-	?ERR("player terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
+	error_logger:info_msg("player terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
 handle_info(send, #state{callid = C, mediaid = M, tag = T, sn = SequenceNumber, type = Type, ssize = FrameLength, ssrc = SSRC, data = {Fd, Size}, starttime = ST} = State) ->
 	case gproc:select([{{{n,l,{media, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
@@ -134,5 +133,5 @@ handle_info(send, #state{callid = C, mediaid = M, tag = T, sn = SequenceNumber, 
 	end;
 
 handle_info(Info, State) ->
-	?ERR("Unmatched info [~p]", [Info]),
+	error_logger:warning_msg("Unmatched info [~p]", [Info]),
 	{noreply, State}.
