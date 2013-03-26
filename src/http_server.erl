@@ -59,10 +59,11 @@ dump_query(RawQuery) ->
 	M = proplists:get_value(mediaid, Query, '_'),
 	T = proplists:get_value(tag, Query, '_'),
 	P = proplists:get_value(payload, Query, '_'),
-	I = proplists:get_value(remoteip, Query, '_'),
+	L = '_',
+	R = case proplists:get_value(remoteip, Query, none) of none  -> '_'; I -> {I,'_','_'} end,
 
 	%% C M T Payload Local Remote
-	List = gproc:select([{{{n,l,{media, C, M, T}}, '_', {P, '_', {I,'_','_'}}}, [], ['$$']}]),
+	List = gproc:select([{{{n,l,{media, C, M, T}}, '_', {P, L, R}}, [], ['$$']}]),
 
 	Result = [
 			begin
@@ -87,7 +88,7 @@ dump_query(RawQuery) ->
 				]
 			}]
 			end
-	|| [{n,l, {media, CallId, MediaId, Tag}}, Pid, {_, {LocalIp, LocalRtpPort, LocalRtcpPort}, {_, _, _}}] <- List],
+	|| [{n,l, {media, CallId, MediaId, Tag}}, Pid, {_, {LocalIp, LocalRtpPort, LocalRtcpPort}, _}] <- List],
 
 	mochijson2:encode([{http_query,  Query}, {num, length(List)}, {calllegs, Result}]).
 
