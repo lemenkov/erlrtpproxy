@@ -9,7 +9,7 @@
 -define(CHILD(I,P), {I, {I, start_link, [P]}, transient, 5000, worker, [I]}).
 
 start_link() ->
-	supervisor:start_link(?MODULE, []).
+	supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 init([]) ->
 	RestartStrategy = one_for_one,
