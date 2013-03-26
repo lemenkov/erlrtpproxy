@@ -103,13 +103,13 @@ rtpproxy_coherence_test_() ->
 							{ok, {?RTPPROXY_IP, ?RTPPROXY_PORT, _}} = gen_udp:recv(Fd, 0),
 
 							% Select two Pids
-							Ret0 = gproc:select([{ { {p,l, media} , '$1' , {CallId, '_', '_', '_', '_', '_'} }, [], ['$1']}]),
+							Ret0 = gproc:select([{{{n,l,{media, CallId, '_', '_'}},'$1',{'_', '_', '_'}}, [], ['$1']}]),
 
 							% Wait enough for triggering timeout
 							timer:sleep(3000),
 
 							% This must return empty list
-							Ret1 = gproc:select([{ { {p,l, media} , '$1' , {CallId, '_', '_', '_', '_', '_'} }, [], ['$1']}]),
+							Ret1 = gproc:select([{{{n,l,{media, CallId, '_', '_'}},'$1',{'_', '_', '_'}}, [], ['$1']}]),
 
 							?assertMatch({[_, _], [true, true], []}, {Ret0, lists:map(fun(X) -> is_pid(X) end, Ret0), Ret1})
 					end

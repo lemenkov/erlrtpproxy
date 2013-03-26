@@ -69,8 +69,8 @@ save_config(ConfigPath) ->
 
 % Simply stop all active sessions
 command(#cmd{type = ?CMD_X}) ->
-	Calls = gproc:lookup_values({p,l,media}),
-	lists:foreach(fun({Pid,{_,_,_,_,_,_}}) -> gen_server:cast(Pid, stop) end, Calls);
+	MediaThreads = gproc:select([{{{n,l,{media, '_', '_', '_'}},'$1','_'}, [], ['$1']}]),
+	lists:foreach(fun(Pid) -> gen_server:cast(Pid, stop) end, MediaThreads);
 
 % DEPRECATED. Use HTTP-JSON.
 command(#cmd{type = ?CMD_I}) ->
@@ -92,7 +92,7 @@ command(#cmd{callid = CallId, mediaid = MediaId} = Cmd) ->
 		_ -> MediaId
 	end,
 
-	case gproc:select([{{{p,l,media},'$1',{CallId,MID,'_','_','_','_'}}, [], ['$1']}]) of
+	case gproc:select([{{{n,l,{media, CallId, MID, '_'}},'$1','_'}, [], ['$1']}]) of
 		[] ->
 			error_logger:warning_msg("Media stream does not exist. Do nothing."),
 			{error, notfound};

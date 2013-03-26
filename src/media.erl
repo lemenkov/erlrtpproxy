@@ -64,9 +64,7 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 
 	% Register itself
 	gproc:reg({n,l,{media, C, M, T}}),
-
-	% Register itself for group call and broadcast commands
-	gproc:reg({p,l,media}, {C, M, T, null, null, null}),
+	gproc:set_value({n,l,{media, C, M, T}}, {null, null, null}),
 
 	Ip = case {proplists:get_value(local, Params), proplists:get_value(remote, Params), proplists:get_value(ipv6, Params)} of
 		{_, _, true} ->
@@ -274,12 +272,11 @@ handle_info({#rtcp{payloads = Rtcps} = Pkt, _, _}, #state{callid = C, mediaid = 
 	{noreply, State#state{rr = Rr, sr = Sr}};
 
 handle_info({phy, {Ip, PortRtp, PortRtcp}}, #state{callid = C, mediaid = M, tag = T, cmd = #cmd{origin = #origin{pid = Pid}} = Cmd} = State) ->
-	% Store info about physical params
-	[[Payload, Remote]] = gproc:select([{{{p,l,media},'_',{C,M,T,'$1','_','$2'}}, [], [['$1','$2']]}]),
-	gproc:unreg({p,l,media}),
-	gproc:reg({p,l,media}, {C, M, T, Payload, {Ip, PortRtp, PortRtcp}, Remote}),
 	% Reply to server
 	gen_server:cast(Pid, {reply, Cmd, {{Ip, PortRtp}, {Ip, PortRtcp}}}),
+	% Store info about physical params
+	{Payload, _, Remote} = gproc:get_value({n,l,{media, C, M, T}}),
+	gproc:set_value({n,l,{media, C, M, T}}, {Payload, {Ip, PortRtp, PortRtcp}, Remote}),
 	% No need to store original Cmd any longer
 	{noreply, State#state{cmd = null, local = {Ip, PortRtp, PortRtcp}}};
 
@@ -296,8 +293,7 @@ handle_info(get_stats, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid, ot
 		% FIXME what if I actually want to receive all RTPs?
 		% This also ruins ZRTP/SRTP
 		(OtherRtpPid /= null) andalso gen_server:call(OtherRtpPid, {rtp_subscriber, gen_server:call(RtpPid, get_rtp_phy)}),
-		gproc:unreg({p,l,media}),
-		gproc:reg({p,l,media}, {C, M, T, Type, Local, {Ip, RtpPort, RtcpPort}})
+		gproc:set_value({n,l,{media, C, M, T}}, {Type, Local, {Ip, RtpPort, RtcpPort}})
 	end,
 	{noreply, State#state{type = Type, global = {Ip, RtpPort, RtcpPort}}};
 
