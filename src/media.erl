@@ -7,7 +7,7 @@
 %%%
 %%% This program is distributed in the hope that it will be useful,
 %%% but WITHOUT ANY WARRANTY; without even the implied warranty of
-%%% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+%%% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
 %%% General Public License for more details.
 %%%
 %%% You should have received a copy of the GNU General Public License
@@ -99,7 +99,7 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 
 	% Should we send start here?
 	Acc = proplists:get_value(acc, Params, null),
-	(Acc /= null) and (Role == master) andalso   rtpproxy_ctl:acc(Acc, C, M, NotifyInfo),
+	(Acc /= null) and (Role == master) andalso rtpproxy_ctl:acc(Acc, C, M, NotifyInfo),
 
 	% Set stats timer
 	{ok, TRef} = timer:send_interval(1000, get_stats),
@@ -131,7 +131,7 @@ handle_call(get_stats, _From, #state{rr = Rr, sr = Sr, rtp = RtpPid} = State) ->
 	{RemoteIp, RemoteRtpPort, RemoteRtcpPor, SSRC, Type, RxBytes, RxPackets, TxBytes, TxPackets} = gen_server:call(RtpPid, get_stats),
 	{reply, {RemoteIp, RemoteRtpPort, RemoteRtcpPor, SSRC, Type, RxBytes, RxPackets, TxBytes, TxPackets, Rr, Sr}, State#state{type = Type}};
 
-handle_call(Call, _From,  State) ->
+handle_call(Call, _From, State) ->
 	error_logger:error_msg("media ~p: Unmatched call [~p]", [self(), Call]),
 	{stop,{error,unknown_call},State}.
 
@@ -195,7 +195,7 @@ handle_cast(
 
 	% Should we send start here?
 	Acc = proplists:get_value(acc, Params, null),
-	(Acc /= null) and (Role == master) andalso   rtpproxy_ctl:acc(Acc, C, M, NotifyInfo),
+	(Acc /= null) and (Role == master) andalso rtpproxy_ctl:acc(Acc, C, M, NotifyInfo),
 
 	{noreply, State};
 
