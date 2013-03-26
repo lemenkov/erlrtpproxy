@@ -69,8 +69,8 @@ save_config(ConfigPath) ->
 
 % Simply stop all active sessions
 command(#cmd{type = ?CMD_X}) ->
-	MediaThreads = gproc:select([{{{n,l,{media, '_', '_', '_'}},'$1','_'}, [], ['$1']}]),
-	lists:foreach(fun(Pid) -> gen_server:cast(Pid, stop) end, MediaThreads);
+	[supervisor:terminate_child(media_sup, SID) || {SID,_,_,_} <- supervisor:which_children(media_sup)],
+	ok;
 
 % DEPRECATED. Use HTTP-JSON.
 command(#cmd{type = ?CMD_I}) ->
@@ -80,7 +80,7 @@ command(#cmd{type = ?CMD_I}) ->
 command(#cmd{type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{tag = Tag}} = Cmd) ->
 	case gproc:where({n,l,{media, CallId, MediaId, Tag}}) of
 		undefined ->
-			media:start(Cmd);
+			rtpproxy_sup:start_media(Cmd);
 		MediaThread ->
 			gen_server:cast(MediaThread, Cmd)
 	end,

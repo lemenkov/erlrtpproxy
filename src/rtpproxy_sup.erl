@@ -1,17 +1,25 @@
 -module(rtpproxy_sup).
 -behaviour(supervisor).
 
--export([start_link/0]).
 -export([init/1]).
+-export([start_media/1]).
+
+-include("../include/common.hrl").
 
 %% Helper macros for declaring children of supervisor
 -define(CHILD(I), {I, {I, start_link, []}, transient, 5000, worker, [I]}).
 -define(CHILD(I,P), {I, {I, start_link, [P]}, transient, 5000, worker, [I]}).
+-define(CHILD(N,I,P), {N, {I, start_link, [P]}, transient, 5000, worker, [I]}).
 
-start_link() ->
-	supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+init(media_sup) ->
+	RestartStrategy = one_for_one,
+	MaxRestarts = 10,
+	MaxTimeBetweenRestarts = 1, % in seconds
+	SupFlags = {RestartStrategy, MaxRestarts, MaxTimeBetweenRestarts},
 
-init([]) ->
+	{ok, {SupFlags, []}};
+
+init(rtpproxy_sup) ->
 	RestartStrategy = one_for_one,
 	MaxRestarts = 10,
 	MaxTimeBetweenRestarts = 1,
@@ -63,3 +71,7 @@ init([]) ->
 	gproc:reg_shared({c,l,calls}),
 
 	{ok, {SupFlags, [ListenerProcess, BackendProcess, HttpProcess, StorageProcess, FileWriterProcess | NotifyBackends]}}.
+
+start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}} = Cmd) ->
+	N = {media, C, M, T},
+	supervisor:start_child(media_sup, {N, {media, start_link, [Cmd]}, temporary, 5000, worker, [media]}).
