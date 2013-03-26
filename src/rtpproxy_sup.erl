@@ -63,4 +63,3 @@ init([]) ->
 	gproc:reg_shared({c,l,calls}),
 
 	{ok, {SupFlags, [ListenerProcess, BackendProcess, HttpProcess, StorageProcess, FileWriterProcess | NotifyBackends]}}.
-
