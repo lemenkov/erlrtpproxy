@@ -286,7 +286,7 @@ handle_info({phy, {Ip, PortRtp, PortRtcp}}, #state{callid = C, mediaid = M, tag 
 handle_info(interim_update, #state{callid = C, mediaid = M, notify_info = NotifyInfo, role = master} = State) ->
 	rtpproxy_ctl:acc(interim_update, C, M, NotifyInfo),
 	{noreply, State};
-handle_info(interim_update, #state{callid = C, mediaid = M, notify_info = NotifyInfo, role = slave} = State) ->
+handle_info(interim_update, #state{role = slave} = State) ->
 	{noreply, State};
 
 handle_info(get_stats, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid, other_rtp = OtherRtpPid, local = Local, global = Global} = State) ->
