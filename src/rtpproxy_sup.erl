@@ -11,6 +11,14 @@
 -define(CHILD(I,P), {I, {I, start_link, [P]}, transient, 5000, worker, [I]}).
 -define(CHILD(N,I,P), {N, {I, start_link, [P]}, transient, 5000, worker, [I]}).
 
+init(media_channel_sup) ->
+	RestartStrategy = one_for_all,
+	MaxRestarts = 10,
+	MaxTimeBetweenRestarts = 1, % in seconds
+	SupFlags = {RestartStrategy, MaxRestarts, MaxTimeBetweenRestarts},
+
+	{ok, {SupFlags, []}};
+
 init(media_sup) ->
 	RestartStrategy = one_for_one,
 	MaxRestarts = 10,
@@ -66,12 +74,24 @@ init(rtpproxy_sup) ->
 	%HttpProcess = ?CHILD(mochiweb_http, [[{loop, {http_server, dispatch}}, {port, HttpPort}, {name, http_server}]]),
 	HttpProcess = {mochiweb_http, {mochiweb_http, start, [[{loop, {http_server, dispatch}}, {port, HttpPort}, {name, http_server}]]}, transient, 5000, worker, [mochiweb_http]},
 
-	% Set up stats
-	% FIXME this should be moved somewhere and switched to {a,g,calls}
-	gproc:reg_shared({c,l,calls}),
-
 	{ok, {SupFlags, [ListenerProcess, BackendProcess, HttpProcess, StorageProcess, FileWriterProcess | NotifyBackends]}}.
 
 start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}} = Cmd) ->
-	N = {media, C, M, T},
-	supervisor:start_child(media_sup, {N, {media, start_link, [Cmd]}, temporary, 5000, worker, [media]}).
+	Ret = supervisor:start_child(media_sup,
+		{
+			{media_channel_sup, C, M},
+			{supervisor, start_link, [rtpproxy_sup, media_channel_sup]},
+			temporary,
+			5000,
+			supervisor,
+			[rtpproxy_sup]
+		}
+	),
+	Pid = case Ret of
+		{ok, Child} -> Child;
+		{ok, Child, _} -> Child;
+		{error,{already_started,Child}} -> Child
+	end,
+	supervisor:start_child(Pid,
+		{{media, C, M, T}, {media, start_link, [Cmd]}, temporary, 5000, worker, [media]}
+	).

@@ -89,7 +89,6 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 	{Role, Sibling, OtherRtpPid} = case gproc:select([{ {{n,l,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
 		[] ->
 			% initial call creation.
-			gproc:update_shared_counter({c,l,calls},1),
 			{master, null, null};
 		[S] ->
 			OtherRtpPid0 = gen_server:call(S, {sibling, self(), RtpPid}),
@@ -157,9 +156,9 @@ handle_cast(
 
 handle_cast(stop, State) ->
 	{stop, normal, State};
-handle_cast(#cmd{type = ?CMD_D, callid = C, mediaid = 0, to = null}, #state{callid = C} = State) ->
+handle_cast(#cmd{type = ?CMD_D, callid = C, mediaid = 0, to = null}, #state{callid = C, role = master} = State) ->
 	{stop, normal, State};
-handle_cast(#cmd{type = ?CMD_D, callid = C, mediaid = 0}, #state{callid = C} = State) ->
+handle_cast(#cmd{type = ?CMD_D, callid = C, mediaid = 0}, #state{callid = C, role = master} = State) ->
 	{stop, normal, State};
 
 handle_cast({prefill, {Ip, Addr}}, #state{rtp = RtpPid, role = slave} = State) ->
@@ -244,11 +243,7 @@ terminate(Reason, #state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_
 	end,
 	gen_rtp_channel:close(RtpPid),
 	Copy andalso gen_server:cast(file_writer, {eof, C, M, T}),
-	Role == master andalso
-	begin
-		rtpproxy_ctl:acc(stop, C, M, NotifyInfo),
-		gproc:update_shared_counter({c,l,calls}, -1)
-	end,
+	Role == master andalso rtpproxy_ctl:acc(stop, C, M, NotifyInfo),
 	% No need to explicitly unregister from gproc - it does so automatically
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	error_logger:error_msg("media ~p: terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
@@ -298,6 +293,5 @@ handle_info(get_stats, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid, ot
 	{noreply, State#state{type = Type, global = {Ip, RtpPort, RtcpPort}}};
 
 handle_info({'EXIT', Pid, _}, #state{rtp = Pid, sibling = Sibling, tref = TRef} = State) ->
-	gen_server:cast(Sibling, stop),
 	timer:cancel(TRef),
 	{stop, normal, State}.

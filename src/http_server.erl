@@ -52,7 +52,7 @@ dispatch(Req) ->
 	end.
 
 dump_query([{"callnum",_}]) ->
-	mochijson2:encode([{callnum, gproc:get_value({c,l,calls}, shared)}]);
+	mochijson2:encode([{callnum, length(supervisor:which_children(media_sup))}]);
 dump_query(RawQuery) ->
 	Query = [ decode_kv(KV) || KV <- RawQuery],
 	C = proplists:get_value(callid, Query, '_'),

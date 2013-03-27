@@ -74,8 +74,7 @@ command(#cmd{type = ?CMD_X}) ->
 
 % DEPRECATED. Use HTTP-JSON.
 command(#cmd{type = ?CMD_I}) ->
-	Length = gproc:get_value({c,l,calls}, shared),
-	{ok, {stats, Length}};
+	{ok, {stats, length(supervisor:which_children(media_sup))}};
 
 command(#cmd{type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{tag = Tag}} = Cmd) ->
 	case gproc:where({n,l,{media, CallId, MediaId, Tag}}) of
