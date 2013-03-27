@@ -156,10 +156,6 @@ handle_cast(
 
 handle_cast(stop, State) ->
 	{stop, normal, State};
-handle_cast(#cmd{type = ?CMD_D, callid = C, mediaid = 0, to = null}, #state{callid = C, role = master} = State) ->
-	{stop, normal, State};
-handle_cast(#cmd{type = ?CMD_D, callid = C, mediaid = 0}, #state{callid = C, role = master} = State) ->
-	{stop, normal, State};
 
 handle_cast({prefill, {Ip, Addr}}, #state{rtp = RtpPid, role = slave} = State) ->
 	{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
