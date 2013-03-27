@@ -13,7 +13,7 @@
 
 init(media_channel_sup) ->
 	RestartStrategy = one_for_all,
-	MaxRestarts = 10,
+	MaxRestarts = 0,
 	MaxTimeBetweenRestarts = 1, % in seconds
 	SupFlags = {RestartStrategy, MaxRestarts, MaxTimeBetweenRestarts},
 
@@ -93,5 +93,5 @@ start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}} = Cmd) ->
 		{error,{already_started,Child}} -> Child
 	end,
 	supervisor:start_child(Pid,
-		{{media, C, M, T}, {media, start_link, [Cmd]}, temporary, 5000, worker, [media]}
+		{{media, C, M, T}, {media, start_link, [Cmd]}, permanent, 5000, worker, [media]}
 	).
