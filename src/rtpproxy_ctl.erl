@@ -26,7 +26,7 @@
 -export([save_config/1]).
 -export([command/1]).
 
--include("../include/common.hrl").
+-include("common.hrl").
 
 acc(Type, CallId, MediaId, Addr) when Type == start; Type == interim_update; Type == stop ->
 	{ok, IgnoreStart} = application:get_env(rtpproxy, ignore_start),

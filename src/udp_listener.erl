@@ -30,8 +30,6 @@
 -export([code_change/3]).
 -export([terminate/2]).
 
--include("../include/common.hrl").
-
 start(Args) ->
 	gen_server:start({local, listener}, ?MODULE, Args, []).
 start_link(Args) ->

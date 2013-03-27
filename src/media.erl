@@ -30,7 +30,7 @@
 -export([code_change/3]).
 -export([terminate/2]).
 
--include("../include/common.hrl").
+-include("common.hrl").
 -include_lib("rtplib/include/rtp.hrl").
 -include_lib("rtplib/include/rtcp.hrl").
 

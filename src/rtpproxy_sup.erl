@@ -4,7 +4,7 @@
 -export([init/1]).
 -export([start_media/1]).
 
--include("../include/common.hrl").
+-include("common.hrl").
 
 %% Helper macros for declaring children of supervisor
 -define(CHILD(I), {I, {I, start_link, []}, transient, 5000, worker, [I]}).
