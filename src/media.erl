@@ -232,7 +232,8 @@ handle_cast(Other, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, #state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_info = NotifyInfo, copy = Copy, role = Role}) ->
+terminate(Reason, #state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_info = NotifyInfo, copy = Copy, role = Role, tref = TRef}) ->
+	timer:cancel(TRef),
 	case gproc:select([{{{n,l,{player, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
 		[] -> ok;
 		[PlayerPid] -> gen_server:cast(PlayerPid, stop)
@@ -288,6 +289,5 @@ handle_info(get_stats, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid, ot
 	end,
 	{noreply, State#state{type = Type, global = {Ip, RtpPort, RtcpPort}}};
 
-handle_info({'EXIT', Pid, _}, #state{rtp = Pid, sibling = Sibling, tref = TRef} = State) ->
-	timer:cancel(TRef),
-	{stop, normal, State}.
+handle_info({'EXIT', Pid, _}, #state{rtp = Pid} = State) ->
+	{stop, timeout, State}.
