@@ -154,9 +154,6 @@ handle_cast(
 	Copy andalso gen_server:cast(file_writer, {Pkt, C, M, T}),
 	{noreply, State};
 
-handle_cast(stop, State) ->
-	{stop, normal, State};
-
 handle_cast({prefill, {Ip, Addr}}, #state{rtp = RtpPid, role = slave} = State) ->
 	{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
 	gen_server:cast(RtpPid, {update, [{sendrecv, SendRecvStrategy}, {prefill, {Ip, Addr}}]}),
