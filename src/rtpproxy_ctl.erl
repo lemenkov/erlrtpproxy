@@ -145,9 +145,22 @@ start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}, params = Param
 	Params1 = Params ++ [{parent, get_pid(Ret1)}, {port, 0}, {ip, Ip}, {rebuildrtp, RebuildRtp}, {timeout_early, TimeoutEarly*1000}, {timeout, Timeout*1000}, {sendrecv, SendRecvStrategy}, {active, ActiveStrategy}],
 
 	% ..and start RTP socket module
-	supervisor:start_child(get_pid(Ret0),
+	{ok, RtpPid0} = supervisor:start_child(get_pid(Ret0),
 		{{phy, C, M, T}, {gen_server, start_link, [gen_rtp_channel, [Params1], []]}, permanent, 5000, worker, [gen_rtp_channel]}
-	).
+	),
+
+	case Ret0 of
+		{error, _} ->
+			% That's a 2nd side
+
+			% Set RTP path
+			[RtpPid1 | _ ] = [P || {{phy, C0, M0, T0}, P, _, _} <- supervisor:which_children(get_pid(Ret0)), T0 /= T, C0 == C, M0 == M],
+			gen_server:call(RtpPid0, {rtp_subscriber, RtpPid1}),
+			gen_server:call(RtpPid1, {rtp_subscriber, RtpPid0}),
+			ok;
+		_ ->
+			ok
+	end.
 
 get_pid({ok, Pid}) -> Pid;
 get_pid({ok, Pid, _}) -> Pid;
