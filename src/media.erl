@@ -66,20 +66,6 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 
 	Copy = proplists:get_value(copy, Params, false),
 
-	{Role, Sibling} = case gproc:select([{ {{n,l,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]) of
-		[] ->
-			% initial call creation.
-			{master, null};
-		[S] ->
-			Addr /= null andalso gen_server:cast(S, {prefill, Addr}),
-			gen_server:call(S, set_sibling),
-			{slave, S}
-	end,
-
-	% Should we send start here?
-	Acc = proplists:get_value(acc, Params, null),
-	(Acc /= null) and (Role == master) andalso rtpproxy_ctl:acc(Acc, C, M, NotifyInfo),
-
 	% Set stats timer
 	{ok, TRef} = timer:send_interval(1000, get_stats),
 
@@ -90,15 +76,18 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 			tag	= T,
 			tref	= TRef,
 			copy	= Copy,
-			sibling = Sibling,
 			notify_info = NotifyInfo,
-			prefill	= Addr,
-			role = Role
+			prefill	= Addr
 		}
 	}.
 
-handle_call(set_sibling, _From, #state{callid = C, mediaid = M, tag = T} = State) ->
-	[Sibling] = gproc:select([{ {{n,l,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]),
+handle_call({set_role, Role}, _From, State) ->
+	% Should we send start here?
+%	Acc = proplists:get_value(acc, Params, null),
+%	(Acc /= null) and (Role == master) andalso rtpproxy_ctl:acc(Acc, C, M, NotifyInfo),
+	{reply, ok, State#state{role = Role}};
+
+handle_call({set_sibling, Sibling}, _From, State) ->
 	{reply, ok, State#state{sibling = Sibling}};
 
 handle_call(get_stats, _From, #state{rr = Rr, sr = Sr, rtp = RtpPid} = State) ->
