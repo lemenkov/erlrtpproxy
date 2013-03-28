@@ -230,6 +230,7 @@ code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 terminate(Reason, #state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_info = NotifyInfo, copy = Copy, role = Role, tref = TRef}) ->
+	{memory, Bytes} = erlang:process_info(self(), memory),
 	timer:cancel(TRef),
 	case gproc:select([{{{n,l,{player, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
 		[] -> ok;
@@ -239,7 +240,6 @@ terminate(Reason, #state{rtp = RtpPid, callid = C, mediaid = M, tag = T, notify_
 	Copy andalso gen_server:cast(file_writer, {eof, C, M, T}),
 	Role == master andalso rtpproxy_ctl:acc(stop, C, M, NotifyInfo),
 	% No need to explicitly unregister from gproc - it does so automatically
-	{memory, Bytes} = erlang:process_info(self(), memory),
 	error_logger:error_msg("media ~p: terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
 
 handle_info({Pkt, _, _}, #state{sibling = Sibling} = State) when is_binary(Pkt) ->
