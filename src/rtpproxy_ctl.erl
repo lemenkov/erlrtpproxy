@@ -167,6 +167,14 @@ start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}, params = Param
 			gen_server:call(Pid1, {set_role, master}),
 			ok;
 		_ ->
+			% That's the first side - let's send accounting start here
+			% FIXME Should we actually do this?
+			Acc = proplists:get_value(acc, Params, null),
+			Acc /= null andalso
+					begin
+						NotifyInfo = proplists:get_value(notify, Params, []),
+						rtpproxy_ctl:acc(Acc, C, M, NotifyInfo)
+					end,
 			ok
 	end.
 

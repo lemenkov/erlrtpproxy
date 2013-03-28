@@ -82,9 +82,6 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 	}.
 
 handle_call({set_role, Role}, _From, State) ->
-	% Should we send start here?
-%	Acc = proplists:get_value(acc, Params, null),
-%	(Acc /= null) and (Role == master) andalso rtpproxy_ctl:acc(Acc, C, M, NotifyInfo),
 	{reply, ok, State#state{role = Role}};
 
 handle_call({set_sibling, Sibling}, _From, #state{prefill = Prefill} = State) ->
@@ -127,28 +124,19 @@ handle_cast({prefill, _}, State) ->
 	{noreply, State};
 
 handle_cast(
-	#cmd{type = ?CMD_U, from = #party{addr = Addr}, origin = #origin{pid = Pid}, params = Params} = Cmd,
-	#state{rtp = RtpPid, callid = C, mediaid = M, local = Local, notify_info = NotifyInfo, role = Role} = State
+	#cmd{type = ?CMD_U, from = #party{addr = {{0,0,0,0}, _}}, origin = #origin{pid = Pid}} = Cmd,
+	#state{local = {_, PortRtp, PortRtcp}} = State
 ) ->
-	case Local of
-		{Ip,PortRtp,PortRtcp} ->
-			case Addr of
-				{{0,0,0,0}, _} ->
-					gen_server:cast(Pid, {reply, Cmd, {{{0,0,0,0}, PortRtp}, {{0,0,0,0}, PortRtcp}}});
-				_ ->
-					gen_server:cast(Pid, {reply, Cmd, {{Ip, PortRtp}, {Ip, PortRtcp}}})
-			end;
-		_ ->
-			% FIXME potential race condition on a client
-			ok
-	end,
+	% Old music-on-hold - FIXME
+	gen_server:cast(Pid, {reply, Cmd, {{{0,0,0,0}, PortRtp}, {{0,0,0,0}, PortRtcp}}}),
+	{noreply, State};
+handle_cast(
+	#cmd{type = ?CMD_U, origin = #origin{pid = Pid}, params = Params} = Cmd,
+	#state{rtp = RtpPid, local = {Ip, PortRtp, PortRtcp}} = State
+) ->
 	{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
 	gen_server:cast(RtpPid, {update, Params ++ [{sendrecv, SendRecvStrategy}]}),
-
-	% Should we send start here?
-	Acc = proplists:get_value(acc, Params, null),
-	(Acc /= null) and (Role == master) andalso rtpproxy_ctl:acc(Acc, C, M, NotifyInfo),
-
+	gen_server:cast(Pid, {reply, Cmd, {{Ip, PortRtp}, {Ip, PortRtcp}}}),
 	{noreply, State};
 
 handle_cast(#cmd{type = ?CMD_P, callid = C, mediaid = M, to = #party{tag = T}, params = P}, #state{callid = C, mediaid = M, tag = T, type = Type, rtp = RtpPid, other_rtp = OtherRtpPid, sibling = Sibling} = State) ->
