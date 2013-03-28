@@ -53,6 +53,7 @@ start(CallId, MediaId, Tag, PayloadInfo) ->
 	gen_server:start(?MODULE, [CallId, MediaId, Tag, PayloadInfo], []).
 
 init([CallId, MediaId, Tag, PayloadInfo]) ->
+	process_flag(trap_exit, true),
 	% Register itself
 	gproc:reg({n,l,{player, CallId, MediaId, Tag}}),
 
