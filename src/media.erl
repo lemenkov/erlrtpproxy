@@ -111,7 +111,7 @@ handle_call(get_stats, _From, #state{rr = Rr, sr = Sr, rtp = RtpPid} = State) ->
 
 handle_call(Call, _From, State) ->
 	error_logger:error_msg("media ~p: Unmatched call [~p]", [self(), Call]),
-	{stop,{error,unknown_call},State}.
+	{stop, {error, {unknown_call, Call}}, State}.
 
 handle_cast(
 	{Pkt, _Ip, _Port},
