@@ -100,8 +100,8 @@ code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 terminate(Reason, #state{tref = TRef}) ->
-	timer:cancel(TRef),
 	{memory, Bytes} = erlang:process_info(self(), memory),
+	timer:cancel(TRef),
 	error_logger:info_msg("player terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
 handle_info(send, #state{callid = C, mediaid = M, tag = T, sn = SequenceNumber, type = Type, ssize = FrameLength, ssrc = SSRC, data = {Fd, Size}, starttime = ST} = State) ->
