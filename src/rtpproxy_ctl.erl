@@ -85,7 +85,7 @@ command(#cmd{type = ?CMD_I}) ->
 command(#cmd{type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{tag = Tag}} = Cmd) ->
 	case gproc:where({n,l,{media, CallId, MediaId, Tag}}) of
 		undefined ->
-			rtpproxy_sup:start_media(Cmd);
+			start_media(Cmd);
 		MediaThread ->
 			gen_server:cast(MediaThread, Cmd)
 	end,
@@ -105,3 +105,50 @@ command(#cmd{callid = CallId, mediaid = MediaId} = Cmd) ->
 			% Group command - return immediately
 			lists:foreach(fun(Pid) -> gen_server:cast(Pid, Cmd) end, MediaThreads)
 	end.
+
+%%
+%% Private functions
+%%
+
+start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}, params = Params} = Cmd) ->
+	Ret0 = supervisor:start_child(media_sup,
+		{
+			{media_channel_sup, C, M},
+			{supervisor, start_link, [rtpproxy_sup, media_channel_sup]},
+			temporary,
+			5000,
+			supervisor,
+			[rtpproxy_sup]
+		}
+	),
+
+	% Start main media module
+	Ret1 = supervisor:start_child(get_pid(Ret0),
+		{{media, C, M, T}, {media, start_link, [Cmd]}, permanent, 5000, worker, [media]}
+	),
+
+	% Determine options...
+	Ip = case {proplists:get_value(local, Params), proplists:get_value(remote, Params), proplists:get_value(ipv6, Params)} of
+		{_, _, true} ->
+			{ok, I} = application:get_env(rtpproxy, ipv6), I;
+		{undefined, _, _} ->
+			{ok, I} = application:get_env(rtpproxy, external), I;
+		{{_,_,_,_}, undefined, _} ->
+			{ok, I} = application:get_env(rtpproxy, internal), I
+	end,
+
+	{ok, RebuildRtp} = application:get_env(rtpproxy, rebuildrtp),
+	{ok, TimeoutEarly} = application:get_env(rtpproxy, ttl_early),
+	{ok, Timeout} = application:get_env(rtpproxy, ttl),
+	{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
+	{ok, ActiveStrategy} = application:get_env(rtpproxy, active),
+	Params1 = Params ++ [{parent, get_pid(Ret1)}, {port, 0}, {ip, Ip}, {rebuildrtp, RebuildRtp}, {timeout_early, TimeoutEarly*1000}, {timeout, Timeout*1000}, {sendrecv, SendRecvStrategy}, {active, ActiveStrategy}],
+
+	% ..and start RTP socket module
+	supervisor:start_child(get_pid(Ret0),
+		{{phy, C, M, T}, {gen_server, start_link, [gen_rtp_channel, [Params1], []]}, permanent, 5000, worker, [gen_rtp_channel]}
+	).
+
+get_pid({ok, Pid}) -> Pid;
+get_pid({ok, Pid, _}) -> Pid;
+get_pid({error, {already_started, Pid}}) -> Pid.
