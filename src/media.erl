@@ -87,7 +87,8 @@ handle_call({set_role, Role}, _From, State) ->
 %	(Acc /= null) and (Role == master) andalso rtpproxy_ctl:acc(Acc, C, M, NotifyInfo),
 	{reply, ok, State#state{role = Role}};
 
-handle_call({set_sibling, Sibling}, _From, State) ->
+handle_call({set_sibling, Sibling}, _From, #state{prefill = Prefill} = State) ->
+	gen_server:cast(Sibling, {prefill, Prefill}),
 	{reply, ok, State#state{sibling = Sibling}};
 
 handle_call(get_stats, _From, #state{rr = Rr, sr = Sr, rtp = RtpPid} = State) ->
@@ -118,16 +119,12 @@ handle_cast(
 	Copy andalso gen_server:cast(file_writer, {Pkt, C, M, T}),
 	{noreply, State};
 
-handle_cast({prefill, {Ip, Addr}}, #state{rtp = RtpPid, role = slave} = State) ->
+handle_cast({prefill, {Ip, Addr}}, #state{rtp = RtpPid} = State) ->
 	{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
 	gen_server:cast(RtpPid, {update, [{sendrecv, SendRecvStrategy}, {prefill, {Ip, Addr}}]}),
 	{noreply, State};
-handle_cast({prefill, {Ip, Addr}}, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid, role = master, prefill = Addr2} = State) ->
-	[Sibling] = gproc:select([{ {{n,l,{media, C, M,'$1'}},'$2','_'}, [{'/=', '$1', T}], ['$2'] }]),
-	{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
-	gen_server:cast(RtpPid, {update, [{sendrecv, SendRecvStrategy}, {prefill, {Ip, Addr}}]}),
-	gen_server:cast(Sibling, {prefill, Addr2}),
-	{noreply, State#state{sibling = Sibling}};
+handle_cast({prefill, _}, State) ->
+	{noreply, State};
 
 handle_cast(
 	#cmd{type = ?CMD_U, from = #party{addr = Addr}, origin = #origin{pid = Pid}, params = Params} = Cmd,
