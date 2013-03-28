@@ -22,7 +22,6 @@
 
 -behaviour(gen_server).
 
--export([start_link/1]).
 -export([init/1]).
 -export([handle_call/3]).
 -export([handle_cast/2]).
@@ -55,9 +54,6 @@
 		role
 	}
 ).
-
-start_link(Cmd) ->
-	gen_server:start_link(?MODULE, [Cmd], []).
 
 init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr = Addr}, params = Params} = Cmd]) ->
 	process_flag(trap_exit, true),

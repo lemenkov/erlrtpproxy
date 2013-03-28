@@ -124,7 +124,7 @@ start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}, params = Param
 
 	% Start main media module
 	Ret1 = supervisor:start_child(get_pid(Ret0),
-		{{media, C, M, T}, {media, start_link, [Cmd]}, permanent, 5000, worker, [media]}
+		{{media, C, M, T}, {gen_server, start_link, [media, [Cmd], []]}, permanent, 5000, worker, [media]}
 	),
 
 	% Determine options...
