@@ -103,6 +103,10 @@ handle_cast({prefill, {Ip, Addr}}, #state{rtp = RtpPid} = State) ->
 handle_cast({prefill, _}, State) ->
 	{noreply, State};
 
+handle_cast({Pkt, null, null}, #state{rtp = RtpPid} = State) ->
+	gen_server:cast(RtpPid, {Pkt, null, null}),
+	{noreply, State};
+
 handle_cast(
 	#cmd{type = ?CMD_U, from = #party{addr = {{0,0,0,0}, _}}, origin = #origin{pid = Pid}} = Cmd,
 	#state{local = {_, PortRtp, PortRtcp}} = State
