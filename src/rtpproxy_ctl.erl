@@ -90,6 +90,33 @@ command(#cmd{type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{ta
 			gen_server:cast(MediaThread, Cmd)
 	end,
 	{ok, sent};
+
+command(#cmd{type = ?CMD_P, callid = C, mediaid = M, to = #party{tag = T}, params = Params} = Cmd) ->
+	[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M],
+	[RtpPid0] = [ P || {{phy, CID, MID, TID}, P, _, _} <- supervisor:which_children(SupervisorPid), CID == C, MID == M, TID == T],
+	[RtpPid1] = [ P || {{phy, CID, MID, TID}, P, _, _} <- supervisor:which_children(SupervisorPid), CID == C, MID == M, TID /= T],
+	Ret = supervisor:start_child(SupervisorPid,
+		% FIXME we should ignore payload type sent by OpenSIPS/B2BUA and append one currently in use
+		{{player, C, M, T}, {gen_server, start_link, [player, [RtpPid0, proplists:get_value(codecs, Params, {'PCMU',8000,1}), binary_to_list(proplists:get_value(filename, Params, <<"default">>)), proplists:get_value(playcount, Params, 0)], []]}, temporary, 5000, worker, [player]}
+	),
+	PlayerPid = get_pid(Ret),
+	gen_server:cast(RtpPid0, {keepalive, disable}),
+	gen_server:cast(RtpPid1, {keepalive, disable}),
+	gen_server:call(RtpPid0, {rtp_subscriber, null}),
+	gen_server:call(RtpPid1, {rtp_subscriber, null}),
+	ok;
+
+command(#cmd{type = ?CMD_S, callid = C, mediaid = M, to = #party{tag = T}} = Cmd) ->
+	[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M],
+	[RtpPid0] = [ P || {{phy, CID, MID, TID}, P, _, _} <- supervisor:which_children(SupervisorPid), CID == C, MID == M, TID == T],
+	[RtpPid1] = [ P || {{phy, CID, MID, TID}, P, _, _} <- supervisor:which_children(SupervisorPid), CID == C, MID == M, TID /= T],
+	gen_server:cast(RtpPid0, {keepalive, enable}),
+	gen_server:cast(RtpPid1, {keepalive, enable}),
+	gen_server:call(RtpPid0, {rtp_subscriber, RtpPid1}),
+	gen_server:call(RtpPid1, {rtp_subscriber, RtpPid0}),
+	supervisor:terminate_child(SupervisorPid, {player, C, M, T}),
+	ok;
+
 command(#cmd{callid = CallId, mediaid = MediaId} = Cmd) ->
 	% First try to find existing session(s)
 	MID = case MediaId of

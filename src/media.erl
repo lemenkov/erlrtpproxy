@@ -96,26 +96,6 @@ handle_call(Call, _From, State) ->
 	error_logger:error_msg("media ~p: Unmatched call [~p]", [self(), Call]),
 	{stop, {error, {unknown_call, Call}}, State}.
 
-handle_cast(
-	{Pkt, _Ip, _Port},
-	#state{rtp = Pid, hold = false, callid = C, mediaid = M, tag = T, copy = Copy} = State
-) ->
-	gen_server:cast(Pid, {Pkt, null, null}),
-	Copy andalso gen_server:cast(file_writer, {Pkt, C, M, T}),
-	{noreply, State};
-
-handle_cast({_Pkt, _Ip, _Port}, #state{hold = true} = State) ->
-	% Music on Hold / Mute
-	{noreply, State};
-
-handle_cast(
-	{'music-on-hold', Pkt},
-	#state{rtp = Pid, callid = C, mediaid = M, tag = T, copy = Copy} = State
-) ->
-	gen_server:cast(Pid, {Pkt, null, null}),
-	Copy andalso gen_server:cast(file_writer, {Pkt, C, M, T}),
-	{noreply, State};
-
 handle_cast({prefill, {Ip, Addr}}, #state{rtp = RtpPid} = State) ->
 	{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
 	gen_server:cast(RtpPid, {update, [{sendrecv, SendRecvStrategy}, {prefill, {Ip, Addr}}]}),
@@ -139,37 +119,6 @@ handle_cast(
 	gen_server:cast(Pid, {reply, Cmd, {{Ip, PortRtp}, {Ip, PortRtcp}}}),
 	{noreply, State};
 
-handle_cast(#cmd{type = ?CMD_P, callid = C, mediaid = M, to = #party{tag = T}, params = P}, #state{callid = C, mediaid = M, tag = T, type = Type, rtp = RtpPid, other_rtp = OtherRtpPid, sibling = Sibling} = State) ->
-	case gproc:select([{{{n,l,{player, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
-		[] ->
-			CodecType = rtp_utils:get_codec_from_payload(Type),
-			% FIXME we just ignore payload type sent by OpenSIPS/B2BUA and append
-			% current one for now
-			player:start(C, M, T, [{codecs,[CodecType]}|proplists:delete(codecs, P)]),
-			gen_server:cast(RtpPid, {keepalive, disable});
-		[_] -> ok
-	end,
-	gen_server:call(RtpPid, {rtp_subscriber, self()}),
-	gen_server:call(OtherRtpPid, {rtp_subscriber, Sibling}),
-	{noreply, State#state{hold = true}};
-handle_cast(#cmd{type = ?CMD_P, callid = C, mediaid = M, from = #party{tag = T}}, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid} = State) ->
-	gen_server:cast(RtpPid, {keepalive, disable}),
-	{noreply, State};
-
-handle_cast(#cmd{type = ?CMD_S, callid = C, mediaid = M, to = #party{tag = T}}, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid, other_rtp = OtherRtpPid} = State) ->
-	case gproc:select([{{{n,l,{player, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
-		[] -> ok;
-		[Pid] ->
-			gen_server:cast(Pid, stop),
-			gen_server:cast(RtpPid, {keepalive, enable})
-	end,
-	gen_server:call(RtpPid, {rtp_subscriber, OtherRtpPid}),
-	gen_server:call(OtherRtpPid, {rtp_subscriber, RtpPid}),
-	{noreply, State#state{hold = false}};
-handle_cast(#cmd{type = ?CMD_S, callid = C, mediaid = M, from = #party{tag = T}}, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid} = State) ->
-	gen_server:cast(RtpPid, {keepalive, enable}),
-	{noreply, State};
-
 handle_cast(Other, State) ->
 	error_logger:error_msg("media ~p: Unmatched cast [~p]", [self(), Other]),
 	{noreply, State}.
@@ -180,10 +129,6 @@ code_change(_OldVsn, State, _Extra) ->
 terminate(Reason, #state{callid = C, mediaid = M, tag = T, notify_info = NotifyInfo, copy = Copy, role = Role, tref = TRef}) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	timer:cancel(TRef),
-	case gproc:select([{{{n,l,{player, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
-		[] -> ok;
-		[PlayerPid] -> gen_server:cast(PlayerPid, stop)
-	end,
 	Copy andalso gen_server:cast(file_writer, {eof, C, M, T}),
 	Role == master andalso rtpproxy_ctl:acc(stop, C, M, NotifyInfo),
 	% No need to explicitly unregister from gproc - it does so automatically
