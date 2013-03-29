@@ -47,7 +47,7 @@
 ).
 
 
-init([Subcriber, [CodecInfo | _], Filename, Playcount]) ->
+init([Subcriber, [CodecInfo | _], FN, Playcount]) ->
 	process_flag(trap_exit, true),
 
 	{FileExt, Type, FrameLength, Clock} = case CodecInfo of
@@ -59,7 +59,11 @@ init([Subcriber, [CodecInfo | _], Filename, Playcount]) ->
 	end,
 
 	{ok, TRef} = timer:send_interval(Clock, send),
-	{ok, {Fd, Size}} = gen_server:call(storage, {get, "/tmp/" ++ Filename ++ FileExt}),
+	Filename = case FN of
+		[$d, $e, $f, $a, $u, $l, $t | _] -> "/tmp/" ++ FN ++ FileExt;
+		_ -> FN ++ FileExt
+	end,
+	{ok, {Fd, Size}} = gen_server:call(storage, {get, Filename}),
 	error_logger:info_msg("player: ~p - started to play \"~s\", ~b times~n", [self(), Filename ++ FileExt, Playcount]),
 	{ok, #state{
 			subscriber = Subcriber,
