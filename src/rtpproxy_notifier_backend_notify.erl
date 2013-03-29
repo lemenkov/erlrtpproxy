@@ -14,18 +14,19 @@ start_link() ->
 	gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init(_) ->
+	process_flag(trap_exit, true),
 	case application:get_env(rtpproxy, notify_servers) of
 		{ok, tcp} ->
-			error_logger:info_msg("Started rtpproxy notify protocol backend (TCP) at ~p~n", [node()]),
+			error_logger:info_msg("SER notify backend: ~p - TCP started at ~p~n", [self(), node()]),
 			{ok, {tcp, []}};
 		{ok, udp} ->
 			{ok, Fd} = gen_udp:open(0, [binary, {active, true}]),
-			error_logger:info_msg("Started rtpproxy notify protocol backend (UDP) at ~p~n", [node()]),
+			error_logger:info_msg("SER notify backend: ~p - UDP started at ~p~n", [self(), node()]),
 			{ok, {udp, Fd}}
 	end.
 
-handle_call(Message, From, State) ->
-	error_logger:warning_msg("Bogus call: ~p from ~p at ~p~n", [Message, From, node()]),
+handle_call(Call, _From, State) ->
+	error_logger:error_msg("SER notify backend: ~p - strange call: ~p~n", [self(), Call]),
 	{reply, {error, unknown_call}, State}.
 
 % Don't send "start" via TCP notification - incompatible with OpenSER
@@ -59,28 +60,25 @@ handle_cast({Type, _, _, [{addr,{Ip,Port}},{tag,NotifyTag}]}, {udp, Fd}) ->
 	error_logger:info_msg("Notification (~p) from ~p sent to udp:~s:~b~n", [Type, node(), inet_parse:ntoa(Ip), Port]),
 	{noreply, {udp, Fd}};
 
-handle_cast(stop, State) ->
-	{stop, normal, State};
+handle_cast(Cast, State) ->
+	error_logger:error_msg("SER notify backend: ~p - strange cast: ~p~n", [self(), Cast]),
+	{stop, {error, {unknown_cast, Cast}}, State}.
 
-handle_cast(Other, State) ->
-	error_logger:warning_msg("Bogus cast: ~p at ~p~n", [Other, node()]),
-	{noreply, State}.
-
-handle_info(Other, State) ->
-	error_logger:warning_msg("Bogus info: ~p at ~p~n", [Other, node()]),
-	{noreply, State}.
+handle_info(Info, State) ->
+	error_logger:error_msg("SER notify backend: ~p - strange info: ~p~n", [self(), Info]),
+	{stop, {error, {unknown_info, Info}}, State}.
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 terminate(Reason, {tcp, FdSet}) ->
+	{memory, Bytes} = erlang:process_info(self(), memory),
 	lists:map(fun({_Addr,X}) -> gen_tcp:close(X) end, FdSet),
-	error_logger:error_msg("Terminated: ~p at ~p~n", [Reason, node()]),
-	ok;
+	error_logger:info_msg("SER notify backend: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]);
 terminate(Reason, {udp, Fd}) ->
+	{memory, Bytes} = erlang:process_info(self(), memory),
 	gen_udp:close(Fd),
-	error_logger:error_msg("Terminated: ~p at ~p~n", [Reason, node()]),
-	ok.
+	error_logger:info_msg("SER notify backend: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
 
 %%
 %% Internal functions

@@ -36,13 +36,14 @@ start_link() ->
 	gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init(_) ->
+	process_flag(trap_exit, true),
 	Ets = ets:new(file_writer, [public, named_table]),
-	error_logger:info_msg("File Writer: started at ~p.~n", [self()]),
+	error_logger:info_msg("file writer: ~p - started at ~p.~n", [self(), node()]),
 	{ok, Ets}.
 
-handle_call(Request, _From, State) ->
-	error_logger:warning_msg("File Writer: strange call [~p]", [Request]),
-	{reply, ok, State}.
+handle_call(Call, _From, State) ->
+	error_logger:error_msg("File Writer: ~p - strange call [~p]", [self(), Call]),
+	{stop, {error, {unknown_call, Call}}, State}.
 
 handle_cast({#rtp{payload_type = Type, payload = Payload, timestamp = Timestamp}, CallId, MediaId, Tag}, Ets) ->
 	handle_cast({{Type, Payload, Timestamp}, CallId, MediaId, Tag}, Ets);
@@ -65,21 +66,18 @@ handle_cast({eof, CallId, MediaId, Tag}, Ets) ->
 	end,
 	{noreply, Ets};
 
-handle_cast(stop, State) ->
-	{stop, normal, State};
-
-handle_cast(Msg, State) ->
-	error_logger:warning_msg("File Writer: strange cast: ~p.~n", [Msg]),
-	{noreply, State}.
+handle_cast(Cast, State) ->
+	error_logger:error_msg("file writer: ~p - strange cast: ~p.~n", [self(), Cast]),
+	{stop, {error, {unknown_cast, Cast}}, State}.
 
 handle_info(Info, State) ->
-	error_logger:warning_msg("File Writer: strange info: ~p.~n", [Info]),
-	{noreply, State}.
+	error_logger:error_msg("file writer: ~p - strange info: ~p.~n", [self(), Info]),
+	{stop, {error, {unknown_info, Info}}, State}.
 
-terminate(_Reason, Ets) ->
+terminate(Reason, Ets) ->
+	{memory, Bytes} = erlang:process_info(self(), memory),
 	lists:foreach(fun([X]) -> file:close(X) end, ets:match(Ets, {{'_', '_', '_'},'$1'})),
-	error_logger:info_msg("File Writer: stopped.~n"),
-	ok.
+	error_logger:info_msg("file writer: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.

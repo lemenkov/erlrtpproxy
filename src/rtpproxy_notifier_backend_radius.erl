@@ -18,39 +18,37 @@ start_link() ->
 	gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init(_) ->
+	process_flag(trap_exit, true),
 	eradius_dict:start(),
 	eradius_dict:load_tables(["dictionary", "dictionary_cisco", "dictionary_rfc2865", "dictionary_rfc2866"]),
 	eradius_acc:start(),
 	?MODULE = ets:new(?MODULE, [public, named_table]),
-	error_logger:info_msg("Started RADIUS backend at ~p~n", [node()]),
+	error_logger:info_msg("RADIUS notify backend: ~p - started at ~p~n", [self(), node()]),
 	{ok, []}.
 
-handle_call(Message, From, State) ->
-	error_logger:warning_msg("Bogus call: ~p from ~p at ~p~n", [Message, From, node()]),
-	{reply, {error, unknown_call}, State}.
+handle_call(Call, _From, State) ->
+	error_logger:error_msg("RADIUS notify backend: ~p - strange call: ~p~n", [self(), Call]),
+	{stop, {error, {unknown_call, Call}}, State}.
 
 handle_cast({Type, CallId, MediaId, _}, State) ->
 	error_logger:info_msg("Got ~p from ~s ~p at ~p~n", [Type, CallId, MediaId, node()]),
 	radius_process(Type, CallId, MediaId, ets:lookup(?MODULE, {CallId, MediaId})),
 	{noreply, State};
 
-handle_cast(stop, State) ->
-	{stop, normal, State};
+handle_cast(Cast, State) ->
+	error_logger:error_msg("RADIUS notify backend: ~p - strange cast: ~p~n", [self(), Cast]),
+	{stop, {error, {unknown_cast, Cast}}, State}.
 
-handle_cast(Other, State) ->
-	error_logger:warning_msg("Bogus cast: ~p at ~p~n", [Other, node()]),
-	{noreply, State}.
-
-handle_info(Other, State) ->
-	error_logger:warning_msg("Bogus info: ~p at ~p~n", [Other, node()]),
-	{noreply, State}.
+handle_info(Info, State) ->
+	error_logger:error_msg("RADIUS notify backend: ~p - strange info: ~p~n", [self(), Info]),
+	{stop, {error, {unknown_info, Info}}, State}.
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 terminate(Reason, _State) ->
-	error_logger:error_msg("Terminated: ~p at ~p~n", [Reason, node()]),
-	ok.
+	{memory, Bytes} = erlang:process_info(self(), memory),
+	error_logger:info_msg("RADIUS notify backend: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 %% Internal functions %%
