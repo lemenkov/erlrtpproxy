@@ -97,13 +97,12 @@ handle_info(send, #state{subscriber = Subscriber, marker = Marker, sn = Sequence
 		_ -> P rem Length
 	end,
 	{ok, Payload} = file:pread(Fd, Position, FrameLength),
-	Timestamp = rtp_utils:mktimestamp(Type, ST),
 	Pkt = #rtp{
 			padding = 0,
 			marker = Marker,
 			payload_type = Type,
 			sequence_number = SequenceNumber,
-			timestamp = Timestamp,
+			timestamp = rtp_utils:mktimestamp(Type, ST),
 			ssrc = SSRC,
 			csrcs = [],
 			extension = null,
