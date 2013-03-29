@@ -40,7 +40,7 @@
 		type,
 		ssize,
 		sn = 0,
-		repeats = 0,
+		repeats,
 		rebuildrtp,
 		starttime
 	}
