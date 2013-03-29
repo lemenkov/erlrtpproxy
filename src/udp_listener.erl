@@ -86,4 +86,3 @@ terminate(Reason, {_, Fd}) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	gen_udp:close(Fd),
 	error_logger:info_msg("UDP listener: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
-

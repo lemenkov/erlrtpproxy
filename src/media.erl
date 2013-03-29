@@ -123,17 +123,6 @@ handle_cast(Other, State) ->
 	error_logger:error_msg("media ~p: Unmatched cast [~p]", [self(), Other]),
 	{noreply, State}.
 
-code_change(_OldVsn, State, _Extra) ->
-	{ok, State}.
-
-terminate(Reason, #state{callid = C, mediaid = M, tag = T, notify_info = NotifyInfo, copy = Copy, role = Role, tref = TRef}) ->
-	{memory, Bytes} = erlang:process_info(self(), memory),
-	timer:cancel(TRef),
-	Copy andalso gen_server:cast(file_writer, {eof, C, M, T}),
-	Role == master andalso rtpproxy_ctl:acc(stop, C, M, NotifyInfo),
-	% No need to explicitly unregister from gproc - it does so automatically
-	error_logger:error_msg("media ~p: terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
-
 handle_info({Pkt, _, _}, #state{sibling = Sibling} = State) when is_binary(Pkt) ->
 	gen_server:cast(Sibling, {Pkt, null, null}),
 	{noreply, State};
@@ -177,3 +166,14 @@ handle_info(get_stats, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid, ot
 		gproc:set_value({n,l,{media, C, M, T}}, {Type, Local, {Ip, RtpPort, RtcpPort}})
 	end,
 	{noreply, State#state{type = Type, global = {Ip, RtpPort, RtcpPort}}}.
+
+code_change(_OldVsn, State, _Extra) ->
+	{ok, State}.
+
+terminate(Reason, #state{callid = C, mediaid = M, tag = T, notify_info = NotifyInfo, copy = Copy, role = Role, tref = TRef}) ->
+	{memory, Bytes} = erlang:process_info(self(), memory),
+	timer:cancel(TRef),
+	Copy andalso gen_server:cast(file_writer, {eof, C, M, T}),
+	Role == master andalso rtpproxy_ctl:acc(stop, C, M, NotifyInfo),
+	% No need to explicitly unregister from gproc - it does so automatically
+	error_logger:error_msg("media ~p: terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).

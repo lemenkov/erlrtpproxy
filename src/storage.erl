@@ -65,10 +65,10 @@ handle_info(Info, State) ->
 	error_logger:error_msg("storage: ~p - strange info: ~p~n", [self(), Info]),
 	{stop, {error, {unknown_info, Info}}, State}.
 
+code_change(_OldVsn, State, _Extra) ->
+        {ok, State}.
+
 terminate(Reason, Ets) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	lists:foreach(fun([X]) -> file:close(X) end, ets:match(Ets, {'_', {'$1', '_'}})),
 	error_logger:info_msg("storage backend: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
-
-code_change(_OldVsn, State, _Extra) ->
-        {ok, State}.

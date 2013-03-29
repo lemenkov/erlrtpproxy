@@ -81,14 +81,6 @@ handle_cast(Cast, State) ->
 	error_logger:error_msg("player: ~p - unmatched cast [~p]", [self(), Cast]),
 	{stop, {error, {unknown_cast, Cast}}, State}.
 
-code_change(_OldVsn, State, _Extra) ->
-	{ok, State}.
-
-terminate(Reason, #state{tref = TRef}) ->
-	{memory, Bytes} = erlang:process_info(self(), memory),
-	timer:cancel(TRef),
-	error_logger:info_msg("player: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
-
 handle_info(send, #state{subscriber = Subscriber, marker = Marker, sn = SequenceNumber, type = Type, ssize = FrameLength, ssrc = SSRC, data = {Fd, Size}, starttime = ST} = State) ->
 	Length = Size - FrameLength,
 	P = FrameLength*SequenceNumber,
@@ -114,3 +106,11 @@ handle_info(send, #state{subscriber = Subscriber, marker = Marker, sn = Sequence
 handle_info(Info, State) ->
 	error_logger:error_msg("player: ~p - unmatched info [~p]", [self(), Info]),
 	{stop, {error, {unknown_info, Info}}, State}.
+
+code_change(_OldVsn, State, _Extra) ->
+	{ok, State}.
+
+terminate(Reason, #state{tref = TRef}) ->
+	{memory, Bytes} = erlang:process_info(self(), memory),
+	timer:cancel(TRef),
+	error_logger:info_msg("player: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).

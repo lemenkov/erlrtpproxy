@@ -125,14 +125,18 @@ handle_info(Info, State) ->
 	error_logger:error_msg("TCP listener: ~p - strange info: ~p~n", [self(), Info]),
 	{stop, {error, {unknown_info, Info}}, State}.
 
+code_change(_OldVsn, State, _Extra) ->
+	{ok, State}.
+
 terminate(Reason, #state{listener = Listener, clients = Clients}) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	gen_tcp:close(Listener),
 	lists:map(fun gen_tcp:close/1, Clients),
 	error_logger:info_msg("TCP listener: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
 
-code_change(_OldVsn, State, _Extra) ->
-	{ok, State}.
+%%%%%%%%%%%%%%%%%%%%%%%%
+%% Internal functions %%
+%%%%%%%%%%%%%%%%%%%%%%%%
 
 set_sockopt(ListSock, CliSocket) ->
 	true = inet_db:register_socket(CliSocket, inet_tcp),

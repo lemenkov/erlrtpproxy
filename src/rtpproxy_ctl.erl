@@ -133,9 +133,9 @@ command(#cmd{callid = CallId, mediaid = MediaId} = Cmd) ->
 			lists:foreach(fun(Pid) -> gen_server:cast(Pid, Cmd) end, MediaThreads)
 	end.
 
-%%
-%% Private functions
-%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+%% Internal functions %%
+%%%%%%%%%%%%%%%%%%%%%%%%
 
 start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}, params = Params} = Cmd) ->
 	Ret0 = supervisor:start_child(media_sup,

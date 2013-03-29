@@ -74,17 +74,17 @@ handle_info(Info, State) ->
 	error_logger:error_msg("file writer: ~p - strange info: ~p.~n", [self(), Info]),
 	{stop, {error, {unknown_info, Info}}, State}.
 
+code_change(_OldVsn, State, _Extra) ->
+	{ok, State}.
+
 terminate(Reason, Ets) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	lists:foreach(fun([X]) -> file:close(X) end, ets:match(Ets, {{'_', '_', '_'},'$1'})),
 	error_logger:info_msg("file writer: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
 
-code_change(_OldVsn, State, _Extra) ->
-	{ok, State}.
-
-%%
-%% Private functions
-%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+%% Internal functions %%
+%%%%%%%%%%%%%%%%%%%%%%%%
 
 to_list(String) when is_list(String) -> String;
 to_list(Binary) when is_binary(Binary) -> binary_to_list(Binary);

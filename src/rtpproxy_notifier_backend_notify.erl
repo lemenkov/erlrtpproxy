@@ -84,9 +84,9 @@ terminate(Reason, {udp, Fd}) ->
 	gen_udp:close(Fd),
 	error_logger:info_msg("SER notify backend: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
 
-%%
-%% Internal functions
-%%
+%%%%%%%%%%%%%%%%%%%%%%%%
+%% Internal functions %%
+%%%%%%%%%%%%%%%%%%%%%%%%
 
 tcp_send({error, E}, _) -> {error, E};
 tcp_send(Fd, Msg) -> gen_tcp:send(Fd, Msg).
