@@ -123,9 +123,6 @@ handle_cast(Other, State) ->
 	error_logger:error_msg("media ~p: Unmatched cast [~p]", [self(), Other]),
 	{noreply, State}.
 
-handle_info({Pkt, _, _}, #state{sibling = Sibling} = State) when is_binary(Pkt) ->
-	gen_server:cast(Sibling, {Pkt, null, null}),
-	{noreply, State};
 handle_info({#rtp{payload = Payload} = Pkt, _, _}, #state{sibling = Sibling} = State) when is_binary(Payload) ->
 	gen_server:cast(Sibling, {Pkt, null, null}),
 	{noreply, State};
