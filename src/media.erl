@@ -93,7 +93,7 @@ handle_call(get_stats, _From, #state{rr = Rr, sr = Sr, rtp = RtpPid} = State) ->
 	{reply, {RemoteIp, RemoteRtpPort, RemoteRtcpPor, SSRC, Type, RxBytes, RxPackets, TxBytes, TxPackets, Rr, Sr}, State#state{type = Type}};
 
 handle_call(Call, _From, State) ->
-	error_logger:error_msg("media ~p: Unmatched call [~p]", [self(), Call]),
+	error_logger:error_msg("media ~p: - strange call [~p]", [self(), Call]),
 	{stop, {error, {unknown_call, Call}}, State}.
 
 handle_cast({prefill, {Ip, Addr}}, #state{rtp = RtpPid} = State) ->
@@ -165,7 +165,11 @@ handle_info(get_stats, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid, ot
 		(OtherRtpPid /= null) andalso gen_server:call(OtherRtpPid, {rtp_subscriber, gen_server:call(RtpPid, get_rtp_phy)}),
 		gproc:set_value({n,l,{media, C, M, T}}, {Type, Local, {Ip, RtpPort, RtcpPort}})
 	end,
-	{noreply, State#state{type = Type, global = {Ip, RtpPort, RtcpPort}}}.
+	{noreply, State#state{type = Type, global = {Ip, RtpPort, RtcpPort}}};
+
+handle_info(Info, State) ->
+	error_logger:error_msg("media: ~p - strange info: ~p~n", [self(), Info]),
+	{stop, {error, {unknown_info, Info}}, State}.
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
