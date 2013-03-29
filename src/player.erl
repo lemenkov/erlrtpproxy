@@ -65,7 +65,8 @@ init([Subcriber, [CodecInfo | _], Filename, Playcount]) ->
 			subscriber = Subcriber,
 			tref	= TRef,
 			ssrc	= random:uniform(2 bsl 31),
-			data	= {Fd, Size},
+			% Count total number of frames and cut off some weird bytes at the end (if any) - we need only whole frames
+			data	= {Fd, Size div FrameLength},
 			type	= Type,
 			ssize	= FrameLength,
 			repeats = Playcount,
@@ -81,13 +82,8 @@ handle_cast(Cast, State) ->
 	error_logger:error_msg("player: ~p - unmatched cast [~p]", [self(), Cast]),
 	{stop, {error, {unknown_cast, Cast}}, State}.
 
-handle_info(send, #state{subscriber = Subscriber, marker = Marker, sn = SequenceNumber, type = Type, ssize = FrameLength, ssrc = SSRC, data = {Fd, Size}, starttime = ST} = State) ->
-	Length = Size - FrameLength,
-	P = FrameLength*SequenceNumber,
-	Position = case P < Length of
-		true -> P;
-		_ -> P rem Length
-	end,
+handle_info(send, #state{subscriber = Subscriber, marker = Marker, sn = SequenceNumber, type = Type, ssize = FrameLength, ssrc = SSRC, data = {Fd, NFrames}, starttime = ST} = State) ->
+	Position = FrameLength * (SequenceNumber rem NFrames),
 	{ok, Payload} = file:pread(Fd, Position, FrameLength),
 	Pkt = #rtp{
 			padding = 0,
