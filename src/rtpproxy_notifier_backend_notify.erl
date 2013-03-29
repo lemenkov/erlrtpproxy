@@ -64,6 +64,10 @@ handle_cast(Cast, State) ->
 	error_logger:error_msg("SER notify backend: ~p - strange cast: ~p~n", [self(), Cast]),
 	{stop, {error, {unknown_cast, Cast}}, State}.
 
+handle_info({tcp_closed, Fd}, {tcp, FdSet}) ->
+	gen_tcp:close(Fd),
+	{noreply, {tcp, [Conn || Conn = {{_,_},F} <- FdSet, F /= Fd]}};
+
 handle_info(Info, State) ->
 	error_logger:error_msg("SER notify backend: ~p - strange info: ~p~n", [self(), Info]),
 	{stop, {error, {unknown_info, Info}}, State}.
