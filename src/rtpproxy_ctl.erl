@@ -102,8 +102,8 @@ command(#cmd{type = ?CMD_P, callid = C, mediaid = M, to = #party{tag = T}, param
 	PlayerPid = get_pid(Ret),
 	gen_server:cast(RtpPid0, {keepalive, disable}),
 	gen_server:cast(RtpPid1, {keepalive, disable}),
-	gen_server:call(RtpPid0, {rtp_subscriber, null}),
-	gen_server:call(RtpPid1, {rtp_subscriber, null}),
+	gen_server:call(RtpPid0, {rtp_subscriber, {set, null}}),
+	gen_server:call(RtpPid1, {rtp_subscriber, {set, null}}),
 	ok;
 
 command(#cmd{type = ?CMD_S, callid = C, mediaid = M, to = #party{tag = T}} = Cmd) ->
@@ -112,8 +112,8 @@ command(#cmd{type = ?CMD_S, callid = C, mediaid = M, to = #party{tag = T}} = Cmd
 	[RtpPid1] = [ P || {{phy, CID, MID, TID}, P, _, _} <- supervisor:which_children(SupervisorPid), CID == C, MID == M, TID /= T],
 	gen_server:cast(RtpPid0, {keepalive, enable}),
 	gen_server:cast(RtpPid1, {keepalive, enable}),
-	gen_server:call(RtpPid0, {rtp_subscriber, RtpPid1}),
-	gen_server:call(RtpPid1, {rtp_subscriber, RtpPid0}),
+	gen_server:call(RtpPid0, {rtp_subscriber, {set, RtpPid1}}),
+	gen_server:call(RtpPid1, {rtp_subscriber, {set, RtpPid0}}),
 	supervisor:terminate_child(SupervisorPid, {player, C, M, T}),
 	ok;
 
@@ -183,8 +183,8 @@ start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}, params = Param
 
 			% Set RTP path
 			[RtpPid1 | _ ] = [P || {{phy, C0, M0, T0}, P, _, _} <- supervisor:which_children(get_pid(Ret0)), T0 /= T, C0 == C, M0 == M],
-			gen_server:call(RtpPid0, {rtp_subscriber, RtpPid1}),
-			gen_server:call(RtpPid1, {rtp_subscriber, RtpPid0}),
+			gen_server:call(RtpPid0, {rtp_subscriber, {set, RtpPid1}}),
+			gen_server:call(RtpPid1, {rtp_subscriber, {set, RtpPid0}}),
 
 			% Set type and siblings
 			[Pid1 | _ ] = [P || {{media, C0, M0, T0}, P, _, _} <- supervisor:which_children(get_pid(Ret0)), T0 /= T, C0 == C, M0 == M],
