@@ -50,9 +50,6 @@ init(rtpproxy_sup) ->
 	% Load storage for mmap-ed files
 	StorageProcess = ?CHILD(storage),
 
-	% Load file writer
-	FileWriterProcess = ?CHILD(file_writer),
-
 	% Check and load (if configured) notification backends
 	RadiusBackendProcess = case application:get_env(rtpproxy, radacct_servers) of
 		{ok, _} ->
@@ -75,6 +72,6 @@ init(rtpproxy_sup) ->
 		_ -> []
 	end,
 
-	Children = [ListenerProcess, BackendProcess] ++ HttpProcess ++ [StorageProcess, FileWriterProcess] ++ RadiusBackendProcess ++ NotifyBackendProcess,
+	Children = [ListenerProcess, BackendProcess] ++ HttpProcess ++ [StorageProcess] ++ RadiusBackendProcess ++ NotifyBackendProcess,
 
 	{ok, {SupFlags, Children}}.

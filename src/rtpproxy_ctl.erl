@@ -116,6 +116,11 @@ command(#cmd{type = ?CMD_S, callid = C, mediaid = M, to = #party{tag = T}}) ->
 	supervisor:terminate_child(SupervisorPid, {player, C, M, T}),
 	ok;
 
+command(#cmd{type = ?CMD_R, callid = C}) ->
+	SupervisorPids = [ P || {{media_channel_sup, CID, _}, P, _, _} <- supervisor:which_children(media_sup), CID == C],
+	[ start_recorder(CID,MID,TID) || SupervisorPid <- SupervisorPids, {{media, CID, MID, TID}, _, _, _} <- supervisor:which_children(SupervisorPid)],
+	ok;
+
 command(#cmd{callid = CallId, mediaid = MediaId} = Cmd) ->
 	% First try to find existing session(s)
 	MID = case MediaId of
@@ -153,6 +158,9 @@ start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}, params = Param
 		{{media, C, M, T}, {gen_server, start_link, [media, [Cmd], []]}, permanent, 5000, worker, [media]}
 	),
 	Pid1 = get_pid(Ret1),
+
+	% Check if we need to start recording
+	proplists:get_value(copy, Params, false) andalso start_recorder(C, M, T),
 
 	% Determine options...
 	Ip = case {proplists:get_value(local, Params), proplists:get_value(remote, Params), proplists:get_value(ipv6, Params)} of
@@ -203,6 +211,16 @@ start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}, params = Param
 					end,
 			ok
 	end.
+
+start_recorder(C, M, T) ->
+	[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M],
+	Ret = supervisor:start_child(SupervisorPid,
+			{{recorder, C, M, T}, {gen_server, start_link, [file_writer, [C, M, T], []]}, permanent, 5000, worker, [file_writer]}
+		),
+	RecorderPid = get_pid(Ret),
+	[RtpPid] = [ P || {{phy, CID, MID, TID}, P, _, _} <- supervisor:which_children(SupervisorPid), CID == C, MID == M, TID == T],
+	gen_server:call(RtpPid, {rtp_subscriber, {set, RecorderPid}}),
+	ok.
 
 get_pid({ok, Pid}) -> Pid;
 get_pid({ok, Pid, _}) -> Pid;

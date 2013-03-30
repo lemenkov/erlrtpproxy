@@ -48,7 +48,6 @@
 		sr = null,
 		local = {null, null, null},
 		global = {null, null, null},
-		copy,
 		notify_info,
 		prefill,
 		role
@@ -64,8 +63,6 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 
 	NotifyInfo = proplists:get_value(notify, Params, []),
 
-	Copy = proplists:get_value(copy, Params, false),
-
 	% Set stats timer
 	{ok, TRef} = timer:send_interval(1000, get_stats),
 
@@ -75,7 +72,6 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 			mediaid	= M,
 			tag	= T,
 			tref	= TRef,
-			copy	= Copy,
 			notify_info = NotifyInfo,
 			prefill	= Addr
 		}
@@ -175,10 +171,9 @@ handle_info(Info, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, #state{callid = C, mediaid = M, tag = T, notify_info = NotifyInfo, copy = Copy, role = Role, tref = TRef}) ->
+terminate(Reason, #state{callid = C, mediaid = M, tag = T, notify_info = NotifyInfo, role = Role, tref = TRef}) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	timer:cancel(TRef),
-	Copy andalso gen_server:cast(file_writer, {eof, C, M, T}),
 	Role == master andalso rtpproxy_ctl:acc(stop, C, M, NotifyInfo),
 	% No need to explicitly unregister from gproc - it does so automatically
 	error_logger:error_msg("media ~p: terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
