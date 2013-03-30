@@ -39,7 +39,6 @@
 		mediaid,
 		tag,
 		rtp = null,
-		other_rtp = null,
 		type = 0, % PCMU by default - required for Music-on-Hold/early media
 		tref = null,
 		hold = false,
@@ -139,15 +138,9 @@ handle_info({phy, {Ip, PortRtp, PortRtcp, RtpPid}}, #state{callid = C, mediaid =
 	% No need to store original Cmd any longer
 	{noreply, State#state{cmd = null, local = {Ip, PortRtp, PortRtcp}, rtp = RtpPid}};
 
-handle_info(get_stats, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid, other_rtp = OtherRtpPid, local = Local, global = Global} = State) ->
+handle_info(get_stats, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid, local = Local, global = Global} = State) ->
 	{Ip, RtpPort, RtcpPort, _SSRC, Type, _, _, _, _} = gen_server:call(RtpPid, get_stats),
-	(Global == {Ip, RtpPort, RtcpPort}) andalso
-	begin
-		% FIXME what if I actually want to receive all RTPs?
-		% This also ruins ZRTP/SRTP
-		(OtherRtpPid /= null) andalso gen_server:call(OtherRtpPid, {rtp_subscriber, gen_server:call(RtpPid, get_rtp_phy)}),
-		gproc:set_value({n,l,{media, C, M, T}}, {Type, Local, {Ip, RtpPort, RtcpPort}})
-	end,
+	(Global == {Ip, RtpPort, RtcpPort}) andalso gproc:set_value({n,l,{media, C, M, T}}, {Type, Local, {Ip, RtpPort, RtcpPort}}),
 	{noreply, State#state{type = Type, global = {Ip, RtpPort, RtcpPort}}};
 
 handle_info(Info, State) ->
