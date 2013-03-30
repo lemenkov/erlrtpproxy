@@ -152,7 +152,7 @@ start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}, params = Param
 	Ret1 = supervisor:start_child(get_pid(Ret0),
 		{{media, C, M, T}, {gen_server, start_link, [media, [Cmd], []]}, permanent, 5000, worker, [media]}
 	),
-	Pid0 = get_pid(Ret1),
+	Pid1 = get_pid(Ret1),
 
 	% Determine options...
 	Ip = case {proplists:get_value(local, Params), proplists:get_value(remote, Params), proplists:get_value(ipv6, Params)} of
@@ -169,7 +169,7 @@ start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}, params = Param
 	{ok, Timeout} = application:get_env(rtpproxy, ttl),
 	{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
 	{ok, ActiveStrategy} = application:get_env(rtpproxy, active),
-	Params1 = Params ++ [{parent, Pid0}, {port, 0}, {ip, Ip}, {rebuildrtp, RebuildRtp}, {timeout_early, TimeoutEarly*1000}, {timeout, Timeout*1000}, {sendrecv, SendRecvStrategy}, {active, ActiveStrategy}],
+	Params1 = Params ++ [{parent, Pid1}, {port, 0}, {ip, Ip}, {rebuildrtp, RebuildRtp}, {timeout_early, TimeoutEarly*1000}, {timeout, Timeout*1000}, {sendrecv, SendRecvStrategy}, {active, ActiveStrategy}],
 
 	% ..and start RTP socket module
 	{ok, RtpPid0} = supervisor:start_child(get_pid(Ret0),
@@ -186,11 +186,11 @@ start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}, params = Param
 			gen_server:call(RtpPid1, {rtp_subscriber, {set, RtpPid0}}),
 
 			% Set type and siblings
-			[Pid1 | _ ] = [P || {{media, C0, M0, T0}, P, _, _} <- supervisor:which_children(get_pid(Ret0)), T0 /= T, C0 == C, M0 == M],
-			gen_server:call(Pid0, {set_sibling, Pid1}),
+			[Pid0 | _ ] = [P || {{media, C0, M0, T0}, P, _, _} <- supervisor:which_children(get_pid(Ret0)), T0 /= T, C0 == C, M0 == M],
 			gen_server:call(Pid1, {set_sibling, Pid0}),
-			gen_server:call(Pid0, {set_role, slave}),
-			gen_server:call(Pid1, {set_role, master}),
+			gen_server:call(Pid0, {set_sibling, Pid1}),
+			gen_server:call(Pid1, {set_role, slave}),
+			gen_server:call(Pid0, {set_role, master}),
 			ok;
 		_ ->
 			% That's the first side - let's send accounting start here
