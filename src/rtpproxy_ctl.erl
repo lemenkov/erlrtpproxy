@@ -20,21 +20,12 @@
 -module(rtpproxy_ctl).
 -author('lemenkov@gmail.com').
 
--export([acc/4]).
 -export([start/0]).
 -export([stop/0]).
 -export([save_config/1]).
 -export([command/1]).
 
 -include("common.hrl").
-
-acc(Type, CallId, MediaId, Addr) when Type == start; Type == interim_update; Type == stop ->
-	{ok, IgnoreStart} = application:get_env(rtpproxy, ignore_start),
-	{ok, IgnoreStop} = application:get_env(rtpproxy, ignore_stop),
-	Send = ((Type == start) and not IgnoreStart) or (Type == interim_update) or ((Type == stop) and not IgnoreStop),
-	Send andalso gen_server:cast(rtpproxy_notifier_backend_radius, {Type, CallId, MediaId, Addr}),
-	Send andalso gen_server:cast(rtpproxy_notifier_backend_notify, {Type, CallId, MediaId, Addr}),
-	ok.
 
 start() ->
 	{ok,[[ConfigPath]]} = init:get_argument(config),
@@ -184,6 +175,18 @@ start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}, params = Param
 		{{phy, C, M, T}, {gen_server, start_link, [gen_rtp_channel, [Params1], []]}, permanent, 5000, worker, [gen_rtp_channel]}
 	),
 
+	% Check and load (if configured) notification backends
+	case application:get_env(rtpproxy, radacct_servers) of
+		{ok, _} -> start_notify_radius(C,M);
+		_ -> ok
+	end,
+	case application:get_env(rtpproxy, notify_servers) of
+		{ok, _} ->
+			NotifyInfo = proplists:get_value(notify, Params, []),
+			start_notify_openser(C,M,NotifyInfo);
+		_ -> ok
+	end,
+
 	case Ret0 of
 		{error, _} ->
 			% That's a 2nd side
@@ -197,18 +200,8 @@ start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}, params = Param
 			[Pid0 | _ ] = [P || {{media, C0, M0, T0}, P, _, _} <- supervisor:which_children(get_pid(Ret0)), T0 /= T, C0 == C, M0 == M],
 			gen_server:call(Pid1, {set_sibling, Pid0}),
 			gen_server:call(Pid0, {set_sibling, Pid1}),
-			gen_server:call(Pid1, {set_role, slave}),
-			gen_server:call(Pid0, {set_role, master}),
 			ok;
 		_ ->
-			% That's the first side - let's send accounting start here
-			% FIXME Should we actually do this?
-			Acc = proplists:get_value(acc, Params, null),
-			Acc /= null andalso
-					begin
-						NotifyInfo = proplists:get_value(notify, Params, []),
-						rtpproxy_ctl:acc(Acc, C, M, NotifyInfo)
-					end,
 			ok
 	end.
 
@@ -220,6 +213,20 @@ start_recorder(C, M, T) ->
 	RecorderPid = get_pid(Ret),
 	[RtpPid] = [ P || {{phy, CID, MID, TID}, P, _, _} <- supervisor:which_children(SupervisorPid), CID == C, MID == M, TID == T],
 	gen_server:call(RtpPid, {rtp_subscriber, {set, RecorderPid}}),
+	ok.
+
+start_notify_radius(C, M) ->
+	[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M],
+	supervisor:start_child(SupervisorPid,
+			{{notify_radius, C, M}, {gen_server, start_link, [rtpproxy_notifier_backend_radius, [C, M], []]}, temporary, 5000, worker, [rtpproxy_notifier_backend_radius]}
+	),
+	ok.
+
+start_notify_openser(C, M, NotifyInfo) ->
+	[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M],
+	supervisor:start_child(SupervisorPid,
+			{{notify_openser, C, M}, {gen_server, start_link, [rtpproxy_notifier_backend_notify, [NotifyInfo], []]}, temporary, 5000, worker, [rtpproxy_notifier_backend_notify]}
+	),
 	ok.
 
 get_pid({ok, Pid}) -> Pid;

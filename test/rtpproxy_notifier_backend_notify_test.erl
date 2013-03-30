@@ -37,7 +37,7 @@
 -define(RTPPROXY_IP, {127,0,0,1}).
 -define(RTPPROXY_PORT, 33333).
 
-rtpproxy_notifier_backend_notify_udp_test_() ->
+rtpproxy_notifier_backend_notify_udp_test_DISABLE() ->
 
 	%%
 	%% This is the socket which will be used for receiving notifications messages
@@ -108,7 +108,7 @@ rtpproxy_notifier_backend_notify_udp_test_() ->
 		]
 	}.
 
-rtpproxy_notifier_backend_notify_tcp_test_() ->
+rtpproxy_notifier_backend_notify_tcp_test_DISABLE() ->
 
 	%%
 	%% This is the socket which will be used for receiving notifications messages
@@ -187,7 +187,7 @@ rtpproxy_notifier_backend_notify_tcp_test_() ->
 		]
 	}.
 
-rtpproxy_notifier_backend_notify_tcp_two_addresses_test_() ->
+rtpproxy_notifier_backend_notify_tcp_two_addresses_test_DISABLE() ->
 
 	%%
 	%% This is the socket which will be used for receiving notifications messages

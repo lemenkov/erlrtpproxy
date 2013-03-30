@@ -48,9 +48,7 @@
 		sr = null,
 		local = {null, null, null},
 		global = {null, null, null},
-		notify_info,
-		prefill,
-		role
+		prefill
 	}
 ).
 
@@ -61,8 +59,6 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 	gproc:reg({n,l,{media, C, M, T}}),
 	gproc:set_value({n,l,{media, C, M, T}}, {null, null, null}),
 
-	NotifyInfo = proplists:get_value(notify, Params, []),
-
 	% Set stats timer
 	{ok, TRef} = timer:send_interval(1000, get_stats),
 
@@ -72,13 +68,9 @@ init([#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr =
 			mediaid	= M,
 			tag	= T,
 			tref	= TRef,
-			notify_info = NotifyInfo,
 			prefill	= Addr
 		}
 	}.
-
-handle_call({set_role, Role}, _From, State) ->
-	{reply, ok, State#state{role = Role}};
 
 handle_call({set_sibling, Sibling}, _From, #state{prefill = Prefill} = State) ->
 	gen_server:cast(Sibling, {prefill, Prefill}),
@@ -147,12 +139,6 @@ handle_info({phy, {Ip, PortRtp, PortRtcp, RtpPid}}, #state{callid = C, mediaid =
 	% No need to store original Cmd any longer
 	{noreply, State#state{cmd = null, local = {Ip, PortRtp, PortRtcp}, rtp = RtpPid}};
 
-handle_info(interim_update, #state{callid = C, mediaid = M, notify_info = NotifyInfo, role = master} = State) ->
-	rtpproxy_ctl:acc(interim_update, C, M, NotifyInfo),
-	{noreply, State};
-handle_info(interim_update, #state{role = slave} = State) ->
-	{noreply, State};
-
 handle_info(get_stats, #state{callid = C, mediaid = M, tag = T, rtp = RtpPid, other_rtp = OtherRtpPid, local = Local, global = Global} = State) ->
 	{Ip, RtpPort, RtcpPort, _SSRC, Type, _, _, _, _} = gen_server:call(RtpPid, get_stats),
 	(Global == {Ip, RtpPort, RtcpPort}) andalso
@@ -171,9 +157,8 @@ handle_info(Info, State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-terminate(Reason, #state{callid = C, mediaid = M, tag = T, notify_info = NotifyInfo, role = Role, tref = TRef}) ->
+terminate(Reason, #state{callid = C, mediaid = M, tag = T, tref = TRef}) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	timer:cancel(TRef),
-	Role == master andalso rtpproxy_ctl:acc(stop, C, M, NotifyInfo),
 	% No need to explicitly unregister from gproc - it does so automatically
 	error_logger:error_msg("media ~p: terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).

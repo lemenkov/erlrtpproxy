@@ -50,20 +50,6 @@ init(rtpproxy_sup) ->
 	% Load storage for mmap-ed files
 	StorageProcess = ?CHILD(storage),
 
-	% Check and load (if configured) notification backends
-	RadiusBackendProcess = case application:get_env(rtpproxy, radacct_servers) of
-		{ok, _} ->
-			[?CHILD(rtpproxy_notifier_backend_radius)];
-		_ ->
-			[]
-	end,
-	NotifyBackendProcess = case application:get_env(rtpproxy, notify_servers) of
-		{ok, _} ->
-			[?CHILD(rtpproxy_notifier_backend_notify)];
-		_ ->
-			[]
-	end,
-
 	% Load http backend
 	HttpProcess = case application:get_env(rtpproxy, http_port) of
 		{ok, HttpPort} ->
@@ -72,6 +58,6 @@ init(rtpproxy_sup) ->
 		_ -> []
 	end,
 
-	Children = [ListenerProcess, BackendProcess] ++ HttpProcess ++ [StorageProcess] ++ RadiusBackendProcess ++ NotifyBackendProcess,
+	Children = [ListenerProcess, BackendProcess] ++ HttpProcess ++ [StorageProcess],
 
 	{ok, {SupFlags, Children}}.
