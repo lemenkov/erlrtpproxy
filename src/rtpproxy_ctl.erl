@@ -215,7 +215,7 @@ start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}, params = Param
 start_recorder(C, M, T) ->
 	[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M],
 	Ret = supervisor:start_child(SupervisorPid,
-			{{recorder, C, M, T}, {gen_server, start_link, [file_writer, [C, M, T], []]}, permanent, 5000, worker, [file_writer]}
+			{{recorder, C, M, T}, {gen_server, start_link, [file_writer, [C, M, T], []]}, temporary, 5000, worker, [file_writer]}
 		),
 	RecorderPid = get_pid(Ret),
 	[RtpPid] = [ P || {{phy, CID, MID, TID}, P, _, _} <- supervisor:which_children(SupervisorPid), CID == C, MID == M, TID == T],
