@@ -59,14 +59,19 @@ dump_query(RawQuery) ->
 	M = proplists:get_value(mediaid, Query, '_'),
 	T = proplists:get_value(tag, Query, '_'),
 	P = proplists:get_value(payload, Query, '_'),
-	L = '_',
+%	L = '_',
 	R = case proplists:get_value(remoteip, Query, none) of none  -> '_'; I -> {I,'_','_'} end,
 
 	List = [
 			{RP, CID, MID, TID, LA, RA, SSRC, Payload, RxBytes, RxPackets, TxBytes, TxPackets, Rr, Sr} ||
 			{{media_channel_sup, _, _}, SP, _, _} <- supervisor:which_children(media_sup),
 			{{phy, CID, MID, TID}, RP, _, _} <- supervisor:which_children(SP),
-			{LA, RA, SSRC, Payload, RxBytes, RxPackets, TxBytes, TxPackets, Rr, Sr} = gen_server:call(RP, get_stats)
+			{LA, {RI, _, _} = RA, SSRC, Payload, RxBytes, RxPackets, TxBytes, TxPackets, Rr, Sr} = gen_server:call(RP, get_stats),
+			(filter(C))(CID),
+			(filter(M))(MID),
+			(filter(T))(TID),
+			(filter(P))(Payload),
+			(filter(R))(RI)
 	],
 
 	Result = [
@@ -91,7 +96,7 @@ dump_query(RawQuery) ->
 				]
 			}]
 			end
-	|| [{RtpPid, CallId, MediaId, Tag, {LocalIp, LocalRtpPort, LocalRtcpPort}, {RemoteIp, RemoteRtpPort, RemoteRtcpPort}, SSRC, Payload, RxBytes, RxPackets, TxBytes, TxPackets, Rr0, Sr0}] <- List],
+	|| [{_RtpPid, CallId, MediaId, Tag, {LocalIp, LocalRtpPort, LocalRtcpPort}, {RemoteIp, RemoteRtpPort, RemoteRtcpPort}, SSRC, Payload, RxBytes, RxPackets, TxBytes, TxPackets, Rr0, Sr0}] <- List],
 
 	mochijson2:encode([{http_query,  Query}, {num, length(List)}, {calllegs, Result}]).
 
@@ -174,3 +179,9 @@ make_ip(null) ->
 	<<"null">>;
 make_ip(Ip) ->
 	list_to_binary(inet_parse:ntoa(Ip)).
+
+
+filter('_') ->
+	fun(_) -> true end;
+filter(P) ->
+	fun(X) -> X =:= P end.
