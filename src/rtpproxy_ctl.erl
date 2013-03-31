@@ -36,9 +36,6 @@ start() ->
 	%% Replace logger with erlsyslog
 	rpc:multicall(Nodes, error_logger, add_report_handler, [erlsyslog]),
 
-	%% Run gproc on each node
-	rpc:multicall(Nodes, application, start, [gproc]),
-
 	%% Load necessary config files
 	rpc:multicall(Nodes, application, load, [rtpproxy]),
 
@@ -73,19 +70,21 @@ command(#cmd{type = ?CMD_D, callid = C}) ->
 command(#cmd{type = ?CMD_I}) ->
 	{ok, {stats, length(supervisor:which_children(media_sup))}};
 
+command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr = {{0,0,0,0}, _}}, origin = #origin{pid = Pid}} = Cmd) ->
+	% Old music-on-hold - FIXME - should start CMD_P actually
+	RtpPid = get_gen_rtp_channel(C, M, T),
+	{_, {_, RtpPort, RtcpPort}, _} = gen_server:call(RtpPid, get_phy),
+	gen_server:cast(Pid, {reply, Cmd, {{{0,0,0,0}, RtpPort}, {{0,0,0,0}, RtcpPort}}}),
+	{ok, sent};
+
 command(#cmd{type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{tag = Tag}} = Cmd) ->
-	case gproc:where({n,l,{media, CallId, MediaId, Tag}}) of
-		undefined ->
-			start_media(Cmd);
-		MediaThread ->
-			gen_server:cast(MediaThread, Cmd)
-	end,
+	start_media(Cmd),
 	{ok, sent};
 
 command(#cmd{type = ?CMD_P, callid = C, mediaid = M, to = #party{tag = T}, params = Params}) ->
+	RtpPid0 = get_gen_rtp_channel(C, M, T),
+	RtpPid1 = get_other_gen_rtp_channel(C, M, T),
 	[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M],
-	[RtpPid0] = [ P || {{phy, CID, MID, TID}, P, _, _} <- supervisor:which_children(SupervisorPid), CID == C, MID == M, TID == T],
-	[RtpPid1] = [ P || {{phy, CID, MID, TID}, P, _, _} <- supervisor:which_children(SupervisorPid), CID == C, MID == M, TID /= T],
 	Ret = supervisor:start_child(SupervisorPid,
 		% FIXME we should ignore payload type sent by OpenSIPS/B2BUA and append one currently in use
 		{{player, C, M, T}, {gen_server, start_link, [player, [RtpPid0, proplists:get_value(codecs, Params, {'PCMU',8000,1}), binary_to_list(proplists:get_value(filename, Params, <<"default">>)), proplists:get_value(playcount, Params, 0)], []]}, temporary, 5000, worker, [player]}
@@ -97,9 +96,9 @@ command(#cmd{type = ?CMD_P, callid = C, mediaid = M, to = #party{tag = T}, param
 	ok;
 
 command(#cmd{type = ?CMD_S, callid = C, mediaid = M, to = #party{tag = T}}) ->
+	RtpPid0 = get_gen_rtp_channel(C, M, T),
+	RtpPid1 = get_other_gen_rtp_channel(C, M, T),
 	[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M],
-	[RtpPid0] = [ P || {{phy, CID, MID, TID}, P, _, _} <- supervisor:which_children(SupervisorPid), CID == C, MID == M, TID == T],
-	[RtpPid1] = [ P || {{phy, CID, MID, TID}, P, _, _} <- supervisor:which_children(SupervisorPid), CID == C, MID == M, TID /= T],
 	gen_server:cast(RtpPid0, {keepalive, enable}),
 	gen_server:cast(RtpPid1, {keepalive, enable}),
 	gen_server:call(RtpPid0, {rtp_subscriber, {set, RtpPid1}}),
@@ -112,28 +111,16 @@ command(#cmd{type = ?CMD_R, callid = C}) ->
 	[ start_recorder(CID,MID,TID) || SupervisorPid <- SupervisorPids, {{media, CID, MID, TID}, _, _, _} <- supervisor:which_children(SupervisorPid)],
 	ok;
 
-command(#cmd{callid = CallId, mediaid = MediaId} = Cmd) ->
-	% First try to find existing session(s)
-	MID = case MediaId of
-		0 -> '_';
-		_ -> MediaId
-	end,
-
-	case gproc:select([{{{n,l,{media, CallId, MID, '_'}},'$1','_'}, [], ['$1']}]) of
-		[] ->
-			error_logger:warning_msg("Media stream does not exist. Do nothing."),
-			{error, notfound};
-		MediaThreads when is_list(MediaThreads) ->
-			% Group command - return immediately
-			lists:foreach(fun(Pid) -> gen_server:cast(Pid, Cmd) end, MediaThreads)
-	end.
+command(_) ->
+	% FIXME CMD_C and CMD_Q not yet supported
+	ok.
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 %% Internal functions %%
 %%%%%%%%%%%%%%%%%%%%%%%%
 
-start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}, params = Params} = Cmd) ->
-	Ret0 = supervisor:start_child(media_sup,
+start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}, params = Params, origin = #origin{pid = Pid}} = Cmd) ->
+	SupRet = supervisor:start_child(media_sup,
 		{
 			{media_channel_sup, C, M},
 			{supervisor, start_link, [rtpproxy_sup, media_channel_sup]},
@@ -143,12 +130,7 @@ start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}, params = Param
 			[rtpproxy_sup]
 		}
 	),
-
-	% Start main media module
-	Ret1 = supervisor:start_child(get_pid(Ret0),
-		{{media, C, M, T}, {gen_server, start_link, [media, [Cmd], []]}, permanent, 5000, worker, [media]}
-	),
-	Pid1 = get_pid(Ret1),
+	SupervisorPid = get_pid(SupRet),
 
 	% Check if we need to start recording
 	proplists:get_value(copy, Params, false) andalso start_recorder(C, M, T),
@@ -168,12 +150,13 @@ start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}, params = Param
 	{ok, Timeout} = application:get_env(rtpproxy, ttl),
 	{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
 	{ok, ActiveStrategy} = application:get_env(rtpproxy, active),
-	Params1 = Params ++ [{parent, Pid1}, {port, 0}, {ip, Ip}, {rebuildrtp, RebuildRtp}, {timeout_early, TimeoutEarly*1000}, {timeout, Timeout*1000}, {sendrecv, SendRecvStrategy}, {active, ActiveStrategy}],
+	Params1 = Params ++ [{port, 0}, {ip, Ip}, {rebuildrtp, RebuildRtp}, {timeout_early, TimeoutEarly*1000}, {timeout, Timeout*1000}, {sendrecv, SendRecvStrategy}, {active, ActiveStrategy}],
 
 	% ..and start RTP socket module
-	{ok, RtpPid0} = supervisor:start_child(get_pid(Ret0),
+	Ret0 = supervisor:start_child(SupervisorPid,
 		{{phy, C, M, T}, {gen_server, start_link, [gen_rtp_channel, [Params1], []]}, permanent, 5000, worker, [gen_rtp_channel]}
 	),
+	RtpPid0 = get_pid(Ret0),
 
 	% Check and load (if configured) notification backends
 	case application:get_env(rtpproxy, radacct_servers) of
@@ -187,23 +170,23 @@ start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}, params = Param
 		_ -> ok
 	end,
 
-	case Ret0 of
+	case SupRet of
 		{error, _} ->
 			% That's a 2nd side
 
 			% Set RTP path
-			[RtpPid1 | _ ] = [P || {{phy, C0, M0, T0}, P, _, _} <- supervisor:which_children(get_pid(Ret0)), T0 /= T, C0 == C, M0 == M],
+			RtpPid1 = get_other_gen_rtp_channel(C, M, T),
 			gen_server:call(RtpPid0, {rtp_subscriber, {set, RtpPid1}}),
 			gen_server:call(RtpPid1, {rtp_subscriber, {set, RtpPid0}}),
-
-			% Set type and siblings
-			[Pid0 | _ ] = [P || {{media, C0, M0, T0}, P, _, _} <- supervisor:which_children(get_pid(Ret0)), T0 /= T, C0 == C, M0 == M],
-			gen_server:call(Pid1, {set_sibling, Pid0}),
-			gen_server:call(Pid0, {set_sibling, Pid1}),
 			ok;
 		_ ->
 			ok
-	end.
+	end,
+	{_, {Ip, RtpPort, RtcpPort}, _} = gen_server:call(RtpPid0, get_phy),
+%	gen_server:cast(RtpPid, {update, Params ++ [{sendrecv, SendRecvStrategy}]}),
+%	gen_server:cast(RtpPid, {update, [{sendrecv, SendRecvStrategy}, {prefill, {Ip, Addr}}]}),
+	gen_server:cast(Pid, {reply, Cmd, {{Ip, RtpPort}, {Ip, RtcpPort}}}),
+	ok.
 
 start_recorder(C, M, T) ->
 	[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M],
@@ -211,7 +194,7 @@ start_recorder(C, M, T) ->
 			{{recorder, C, M, T}, {gen_server, start_link, [file_writer, [C, M, T], []]}, temporary, 5000, worker, [file_writer]}
 		),
 	RecorderPid = get_pid(Ret),
-	[RtpPid] = [ P || {{phy, CID, MID, TID}, P, _, _} <- supervisor:which_children(SupervisorPid), CID == C, MID == M, TID == T],
+	RtpPid = get_gen_rtp_channel(C, M, T),
 	gen_server:call(RtpPid, {rtp_subscriber, {set, RecorderPid}}),
 	ok.
 
@@ -228,6 +211,21 @@ start_notify_openser(C, M, NotifyInfo) ->
 			{{notify_openser, C, M}, {gen_server, start_link, [rtpproxy_notifier_backend_notify, [NotifyInfo], []]}, temporary, 5000, worker, [rtpproxy_notifier_backend_notify]}
 	),
 	ok.
+
+
+get_gen_rtp_channel(C, M, T) ->
+	[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M],
+	case [ P || {{phy, CID, MID, TID}, P, _, _} <- supervisor:which_children(SupervisorPid), CID == C, MID == M, TID == T] of
+		[] -> null;
+		[RtpPid] -> RtpPid
+	end.
+
+get_other_gen_rtp_channel(C, M, T) ->
+	[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M],
+	case [ P || {{phy, CID, MID, TID}, P, _, _} <- supervisor:which_children(SupervisorPid), CID == C, MID == M, TID /= T] of
+		[] -> null;
+		[RtpPid] -> RtpPid
+	end.
 
 get_pid({ok, Pid}) -> Pid;
 get_pid({ok, Pid, _}) -> Pid;

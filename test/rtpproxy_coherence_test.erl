@@ -103,15 +103,18 @@ rtpproxy_coherence_test_() ->
 							{ok, {?RTPPROXY_IP, ?RTPPROXY_PORT, _}} = gen_udp:recv(Fd, 0),
 
 							% Select two Pids
-							Ret0 = gproc:select([{{{n,l,{media, CallId, '_', '_'}},'$1',{'_', '_', '_'}}, [], ['$1']}]),
+							[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == CallId, MID == <<"1">>],
+							[RtpPid0] = [ P || {{phy, CID, MID, TID}, P, _, _} <- supervisor:which_children(SupervisorPid), CID == CallId, MID == <<"1">>, TID == TagFrom],
+							[RtpPid1] = [ P || {{phy, CID, MID, TID}, P, _, _} <- supervisor:which_children(SupervisorPid), CID == CallId, MID == <<"1">>, TID == TagTo],
+
+							% We now have two pids
+							?assertMatch([true, true], [is_pid(RtpPid0), is_pid(RtpPid1)]),
 
 							% Wait enough for triggering timeout
 							timer:sleep(3000),
 
 							% This must return empty list
-							Ret1 = gproc:select([{{{n,l,{media, CallId, '_', '_'}},'$1',{'_', '_', '_'}}, [], ['$1']}]),
-
-							?assertMatch({[_, _], [true, true], []}, {Ret0, lists:map(fun(X) -> is_pid(X) end, Ret0), Ret1})
+							?assertMatch([], [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == CallId, MID == <<"1">>])
 					end
 				}
 			]

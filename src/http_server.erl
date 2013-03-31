@@ -62,12 +62,15 @@ dump_query(RawQuery) ->
 	L = '_',
 	R = case proplists:get_value(remoteip, Query, none) of none  -> '_'; I -> {I,'_','_'} end,
 
-	%% C M T Payload Local Remote
-	List = gproc:select([{{{n,l,{media, C, M, T}}, '_', {P, L, R}}, [], ['$$']}]),
+	List = [
+			{RP, CID, MID, TID, LA, RA, SSRC, Payload, RxBytes, RxPackets, TxBytes, TxPackets, Rr, Sr} ||
+			{{media_channel_sup, _, _}, SP, _, _} <- supervisor:which_children(media_sup),
+			{{phy, CID, MID, TID}, RP, _, _} <- supervisor:which_children(SP),
+			{LA, RA, SSRC, Payload, RxBytes, RxPackets, TxBytes, TxPackets, Rr, Sr} = gen_server:call(RP, get_stats)
+	],
 
 	Result = [
 			begin
-			{RemoteIp, RemoteRtpPort, RemoteRtcpPort, SSRC, Payload, RxBytes, RxPackets, TxBytes, TxPackets, Rr0, Sr0} = gen_server:call(Pid, get_stats),
 			Rr = case Rr0 of null -> {rr, null}; false -> {rr, null}; _ ->  rtp_utils:to_proplist(Rr0) end,
 			Sr = case Sr0 of null -> {sr, null}; false -> {sr, null}; _ ->  rtp_utils:to_proplist(Sr0) end,
 			[{media,
@@ -88,7 +91,7 @@ dump_query(RawQuery) ->
 				]
 			}]
 			end
-	|| [{n,l, {media, CallId, MediaId, Tag}}, Pid, {_, {LocalIp, LocalRtpPort, LocalRtcpPort}, _}] <- List],
+	|| [{RtpPid, CallId, MediaId, Tag, {LocalIp, LocalRtpPort, LocalRtcpPort}, {RemoteIp, RemoteRtpPort, RemoteRtcpPort}, SSRC, Payload, RxBytes, RxPackets, TxBytes, TxPackets, Rr0, Sr0}] <- List],
 
 	mochijson2:encode([{http_query,  Query}, {num, length(List)}, {calllegs, Result}]).
 
