@@ -52,22 +52,30 @@ dispatch(Req) ->
 	end.
 
 dump_query([{"callnum",_}]) ->
-	mochijson2:encode([{callnum, gproc:get_value({c,l,calls}, shared)}]);
+	mochijson2:encode([{callnum, length(supervisor:which_children(media_sup))}]);
 dump_query(RawQuery) ->
 	Query = [ decode_kv(KV) || KV <- RawQuery],
 	C = proplists:get_value(callid, Query, '_'),
 	M = proplists:get_value(mediaid, Query, '_'),
 	T = proplists:get_value(tag, Query, '_'),
 	P = proplists:get_value(payload, Query, '_'),
-	L = '_',
+%	L = '_',
 	R = case proplists:get_value(remoteip, Query, none) of none  -> '_'; I -> {I,'_','_'} end,
 
-	%% C M T Payload Local Remote
-	List = gproc:select([{{{n,l,{media, C, M, T}}, '_', {P, L, R}}, [], ['$$']}]),
+	List = [
+			{RP, CID, MID, TID, LA, RA, SSRC, Payload, RxBytes, RxPackets, TxBytes, TxPackets, Sr, Rr} ||
+			{{media_channel_sup, _, _}, SP, _, _} <- supervisor:which_children(media_sup),
+			{{phy, CID, MID, TID}, RP, _, _} <- supervisor:which_children(SP),
+			{LA, {RI, _, _} = RA, SSRC, Payload, RxBytes, RxPackets, TxBytes, TxPackets, Sr, Rr} <- [gen_server:call(RP, get_stats)],
+			filter(C, CID),
+			filter(M, MID),
+			filter(T, TID),
+			filter(P, Payload),
+			filter(R, RI)
+	],
 
 	Result = [
 			begin
-			{RemoteIp, RemoteRtpPort, RemoteRtcpPort, SSRC, Payload, RxBytes, RxPackets, TxBytes, TxPackets, Rr0, Sr0} = gen_server:call(Pid, get_stats),
 			Rr = case Rr0 of null -> {rr, null}; false -> {rr, null}; _ ->  rtp_utils:to_proplist(Rr0) end,
 			Sr = case Sr0 of null -> {sr, null}; false -> {sr, null}; _ ->  rtp_utils:to_proplist(Sr0) end,
 			[{media,
@@ -83,12 +91,12 @@ dump_query(RawQuery) ->
 					{ssrc, SSRC},
 					{local, [{ip, make_ip(LocalIp)}, {rtp, LocalRtpPort}, {rtcp, LocalRtcpPort}]},
 					{remote,[{ip, make_ip(RemoteIp)}, {rtp, RemoteRtpPort}, {rtcp, RemoteRtcpPort}]},
-					Rr,
-					Sr
+					Sr,
+					Rr
 				]
 			}]
 			end
-	|| [{n,l, {media, CallId, MediaId, Tag}}, Pid, {_, {LocalIp, LocalRtpPort, LocalRtcpPort}, _}] <- List],
+	|| {_RtpPid, CallId, MediaId, Tag, {LocalIp, LocalRtpPort, LocalRtcpPort}, {RemoteIp, RemoteRtpPort, RemoteRtcpPort}, SSRC, Payload, RxBytes, RxPackets, TxBytes, TxPackets, Sr0, Rr0} <- List],
 
 	mochijson2:encode([{http_query,  Query}, {num, length(List)}, {calllegs, Result}]).
 
@@ -171,3 +179,7 @@ make_ip(null) ->
 	<<"null">>;
 make_ip(Ip) ->
 	list_to_binary(inet_parse:ntoa(Ip)).
+
+
+filter('_', _) -> true;
+filter(P, X) -> P =:= X.

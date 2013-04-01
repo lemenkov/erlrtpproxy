@@ -36,7 +36,7 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
--include("../include/common.hrl").
+-include("../src/common.hrl").
 
 cmd_v_test_() ->
 	Cmd = #cmd{

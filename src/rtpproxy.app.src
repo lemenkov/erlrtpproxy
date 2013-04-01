@@ -5,7 +5,7 @@
 		{vsn, "%VSN%"},
 		{modules, []},
 		{registered, [backend_ser, listener]},
-		{applications, [kernel, stdlib, gproc]},
+		{applications, [kernel, stdlib]},
 		{mod, {rtpproxy_app, []}}
 	    ]
 }.

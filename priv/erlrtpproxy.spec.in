@@ -18,17 +18,15 @@ BuildRoot:	%(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 BuildRequires:	erlang-eradius >= 0.8.5
 BuildRequires:	erlang-erlando
 BuildRequires:	erlang-erlsyslog
-BuildRequires:	erlang-gproc
 BuildRequires:	erlang-meck
 BuildRequires:	erlang-rebar
-BuildRequires:	erlang-rtplib >= 0.5.17
+BuildRequires:	erlang-rtplib >= 0.6.4
 Requires:	erlang
 Requires:	erlang-emmap
 Requires:	erlang-eradius >= 0.8.5
 Requires:	erlang-erlsyslog
-Requires:	erlang-gproc
 Requires:	erlang-mochiweb
-Requires:	erlang-rtplib >= 0.5.17
+Requires:	erlang-rtplib >= 0.6.4
 Requires(post): /sbin/chkconfig
 Requires(preun): /sbin/chkconfig
 Requires(preun): /sbin/service
@@ -100,7 +98,6 @@ make test
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_ctl.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/%{realname}_sup.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/utils.beam
-%{_libdir}/erlang/lib/%{realname}-%{version}/ebin/media.beam
 %{_libdir}/erlang/lib/%{realname}-%{version}/ebin/player.beam
 
 # OpenSER/OpenSIPS/Kamailio/Sippy interface

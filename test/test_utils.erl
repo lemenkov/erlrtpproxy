@@ -37,9 +37,6 @@
 -define(RTPPROXY_PORT, 33333).
 
 start() ->
-	%% Run gproc
-	application:start(gproc),
-
 	%% Load main module
 	application:start(rtpproxy).
 
@@ -76,11 +73,4 @@ set_default_opts() ->
 
 stop() ->
 	application:stop(rtpproxy),
-	gen_server:cast(listener, stop),
-	gen_server:cast(rtpproxy_notifier_backend_notify, stop),
-	gen_server:cast(rtpproxy_notifier_backend_radius, stop),
-	gen_server:cast(backend_ser, stop),
-	gen_server:cast(file_writer, stop),
-	gen_server:cast(storage, stop),
-	application:stop(gproc),
 	net_kernel:stop().

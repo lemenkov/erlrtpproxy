@@ -3,5 +3,6 @@
 *.patch
 *.rej
 *~
+.eunit/
 ebin/
 priv/erlrtpproxy.spec

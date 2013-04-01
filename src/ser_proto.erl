@@ -23,7 +23,7 @@
 -export([decode/1]).
 -export([encode/1]).
 
--include("../include/common.hrl").
+-include("common.hrl").
 
 -define(SAFE_PARTY(Val0), case Val0 of null -> null; _ -> [Val, _] = ensure_mediaid(binary_split(Val0, $;)), #party{tag = Val} end).
 

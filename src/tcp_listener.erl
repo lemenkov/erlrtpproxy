@@ -42,8 +42,6 @@
 	clients = []
 }).
 
--include("../include/common.hrl").
-
 start(Args) ->
 	gen_server:start({local, listener}, ?MODULE, Args, []).
 start_link(Args) ->
@@ -58,10 +56,11 @@ init ([Parent, {I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
 	is_integer(I5), I5 >= 0, I5 < 65535,
 	is_integer(I6), I6 >= 0, I6 < 65535,
 	is_integer(I7), I7 >= 0, I7 < 65535 ->
+	process_flag(trap_exit, true),
 	Opts = [{ip, IPv6}, binary, {packet, line}, {reuseaddr, true}, {keepalive, true}, {backlog, 30}, {active, false}, inet6],
 	{ok, Socket} = gen_tcp:listen(Port, Opts),
 	{ok, Ref} = prim_inet:async_accept(Socket, -1),
-	error_logger:info_msg("TCP listener started at [~s:~w]~n", [inet_parse:ntoa(IPv6), Port]),
+	error_logger:info_msg("TCP listener: ~p - started at [~s:~w]~n", [self(), inet_parse:ntoa(IPv6), Port]),
 	{ok, #state{parent = Parent, listener = Socket, acceptor = Ref}};
 
 init ([Parent, {I0, I1, I2, I3} = IPv4, Port]) when
@@ -69,15 +68,16 @@ init ([Parent, {I0, I1, I2, I3} = IPv4, Port]) when
 	is_integer(I1), I1 >= 0, I1 < 256,
 	is_integer(I2), I2 >= 0, I2 < 256,
 	is_integer(I3), I3 >= 0, I3 < 256 ->
+	process_flag(trap_exit, true),
 	Opts = [{ip, IPv4}, binary, {packet, line}, {reuseaddr, true}, {keepalive, true}, {backlog, 30}, {active, false}],
 	{ok, Socket} = gen_tcp:listen(Port, Opts),
 	{ok, Ref} = prim_inet:async_accept(Socket, -1),
-	error_logger:info_msg("TCP listener started at [~s:~w]~n", [inet_parse:ntoa(IPv4), Port]),
+	error_logger:info_msg("TCP listener: ~p - started at [~s:~w]~n", [self(), inet_parse:ntoa(IPv4), Port]),
 	{ok, #state{parent = Parent, listener = Socket, acceptor = Ref}}.
 
-handle_call(Other, _From, State) ->
-	error_logger:warning_msg("TCP listener: strange call: ~p~n", [Other]),
-	{noreply, State}.
+handle_call(Call, _From, State) ->
+	error_logger:error_msg("TCP listener: ~p - strange call: ~p~n", [self(), Call]),
+	{stop, {error, {unknown_call, Call}}, State}.
 
 handle_cast({msg, Msg, Ip, Port}, State = #state{clients=Clients}) ->
 	% Select proper client
@@ -87,12 +87,9 @@ handle_cast({msg, Msg, Ip, Port}, State = #state{clients=Clients}) ->
 	end,
 	{noreply, State};
 
-handle_cast(stop, State) ->
-	{stop, normal, State};
-
-handle_cast(Other, State) ->
-	error_logger:warning_msg("TCP listener: strange cast: ~p~n", [Other]),
-	{noreply, State}.
+handle_cast(Cast, State) ->
+	error_logger:error_msg("TCP listener: ~p - strange cast: ~p~n", [self(), Cast]),
+	{stop, {error, {unknown_cast, Cast}}, State}.
 
 handle_info({tcp, Client, Msg}, #state{parent = Parent} = State) ->
 	inet:setopts(Client, [{active, once}, {packet, line}, binary]),
@@ -125,17 +122,21 @@ handle_info({inet_async, ListSock, Ref, Error}, #state{listener=ListSock, accept
 	{stop, Error, State};
 
 handle_info(Info, State) ->
-	error_logger:warning_msg("TCP listener: strange info: ~p~n", [Info]),
-	{noreply, State}.
-
-terminate(Reason, #state{listener = Listener, clients = Clients}) ->
-	gen_tcp:close(Listener),
-	lists:map(fun gen_tcp:close/1, Clients),
-	error_logger:error_msg("TCP listener closed: ~p~n", [Reason]),
-	ok.
+	error_logger:error_msg("TCP listener: ~p - strange info: ~p~n", [self(), Info]),
+	{stop, {error, {unknown_info, Info}}, State}.
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
+
+terminate(Reason, #state{listener = Listener, clients = Clients}) ->
+	{memory, Bytes} = erlang:process_info(self(), memory),
+	gen_tcp:close(Listener),
+	lists:map(fun gen_tcp:close/1, Clients),
+	error_logger:info_msg("TCP listener: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%% Internal functions %%
+%%%%%%%%%%%%%%%%%%%%%%%%
 
 set_sockopt(ListSock, CliSocket) ->
 	true = inet_db:register_socket(CliSocket, inet_tcp),

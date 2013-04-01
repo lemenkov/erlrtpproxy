@@ -34,21 +34,19 @@
 -export([code_change/3]).
 -export([terminate/2]).
 
--include("../include/common.hrl").
+-include("common.hrl").
 
 start_link() ->
 	gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init (_) ->
-	error_logger:info_msg("Erlrtpproxy SER backend started at ~p~n", [node()]),
+	process_flag(trap_exit, true),
+	error_logger:info_msg("SER backend: ~p - started at ~p~n", [self(), node()]),
 	{ok, []}.
 
-handle_call(Other, _From, State) ->
-	error_logger:warning_msg("Erlrtpproxy SER backend: strange call: ~p~n", [Other]),
-	{noreply, State}.
-
-handle_cast(stop, State) ->
-	{stop, normal, State};
+handle_call(Call, _From, State) ->
+	error_logger:error_msg("SER backend: ~p - strange call: ~p~n", [self(), Call]),
+	{stop, {error, {unknown_call, Call}}, State}.
 
 handle_cast({reply, Cmd = #cmd{origin = #origin{type = ser, ip = Ip, port = Port}}, {Addr1, Addr2}}, State) ->
 	error_logger:info_msg("SER reply ~p~n", [{Addr1, Addr2}]),
@@ -131,16 +129,17 @@ handle_cast({msg, Msg, Ip, Port}, State) ->
 	end,
 	{noreply, State};
 
-handle_cast(Other, State) ->
-	error_logger:warning_msg("Erlrtpproxy SER backend: strange cast: ~p~n", [Other]),
-	{noreply, State}.
+handle_cast(Cast, State) ->
+	error_logger:error_msg("SER backend: ~p - strange cast: ~p~n", [self(), Cast]),
+	{stop, {error, {unknown_cast, Cast}}, State}.
 
 handle_info(Info, State) ->
-	error_logger:warning_msg("Erlrtpproxy SER backend: strange info: ~p~n", [Info]),
-	{noreply, State}.
+	error_logger:error_msg("SER backend: ~p - strange info: ~p~n", [self(), Info]),
+	{stop, {error, {unknown_info, Info}}, State}.
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 terminate(Reason, _) ->
-	error_logger:error_msg("Erlrtpproxy SER backend stopped: ~p~n", [Reason]).
+	{memory, Bytes} = erlang:process_info(self(), memory),
+	error_logger:info_msg("SER backend: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).

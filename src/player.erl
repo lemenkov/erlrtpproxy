@@ -22,7 +22,6 @@
 
 -behaviour(gen_server).
 
--export([start/4]).
 -export([init/1]).
 -export([handle_call/3]).
 -export([handle_cast/2]).
@@ -33,34 +32,24 @@
 -include_lib("rtplib/include/rtp.hrl").
 
 -record(state, {
-		callid,
-		mediaid,
-		tag,
+		subscriber,
 		tref,
+		marker = 1,
 		ssrc,
 		data,
 		type,
 		ssize,
 		sn = 0,
-		repeats = 0,
+		repeats,
 		rebuildrtp,
 		starttime
 	}
 ).
 
 
-start(CallId, MediaId, Tag, PayloadInfo) ->
-	gen_server:start(?MODULE, [CallId, MediaId, Tag, PayloadInfo], []).
+init([Subcriber, [CodecInfo | _], FN, Playcount]) ->
+	process_flag(trap_exit, true),
 
-init([CallId, MediaId, Tag, PayloadInfo]) ->
-	% Register itself
-	gproc:reg({n,l,{player, CallId, MediaId, Tag}}),
-
-	% How many times we should playbak (FIXME not used for now)
-	Playcount = proplists:get_value(playcount, PayloadInfo, 0),
-	% We need a codec
-	[CodecInfo | _] = proplists:get_value(codecs, PayloadInfo),
-	Filename = binary_to_list(proplists:get_value(filename, PayloadInfo, <<"default">>)),
 	{FileExt, Type, FrameLength, Clock} = case CodecInfo of
 		{'PCMU', _, _} -> {".pcmu", ?RTP_PAYLOAD_PCMU, 160, 20};
 		{'PCMA', _, _} -> {".pcma", ?RTP_PAYLOAD_PCMA, 160, 20};
@@ -70,14 +59,18 @@ init([CallId, MediaId, Tag, PayloadInfo]) ->
 	end,
 
 	{ok, TRef} = timer:send_interval(Clock, send),
-	{ok, {Fd, Size}} = gen_server:call(storage, {get, "/tmp/" ++ Filename ++ FileExt}),
+	Filename = case FN of
+		[$d, $e, $f, $a, $u, $l, $t | _] -> "/tmp/" ++ FN ++ FileExt;
+		_ -> FN ++ FileExt
+	end,
+	{ok, {Fd, Size}} = gen_server:call(storage, {get, Filename}),
+	error_logger:info_msg("player: ~p - started to play \"~s\", ~b times~n", [self(), Filename ++ FileExt, Playcount]),
 	{ok, #state{
-			callid	= CallId,
-			mediaid = MediaId,
-			tag	= Tag,
+			subscriber = Subcriber,
 			tref	= TRef,
 			ssrc	= random:uniform(2 bsl 31),
-			data	= {Fd, Size},
+			% Count total number of frames and cut off some weird bytes at the end (if any) - we need only whole frames
+			data	= {Fd, Size div FrameLength},
 			type	= Type,
 			ssize	= FrameLength,
 			repeats = Playcount,
@@ -86,52 +79,38 @@ init([CallId, MediaId, Tag, PayloadInfo]) ->
 	}.
 
 handle_call(Call, _From,  State) ->
-	error_logger:warning_msg("Unmatched call [~p]", [Call]),
-	{reply,{error,unknown_call},State}.
+	error_logger:error_msg("player: ~p - unmatched call [~p]", [self(), Call]),
+	{stop, {error, {unknown_call, Call}}, State}.
 
-handle_cast(stop, State) ->
-	{stop, normal, State};
+handle_cast(Cast, State) ->
+	error_logger:error_msg("player: ~p - unmatched cast [~p]", [self(), Cast]),
+	{stop, {error, {unknown_cast, Cast}}, State}.
 
-handle_cast(Other, State) ->
-	error_logger:warning_msg("Unmatched cast [~p]", [Other]),
-	{noreply, State}.
+handle_info(send, #state{subscriber = Subscriber, marker = Marker, sn = SequenceNumber, type = Type, ssize = FrameLength, ssrc = SSRC, data = {Fd, NFrames}, starttime = ST} = State) ->
+	Position = FrameLength * (SequenceNumber rem NFrames),
+	{ok, Payload} = file:pread(Fd, Position, FrameLength),
+	Pkt = #rtp{
+			padding = 0,
+			marker = Marker,
+			payload_type = Type,
+			sequence_number = SequenceNumber,
+			timestamp = rtp_utils:mktimestamp(Type, ST),
+			ssrc = SSRC,
+			csrcs = [],
+			extension = null,
+			payload = Payload
+		},
+	gen_server:cast(Subscriber, {rtp:encode(Pkt), null, null}),
+	{noreply, State#state{marker = 0, sn = SequenceNumber + 1}};
+
+handle_info(Info, State) ->
+	error_logger:error_msg("player: ~p - unmatched info [~p]", [self(), Info]),
+	{stop, {error, {unknown_info, Info}}, State}.
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 terminate(Reason, #state{tref = TRef}) ->
-	timer:cancel(TRef),
 	{memory, Bytes} = erlang:process_info(self(), memory),
-	error_logger:info_msg("player terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
-
-handle_info(send, #state{callid = C, mediaid = M, tag = T, sn = SequenceNumber, type = Type, ssize = FrameLength, ssrc = SSRC, data = {Fd, Size}, starttime = ST} = State) ->
-	case gproc:select([{{{n,l,{media, C, M, T}}, '$1', '_'}, [], ['$1']}]) of
-		[] ->
-			{noreply, State};
-		[Pid] ->
-			Length = Size - FrameLength,
-			P = FrameLength*SequenceNumber,
-			Position = case P < Length of
-				true -> P;
-				_ -> P rem Length
-			end,
-			{ok, Payload} = file:pread(Fd, Position, FrameLength),
-			Timestamp = rtp_utils:mktimestamp(Type, ST),
-			Pkt = #rtp{
-					padding = 0,
-					marker = case SequenceNumber of 0 -> 1; _ -> 0 end,
-					payload_type = Type,
-					sequence_number = SequenceNumber,
-					timestamp = Timestamp,
-					ssrc = SSRC,
-					csrcs = [],
-					extension = null,
-					payload = Payload
-				},
-			gen_server:cast(Pid, {'music-on-hold', Pkt}),
-			{noreply, State#state{sn = SequenceNumber + 1}}
-	end;
-
-handle_info(Info, State) ->
-	error_logger:warning_msg("Unmatched info [~p]", [Info]),
-	{noreply, State}.
+	timer:cancel(TRef),
+	error_logger:info_msg("player: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).

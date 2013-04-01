@@ -22,7 +22,6 @@
 
 -behaviour(gen_server).
 
--export([start_link/0]).
 -export([init/1]).
 -export([handle_call/3]).
 -export([handle_cast/2]).
@@ -32,61 +31,50 @@
 
 -include_lib("rtplib/include/rtp.hrl").
 
-start_link() ->
-	gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+init([C, M, T]) ->
+	process_flag(trap_exit, true),
+	Filename = "/tmp/capture_cid_" ++ to_list(C) ++ "_mid_" ++ to_list(M) ++ "_tag_" ++ to_list(T),
+	error_logger:info_msg("file writer: ~p - started at ~p.~n", [self(), node()]),
+	{ok, {filename, Filename}}.
 
-init(_) ->
-	Ets = ets:new(file_writer, [public, named_table]),
-	error_logger:info_msg("File Writer: started at ~p.~n", [self()]),
-	{ok, Ets}.
+handle_call(Call, _From, State) ->
+	error_logger:error_msg("File Writer: ~p - strange call [~p]", [self(), Call]),
+	{stop, {error, {unknown_call, Call}}, State}.
 
-handle_call(Request, _From, State) ->
-	error_logger:warning_msg("File Writer: strange call [~p]", [Request]),
-	{reply, ok, State}.
+handle_cast({Pkt, _, _}, State) when is_binary(Pkt) ->
+	{ok, Rtp} = rtp:decode(Pkt),
+	handle_cast({Rtp, null, null}, State);
 
-handle_cast({#rtp{payload_type = Type, payload = Payload, timestamp = Timestamp}, CallId, MediaId, Tag}, Ets) ->
-	handle_cast({{Type, Payload, Timestamp}, CallId, MediaId, Tag}, Ets);
-handle_cast({{Type, Payload, _}, CallId, MediaId, Tag}, Ets) ->
-	Fd = case ets:lookup(Ets, {CallId, MediaId, Tag}) of
-		[] ->
-			Filename = "/tmp/capture_cid_" ++ to_list(CallId) ++ "_mid_" ++ to_list(MediaId) ++ "_tag_" ++ to_list(Tag) ++ "." ++ to_list(Type),
-			{ok, F} = file:open(Filename, [raw, write, append]),
-			ets:insert_new(Ets, {{CallId, MediaId, Tag}, F}),
-			F;
-		[{{CallId, MediaId, Tag}, F}] -> F
-	end,
+handle_cast({#rtp{payload_type = Type}, _, _} = Cast, {filename, Filename}) ->
+	{ok, Fd} = file:open(Filename ++ "." ++ to_list(Type), [raw, write, append]),
+	handle_cast(Cast, Fd);
+
+handle_cast({#rtp{payload = Payload}, _, _}, Fd) ->
 	file:write(Fd, Payload),
-	{noreply, Ets};
+	{noreply, Fd};
 
-handle_cast({eof, CallId, MediaId, Tag}, Ets) ->
-	case ets:lookup(Ets, {CallId, MediaId, Tag}) of
-		[] -> ok;
-		[Fd] -> file:close(Fd)
-	end,
-	{noreply, Ets};
-
-handle_cast(stop, State) ->
-	{stop, normal, State};
-
-handle_cast(Msg, State) ->
-	error_logger:warning_msg("File Writer: strange cast: ~p.~n", [Msg]),
-	{noreply, State}.
+handle_cast(Cast, State) ->
+	error_logger:error_msg("file writer: ~p - strange cast: ~p.~n", [self(), Cast]),
+	{stop, {error, {unknown_cast, Cast}}, State}.
 
 handle_info(Info, State) ->
-	error_logger:warning_msg("File Writer: strange info: ~p.~n", [Info]),
-	{noreply, State}.
-
-terminate(_Reason, Ets) ->
-	lists:foreach(fun([X]) -> file:close(X) end, ets:match(Ets, {{'_', '_', '_'},'$1'})),
-	error_logger:info_msg("File Writer: stopped.~n"),
-	ok.
+	error_logger:error_msg("file writer: ~p - strange info: ~p.~n", [self(), Info]),
+	{stop, {error, {unknown_info, Info}}, State}.
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-%%
-%% Private functions
-%%
+terminate(Reason, {filename, _}) ->
+	{memory, Bytes} = erlang:process_info(self(), memory),
+	error_logger:info_msg("file writer: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]);
+terminate(Reason, Fd) ->
+	{memory, Bytes} = erlang:process_info(self(), memory),
+	file:close(Fd),
+	error_logger:info_msg("file writer: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+%% Internal functions %%
+%%%%%%%%%%%%%%%%%%%%%%%%
 
 to_list(String) when is_list(String) -> String;
 to_list(Binary) when is_binary(Binary) -> binary_to_list(Binary);

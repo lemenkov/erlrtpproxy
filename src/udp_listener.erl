@@ -30,8 +30,6 @@
 -export([code_change/3]).
 -export([terminate/2]).
 
--include("../include/common.hrl").
-
 start(Args) ->
 	gen_server:start({local, listener}, ?MODULE, Args, []).
 start_link(Args) ->
@@ -46,32 +44,31 @@ init ([Parent, {I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
 	is_integer(I5), I5 >= 0, I5 < 65535,
 	is_integer(I6), I6 >= 0, I6 < 65535,
 	is_integer(I7), I7 >= 0, I7 < 65535 ->
+	process_flag(trap_exit, true),
 	{ok, Fd} = gen_udp:open(Port, [{ip, IPv6}, {active, true}, binary, inet6]),
-	error_logger:info_msg("UDP listener started at [~s:~w]~n", [inet_parse:ntoa(IPv6), Port]),
+	error_logger:info_msg("UDP listener: ~p - started at [~s:~w]~n", [self(), inet_parse:ntoa(IPv6), Port]),
 	{ok, {Parent, Fd}};
 init ([Parent, {I0, I1, I2, I3} = IPv4, Port]) when
 	is_integer(I0), I0 >= 0, I0 < 256,
 	is_integer(I1), I1 >= 0, I1 < 256,
 	is_integer(I2), I2 >= 0, I2 < 256,
 	is_integer(I3), I3 >= 0, I3 < 256 ->
+	process_flag(trap_exit, true),
 	{ok, Fd} = gen_udp:open(Port, [{ip, IPv4}, {active, true}, binary]),
-	error_logger:info_msg("UDP listener started at [~s:~w]~n", [inet_parse:ntoa(IPv4), Port]),
+	error_logger:info_msg("UDP listener: ~p - started at [~s:~w]~n", [self(), inet_parse:ntoa(IPv4), Port]),
 	{ok, {Parent, Fd}}.
 
-handle_call(Other, _From, State) ->
-	error_logger:warning_msg("UDP listener: strange call: ~p~n", [Other]),
-	{noreply, State}.
+handle_call(Call, _From, State) ->
+	error_logger:error_msg("UDP listener: ~p - strange call: ~p~n", [self(), Call]),
+	{stop, {error, {unknown_call, Call}}, State}.
 
 handle_cast({msg, Msg, Ip, Port}, {Parent, Fd}) ->
 	gen_udp:send(Fd, Ip, Port, Msg),
 	{noreply, {Parent, Fd}};
 
-handle_cast(stop, State) ->
-	{stop, normal, State};
-
-handle_cast(Other, State) ->
-	error_logger:warning_msg("UDP listener: strange cast: ~p~n", [Other]),
-	{noreply, State}.
+handle_cast(Cast, State) ->
+	error_logger:error_msg("UDP listener: ~p - strange cast: ~p~n", [self(), Cast]),
+	{stop, {error, {unknown_cast, Cast}}, State}.
 
 % Fd from which message arrived must be equal to Fd from our state
 handle_info({udp, Fd, Ip, Port, Msg}, {Parent, Fd}) ->
@@ -79,14 +76,13 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Parent, Fd}) ->
 	{noreply, {Parent, Fd}};
 
 handle_info(Info, State) ->
-	error_logger:warning_msg("UDP listener: strange info: ~p~n", [Info]),
-	{noreply, State}.
+	error_logger:error_msg("UDP listener: ~p - strange info: ~p~n", [self(), Info]),
+	{stop, {error, {unknown_info, Info}}, State}.
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
 terminate(Reason, {_, Fd}) ->
+	{memory, Bytes} = erlang:process_info(self(), memory),
 	gen_udp:close(Fd),
-	error_logger:error_msg("UDP listener closed: ~p~n", [Reason]),
-	ok.
-
+	error_logger:info_msg("UDP listener: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).

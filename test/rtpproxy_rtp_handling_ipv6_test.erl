@@ -33,7 +33,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("rtplib/include/rtp.hrl").
 
--include("../include/common.hrl").
+-include("../src/common.hrl").
 
 -define(RTPPROXY_IP, {127,0,0,1}).
 -define(RTPPROXY_IP6, {0,0,0,0,0,0,0,1}).
