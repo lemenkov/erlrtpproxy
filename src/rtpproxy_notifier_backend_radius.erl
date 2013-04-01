@@ -21,7 +21,7 @@
 init([C, _M]) ->
 	process_flag(trap_exit, true),
 	{ok, Timeout} = application:get_env(rtpproxy, ttl),
-	{ok, TRef} = timer:send_interval(Timeout, interim_update),
+	{ok, TRef} = timer:send_interval(Timeout*1000, interim_update),
 	eradius_dict:start(),
 	eradius_dict:load_tables(["dictionary", "dictionary_cisco", "dictionary_rfc2865", "dictionary_rfc2866"]),
 	eradius_acc:start(),
