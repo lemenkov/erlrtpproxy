@@ -91,8 +91,8 @@ command(#cmd{type = ?CMD_P, callid = C, mediaid = M, to = #party{tag = T}, param
 	),
 	gen_server:cast(RtpPid0, {keepalive, disable}),
 	gen_server:cast(RtpPid1, {keepalive, disable}),
-	gen_server:call(RtpPid0, {rtp_subscriber, {set, null}}),
-	gen_server:call(RtpPid1, {rtp_subscriber, {set, null}}),
+	safe_call(RtpPid0, {rtp_subscriber, {set, null}}),
+	safe_call(RtpPid1, {rtp_subscriber, {set, null}}),
 	ok;
 
 command(#cmd{type = ?CMD_S, callid = C, mediaid = M, to = #party{tag = T}}) ->
@@ -101,8 +101,8 @@ command(#cmd{type = ?CMD_S, callid = C, mediaid = M, to = #party{tag = T}}) ->
 	[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M],
 	gen_server:cast(RtpPid0, {keepalive, enable}),
 	gen_server:cast(RtpPid1, {keepalive, enable}),
-	gen_server:call(RtpPid0, {rtp_subscriber, {set, RtpPid1}}),
-	gen_server:call(RtpPid1, {rtp_subscriber, {set, RtpPid0}}),
+	safe_call(RtpPid0, {rtp_subscriber, {set, RtpPid1}}),
+	safe_call(RtpPid1, {rtp_subscriber, {set, RtpPid0}}),
 	supervisor:terminate_child(SupervisorPid, {player, C, M, T}),
 	ok;
 
@@ -176,8 +176,8 @@ start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}, params = Param
 
 			% Set RTP path
 			RtpPid1 = get_other_gen_rtp_channel(C, M, T),
-			gen_server:call(RtpPid0, {rtp_subscriber, {set, RtpPid1}}),
-			gen_server:call(RtpPid1, {rtp_subscriber, {set, RtpPid0}}),
+			safe_call(RtpPid0, {rtp_subscriber, {set, RtpPid1}}),
+			safe_call(RtpPid1, {rtp_subscriber, {set, RtpPid0}}),
 			ok;
 		_ ->
 			ok
@@ -195,7 +195,7 @@ start_recorder(C, M, T) ->
 		),
 	RecorderPid = get_pid(Ret),
 	RtpPid = get_gen_rtp_channel(C, M, T),
-	gen_server:call(RtpPid, {rtp_subscriber, {set, RecorderPid}}),
+	safe_call(RtpPid, {rtp_subscriber, {set, RecorderPid}}),
 	ok.
 
 start_notify_radius(C, M) ->
@@ -230,3 +230,6 @@ get_other_gen_rtp_channel(C, M, T) ->
 get_pid({ok, Pid}) -> Pid;
 get_pid({ok, Pid, _}) -> Pid;
 get_pid({error, {already_started, Pid}}) -> Pid.
+
+safe_call(null, Message) -> ok;
+safe_call(Pid, Message) -> gen_server:call(Pid, Message).
