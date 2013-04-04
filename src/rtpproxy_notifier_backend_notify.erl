@@ -18,7 +18,7 @@
 init([NotifyInfo]) ->
 	process_flag(trap_exit, true),
 	{ok, Timeout} = application:get_env(rtpproxy, ttl),
-	{ok, TRef} = timer:send_interval(Timeout, interim_update),
+	{ok, TRef} = timer:send_interval(Timeout*1000, interim_update),
 	{ok, IgnoreStart} = application:get_env(rtpproxy, ignore_start),
 	{Module, Fd} = case application:get_env(rtpproxy, notify_servers) of
 		{ok, tcp} ->
