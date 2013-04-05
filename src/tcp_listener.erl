@@ -60,7 +60,7 @@ init ([Parent, {I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
 	Opts = [{ip, IPv6}, binary, {packet, line}, {reuseaddr, true}, {keepalive, true}, {backlog, 30}, {active, false}, inet6],
 	{ok, Socket} = gen_tcp:listen(Port, Opts),
 	{ok, Ref} = prim_inet:async_accept(Socket, -1),
-	error_logger:info_msg("TCP listener: ~p - started at [~s:~w]~n", [self(), inet_parse:ntoa(IPv6), Port]),
+	lager:info("TCP listener: ~p - started at [~s:~w]~n", [self(), inet_parse:ntoa(IPv6), Port]),
 	{ok, #state{parent = Parent, listener = Socket, acceptor = Ref}};
 
 init ([Parent, {I0, I1, I2, I3} = IPv4, Port]) when
@@ -72,11 +72,11 @@ init ([Parent, {I0, I1, I2, I3} = IPv4, Port]) when
 	Opts = [{ip, IPv4}, binary, {packet, line}, {reuseaddr, true}, {keepalive, true}, {backlog, 30}, {active, false}],
 	{ok, Socket} = gen_tcp:listen(Port, Opts),
 	{ok, Ref} = prim_inet:async_accept(Socket, -1),
-	error_logger:info_msg("TCP listener: ~p - started at [~s:~w]~n", [self(), inet_parse:ntoa(IPv4), Port]),
+	lager:info("TCP listener: ~p - started at [~s:~w]~n", [self(), inet_parse:ntoa(IPv4), Port]),
 	{ok, #state{parent = Parent, listener = Socket, acceptor = Ref}}.
 
 handle_call(Call, _From, State) ->
-	error_logger:error_msg("TCP listener: ~p - strange call: ~p~n", [self(), Call]),
+	lager:error("TCP listener: ~p - strange call: ~p~n", [self(), Call]),
 	{stop, {error, {unknown_call, Call}}, State}.
 
 handle_cast({msg, Msg, Ip, Port}, State = #state{clients=Clients}) ->
@@ -88,7 +88,7 @@ handle_cast({msg, Msg, Ip, Port}, State = #state{clients=Clients}) ->
 	{noreply, State};
 
 handle_cast(Cast, State) ->
-	error_logger:error_msg("TCP listener: ~p - strange cast: ~p~n", [self(), Cast]),
+	lager:error("TCP listener: ~p - strange cast: ~p~n", [self(), Cast]),
 	{stop, {error, {unknown_cast, Cast}}, State}.
 
 handle_info({tcp, Client, Msg}, #state{parent = Parent} = State) ->
@@ -99,7 +99,7 @@ handle_info({tcp, Client, Msg}, #state{parent = Parent} = State) ->
 
 handle_info({tcp_closed, Client}, State = #state{clients=Clients}) ->
 	gen_tcp:close(Client),
-	error_logger:warning_msg("Client ~p closed connection~n", [Client]),
+	lager:warning("Client ~p closed connection~n", [Client]),
 	{noreply, State#state{clients = lists:delete(Client, Clients)}};
 
 handle_info({inet_async, ListSock, Ref, {ok, CliSocket}}, #state{listener=ListSock, acceptor=Ref, clients = Clients} = State) ->
@@ -118,11 +118,11 @@ handle_info({inet_async, ListSock, Ref, {ok, CliSocket}}, #state{listener=ListSo
 	{noreply, State#state{acceptor=NewRef, clients = Clients ++ [CliSocket]}};
 
 handle_info({inet_async, ListSock, Ref, Error}, #state{listener=ListSock, acceptor=Ref} = State) ->
-	error_logger:error_msg("Error in socket acceptor: ~p.~n", [Error]),
+	lager:error("Error in socket acceptor: ~p.~n", [Error]),
 	{stop, Error, State};
 
 handle_info(Info, State) ->
-	error_logger:error_msg("TCP listener: ~p - strange info: ~p~n", [self(), Info]),
+	lager:error("TCP listener: ~p - strange info: ~p~n", [self(), Info]),
 	{stop, {error, {unknown_info, Info}}, State}.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -132,7 +132,7 @@ terminate(Reason, #state{listener = Listener, clients = Clients}) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	gen_tcp:close(Listener),
 	lists:map(fun gen_tcp:close/1, Clients),
-	error_logger:info_msg("TCP listener: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
+	lager:info("TCP listener: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 %% Internal functions %%

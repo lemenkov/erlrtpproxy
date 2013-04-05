@@ -31,15 +31,15 @@ init([NotifyInfo]) ->
 			IgnoreStart orelse send(gen_udp, F, NotifyInfo),
 			{gen_udp, F}
 	end,
-	error_logger:info_msg("SER notify backend: ~p - started at ~p~n", [self(), node()]),
+	lager:info("SER notify backend: ~p - started at ~p~n", [self(), node()]),
 	{ok, #state{tref = TRef, notify = NotifyInfo, fd = {Module, Fd}}}.
 
 handle_call(Call, _From, State) ->
-	error_logger:error_msg("SER notify backend: ~p - strange call: ~p~n", [self(), Call]),
+	lager:error("SER notify backend: ~p - strange call: ~p~n", [self(), Call]),
 	{reply, {error, unknown_call}, State}.
 
 handle_cast(Cast, State) ->
-	error_logger:error_msg("SER notify backend: ~p - strange cast: ~p~n", [self(), Cast]),
+	lager:error("SER notify backend: ~p - strange cast: ~p~n", [self(), Cast]),
 	{stop, {error, {unknown_cast, Cast}}, State}.
 
 % Don't send "interim_update" via TCP notification - incompatible with OpenSER
@@ -50,7 +50,7 @@ handle_info(interim_update, #state{notify = NotifyInfo, fd = {gen_udp, Fd}} = St
 	{noreply, State};
 
 handle_info(Info, State) ->
-	error_logger:error_msg("SER notify backend: ~p - strange info: ~p~n", [self(), Info]),
+	lager:error("SER notify backend: ~p - strange info: ~p~n", [self(), Info]),
 	{stop, {error, {unknown_info, Info}}, State}.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -62,7 +62,7 @@ terminate(Reason, #state{tref = TRef, notify = NotifyInfo, fd = {Module, Fd}}) -
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	timer:cancel(TRef),
 	Module:close(Fd),
-	error_logger:info_msg("SER notify backend: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
+	lager:info("SER notify backend: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 %% Internal functions %%
@@ -70,7 +70,7 @@ terminate(Reason, #state{tref = TRef, notify = NotifyInfo, fd = {Module, Fd}}) -
 
 send(gen_tcp, Fd, [{addr,{Ip,Port}},{tag,NotifyTag}]) ->
 	gen_tcp:send(Fd, NotifyTag),
-	error_logger:info_msg("SER notify backend: ~p - ~w sent to tcp:~s:~b~n", [self(), NotifyTag, inet_parse:ntoa(Ip), Port]);
+	lager:debug("SER notify backend: ~p - ~w sent to tcp:~s:~b~n", [self(), NotifyTag, inet_parse:ntoa(Ip), Port]);
 send(gen_udp, Fd, [{addr,{Ip,Port}},{tag,NotifyTag}]) ->
 	gen_udp:send(Fd, Ip, Port, NotifyTag),
-	error_logger:info_msg("SER notify backend: ~p - ~w sent to udp:~s:~b~n", [self(), NotifyTag, inet_parse:ntoa(Ip), Port]).
+	lager:debug("SER notify backend: ~p - ~w sent to udp:~s:~b~n", [self(), NotifyTag, inet_parse:ntoa(Ip), Port]).

@@ -27,6 +27,8 @@ Requires:	erlang-eradius >= 0.8.5
 Requires:	erlang-erlsyslog
 Requires:	erlang-mochiweb
 Requires:	erlang-rtplib >= 0.6.4
+Requires:	erlang-lager
+Requires:	erlang-lager_syslog
 Requires(post): /sbin/chkconfig
 Requires(preun): /sbin/chkconfig
 Requires(preun): /sbin/service

@@ -46,7 +46,7 @@ init ([Parent, {I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
 	is_integer(I7), I7 >= 0, I7 < 65535 ->
 	process_flag(trap_exit, true),
 	{ok, Fd} = gen_udp:open(Port, [{ip, IPv6}, {active, true}, binary, inet6]),
-	error_logger:info_msg("UDP listener: ~p - started at [~s:~w]~n", [self(), inet_parse:ntoa(IPv6), Port]),
+	lager:info("UDP listener: ~p - started at [~s:~w]~n", [self(), inet_parse:ntoa(IPv6), Port]),
 	{ok, {Parent, Fd}};
 init ([Parent, {I0, I1, I2, I3} = IPv4, Port]) when
 	is_integer(I0), I0 >= 0, I0 < 256,
@@ -55,11 +55,11 @@ init ([Parent, {I0, I1, I2, I3} = IPv4, Port]) when
 	is_integer(I3), I3 >= 0, I3 < 256 ->
 	process_flag(trap_exit, true),
 	{ok, Fd} = gen_udp:open(Port, [{ip, IPv4}, {active, true}, binary]),
-	error_logger:info_msg("UDP listener: ~p - started at [~s:~w]~n", [self(), inet_parse:ntoa(IPv4), Port]),
+	lager:info("UDP listener: ~p - started at [~s:~w]~n", [self(), inet_parse:ntoa(IPv4), Port]),
 	{ok, {Parent, Fd}}.
 
 handle_call(Call, _From, State) ->
-	error_logger:error_msg("UDP listener: ~p - strange call: ~p~n", [self(), Call]),
+	lager:error("UDP listener: ~p - strange call: ~p~n", [self(), Call]),
 	{stop, {error, {unknown_call, Call}}, State}.
 
 handle_cast({msg, Msg, Ip, Port}, {Parent, Fd}) ->
@@ -67,7 +67,7 @@ handle_cast({msg, Msg, Ip, Port}, {Parent, Fd}) ->
 	{noreply, {Parent, Fd}};
 
 handle_cast(Cast, State) ->
-	error_logger:error_msg("UDP listener: ~p - strange cast: ~p~n", [self(), Cast]),
+	lager:error("UDP listener: ~p - strange cast: ~p~n", [self(), Cast]),
 	{stop, {error, {unknown_cast, Cast}}, State}.
 
 % Fd from which message arrived must be equal to Fd from our state
@@ -76,7 +76,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Parent, Fd}) ->
 	{noreply, {Parent, Fd}};
 
 handle_info(Info, State) ->
-	error_logger:error_msg("UDP listener: ~p - strange info: ~p~n", [self(), Info]),
+	lager:error("UDP listener: ~p - strange info: ~p~n", [self(), Info]),
 	{stop, {error, {unknown_info, Info}}, State}.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -85,4 +85,4 @@ code_change(_OldVsn, State, _Extra) ->
 terminate(Reason, {_, Fd}) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	gen_udp:close(Fd),
-	error_logger:info_msg("UDP listener: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
+	lager:info("UDP listener: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).

@@ -43,7 +43,7 @@ dispatch(Req) ->
 							Req:respond({200, [], "Done"})
 					end;
 				_ ->
-					error_logger:warning_msg("UNKNOWN: ~p~n", [Path]),
+					lager:warning("UNKNOWN: ~p~n", [Path]),
 					Req:respond({404, [], "404 Not found\r\n"})
 			end;
 		_ ->
@@ -116,7 +116,7 @@ set_params(RawQuery) ->
 		true ->
 			%% Save current config
 			{ok,[[ConfigPath]]} = init:get_argument(config),
-			error_logger:error_msg("SAVE: [~s]~n", [ConfigPath]),
+			lager:error("SAVE: [~s]~n", [ConfigPath]),
 			%% Run on all connected nodes
 			rpc:multicall(pool:get_nodes(), rtpproxy_ctl, save_config, [ConfigPath]),
 			ok;

@@ -64,7 +64,7 @@ init([Subcriber, [CodecInfo | _], FN, Playcount]) ->
 		_ -> FN ++ FileExt
 	end,
 	{ok, {Fd, Size}} = gen_server:call(storage, {get, Filename}),
-	error_logger:info_msg("player: ~p - started to play \"~s\", ~b times~n", [self(), Filename ++ FileExt, Playcount]),
+	lager:info("player: ~p - started to play \"~s\", ~b times~n", [self(), Filename ++ FileExt, Playcount]),
 	{ok, #state{
 			subscriber = Subcriber,
 			tref	= TRef,
@@ -79,11 +79,11 @@ init([Subcriber, [CodecInfo | _], FN, Playcount]) ->
 	}.
 
 handle_call(Call, _From,  State) ->
-	error_logger:error_msg("player: ~p - unmatched call [~p]", [self(), Call]),
+	lager:error("player: ~p - unmatched call [~p]", [self(), Call]),
 	{stop, {error, {unknown_call, Call}}, State}.
 
 handle_cast(Cast, State) ->
-	error_logger:error_msg("player: ~p - unmatched cast [~p]", [self(), Cast]),
+	lager:error("player: ~p - unmatched cast [~p]", [self(), Cast]),
 	{stop, {error, {unknown_cast, Cast}}, State}.
 
 handle_info(send, #state{subscriber = Subscriber, marker = Marker, sn = SequenceNumber, type = Type, ssize = FrameLength, ssrc = SSRC, data = {Fd, NFrames}, starttime = ST} = State) ->
@@ -104,7 +104,7 @@ handle_info(send, #state{subscriber = Subscriber, marker = Marker, sn = Sequence
 	{noreply, State#state{marker = 0, sn = SequenceNumber + 1}};
 
 handle_info(Info, State) ->
-	error_logger:error_msg("player: ~p - unmatched info [~p]", [self(), Info]),
+	lager:error("player: ~p - unmatched info [~p]", [self(), Info]),
 	{stop, {error, {unknown_info, Info}}, State}.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -113,4 +113,4 @@ code_change(_OldVsn, State, _Extra) ->
 terminate(Reason, #state{tref = TRef}) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	timer:cancel(TRef),
-	error_logger:info_msg("player: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
+	lager:info("player: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).

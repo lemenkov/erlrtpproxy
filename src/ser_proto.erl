@@ -100,7 +100,7 @@ encode(#response{cookie = Cookie, type = error, data = software}) ->
 encode(#response{cookie = Cookie, type = error, data = notfound}) ->
 	<<Cookie/binary, <<" E8\n">>/binary>>;
 encode(#response{} = Unknown) ->
-	error_logger:error_msg("Unknown response: ~p~n", [Unknown]),
+	lager:error("Unknown response: ~p~n", [Unknown]),
 	throw({error_syntax, "Unknown (or unsupported) #response"});
 
 encode(#cmd{cookie = Cookie, type = ?CMD_V}) ->
@@ -199,7 +199,7 @@ encode(#cmd{cookie = Cookie, type = ?CMD_I, params = [brief]}) ->
 	<<Cookie/binary, <<" IB\n">>/binary>>;
 
 encode(#cmd{} = Unknown) ->
-	error_logger:error_msg("Unknown command: ~p~n", [Unknown]),
+	lager:error("Unknown command: ~p~n", [Unknown]),
 	throw({error_syntax, "Unknown (or unsupported) #cmd"}).
 
 %%
@@ -444,7 +444,7 @@ parse_splitted(["SESSIONS", "created:" | Rest]) ->
 %%
 
 parse_splitted(Unknown) ->
-	error_logger:error_msg("Unknown command: ~p~n", [Unknown]),
+	lager:error("Unknown command: ~p~n", [Unknown]),
 	throw({error_syntax, "Unknown command"}).
 
 %%
@@ -526,7 +526,7 @@ decode_params([$C|Rest], Result) ->
 	case string:span(Rest, "0123456789,") of
 		0 ->
 			% Bogus - skip incomplete modifier
-			error_logger:error_msg("Found C parameter w/o necessary values - skipping~n"),
+			lager:error("Found C parameter w/o necessary values - skipping~n"),
 			decode_params(Rest, Result);
 		Ret ->
 			Rest1 = string:substr(Rest, Ret + 1),
@@ -559,7 +559,7 @@ decode_params([$L|Rest], Result) ->
 	case string:span(Rest, "0123456789.") of
 		0 ->
 			% Bogus - skip incomplete modifier
-			error_logger:error_msg("Found L parameter w/o necessary values - skipping~n"),
+			lager:error("Found L parameter w/o necessary values - skipping~n"),
 			decode_params(Rest, Result);
 		Ret ->
 			Rest1 = string:substr(Rest, Ret + 1),
@@ -571,7 +571,7 @@ decode_params([$R|Rest], Result) ->
 	case string:span(Rest, "0123456789.") of
 		0 ->
 			% Bogus - skip incomplete modifier
-			error_logger:error_msg("Found R parameter w/o necessary values - skipping~n"),
+			lager:error("Found R parameter w/o necessary values - skipping~n"),
 			decode_params(Rest, Result);
 		Ret ->
 			Rest1 = string:substr(Rest, Ret + 1),
@@ -591,7 +591,7 @@ decode_params([$Z|Rest], Result) ->
 	case cut_number(Rest) of
 		{error, _} ->
 			% Bogus - skip incomplete modifier
-			error_logger:error_msg("Found Z parameter w/o necessary values - skipping~n"),
+			lager:error("Found Z parameter w/o necessary values - skipping~n"),
 			decode_params(Rest, Result);
 		{Value, Rest1} ->
 			decode_params(Rest1, ensure_alone(Result, repacketize, Value))
@@ -611,7 +611,7 @@ decode_params([$T|Rest], Result) ->
 	case cut_number(Rest) of
 		{error, _} ->
 			% Bogus - skip incomplete modifier
-			error_logger:error_msg("Found T parameter w/o necessary values - skipping~n"),
+			lager:error("Found T parameter w/o necessary values - skipping~n"),
 			decode_params(Rest, Result);
 		{Value, Rest1} ->
 			decode_params(Rest1, ensure_alone(Result, transcode, rtp_utils:get_codec_from_payload(Value)))
@@ -628,7 +628,7 @@ decode_params([$D|Rest], Result) ->
 	case cut_number(Rest) of
 		{error, _} ->
 			% Bogus - skip incomplete modifier
-			error_logger:error_msg("Found D parameter w/o necessary values - skipping~n"),
+			lager:error("Found D parameter w/o necessary values - skipping~n"),
 			decode_params(Rest, Result);
 		{Value, Rest1} ->
 			decode_params(Rest1, ensure_alone(Result, dtmf, Value))
@@ -647,7 +647,7 @@ decode_params([$M|Rest], Result) ->
 
 % Unknown parameter - just skip it
 decode_params([Unknown|Rest], Result) ->
-	error_logger:error_msg("Unsupported parameter while encoding: [~p]~n", [Unknown]),
+	lager:error("Unsupported parameter while encoding: [~p]~n", [Unknown]),
 	decode_params(Rest, Result).
 
 encode_params(Params) ->
@@ -685,7 +685,7 @@ encode_params([{codecs, Codecs}|[]], Result) ->
 encode_params([{codecs, Codecs}|Rest], Result) ->
 	encode_params(Rest ++ [{codecs, Codecs}], Result);
 encode_params([Unknown|Rest], Result) ->
-	error_logger:error_msg("Unsupported parameter while encoding: [~p]~n", [Unknown]),
+	lager:error("Unsupported parameter while encoding: [~p]~n", [Unknown]),
 	encode_params(Rest, Result).
 
 print_codecs([session]) ->

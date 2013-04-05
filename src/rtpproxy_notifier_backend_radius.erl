@@ -33,15 +33,15 @@ init([C, _M]) ->
 		vend_attrs = [{?Cisco, [{?h323_connect_time, date_time_fmt()}]}]
 	},
 	eradius_acc:acc_start(Req),
-	error_logger:info_msg("RADIUS notify backend: ~p - started at ~p~n", [self(), node()]),
+	lager:info("RADIUS notify backend: ~p - started at ~p~n", [self(), node()]),
 	{ok, #state{tref = TRef, req = Req}}.
 
 handle_call(Call, _From, State) ->
-	error_logger:error_msg("RADIUS notify backend: ~p - strange call: ~p~n", [self(), Call]),
+	lager:error("RADIUS notify backend: ~p - strange call: ~p~n", [self(), Call]),
 	{stop, {error, {unknown_call, Call}}, State}.
 
 handle_cast(Cast, State) ->
-	error_logger:error_msg("RADIUS notify backend: ~p - strange cast: ~p~n", [self(), Cast]),
+	lager:error("RADIUS notify backend: ~p - strange cast: ~p~n", [self(), Cast]),
 	{stop, {error, {unknown_cast, Cast}}, State}.
 
 handle_info(interim_update, #state{req = Req} = State) ->
@@ -52,7 +52,7 @@ handle_info(interim_update, #state{req = Req} = State) ->
 	{noreply, State};
 
 handle_info(Info, State) ->
-	error_logger:error_msg("RADIUS notify backend: ~p - strange info: ~p~n", [self(), Info]),
+	lager:error("RADIUS notify backend: ~p - strange info: ~p~n", [self(), Info]),
 	{stop, {error, {unknown_info, Info}}, State}.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -66,7 +66,7 @@ terminate(Reason, #state{tref = TRef, req = Req0}) ->
 	eradius_acc:acc_stop(Req2),
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	timer:cancel(TRef),
-	error_logger:info_msg("RADIUS notify backend: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
+	lager:info("RADIUS notify backend: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 %% Internal functions %%

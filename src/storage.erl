@@ -38,7 +38,7 @@ start_link() ->
 init(_) ->
 	process_flag(trap_exit, true),
 	Ets = ets:new(mmap, [public, named_table]),
-        error_logger:info_msg("storage: ~p - started at ~p.~n", [self(), node()]),
+        lager:info("storage: ~p - started at ~p.~n", [self(), node()]),
 	{ok, Ets}.
 
 handle_call({get, Filename}, _From, Ets) ->
@@ -54,15 +54,15 @@ handle_call({get, Filename}, _From, Ets) ->
         {reply, {ok, FI}, Ets};
 
 handle_call(Call, _From, State) ->
-	error_logger:error_msg("storage: ~p - strange call: ~p~n", [self(), Call]),
+	lager:error("storage: ~p - strange call: ~p~n", [self(), Call]),
 	{stop, {error, {unknown_call, Call}}, State}.
 
 handle_cast(Cast, State) ->
-	error_logger:error_msg("storage: ~p - strange cast: ~p~n", [self(), Cast]),
+	lager:error("storage: ~p - strange cast: ~p~n", [self(), Cast]),
 	{stop, {error, {unknown_cast, Cast}}, State}.
 
 handle_info(Info, State) ->
-	error_logger:error_msg("storage: ~p - strange info: ~p~n", [self(), Info]),
+	lager:error("storage: ~p - strange info: ~p~n", [self(), Info]),
 	{stop, {error, {unknown_info, Info}}, State}.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -71,4 +71,4 @@ code_change(_OldVsn, State, _Extra) ->
 terminate(Reason, Ets) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	lists:foreach(fun([X]) -> file:close(X) end, ets:match(Ets, {'_', {'$1', '_'}})),
-	error_logger:info_msg("storage backend: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
+	lager:info("storage backend: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
