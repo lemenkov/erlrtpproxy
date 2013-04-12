@@ -141,7 +141,7 @@ rtpproxy_rtp_handling_local_to_local_test_() ->
 		]
 	}.
 
-rtpproxy_rtp_handling_local_to_global_test_() ->
+rtpproxy_rtp_handling_local_to_global_test_DISABLE() ->
 	%%
 	%% This is the socket which will be used for sending commands and receiving notifications messages
 	%%
