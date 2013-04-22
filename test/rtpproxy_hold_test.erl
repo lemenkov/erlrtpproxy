@@ -38,7 +38,7 @@
 -define(RTPPROXY_IP, {127,0,0,1}).
 -define(RTPPROXY_PORT, 33333).
 
-rtpproxy_rtp_old_hold_via_invite_test_() ->
+rtpproxy_rtp_old_hold_via_invite_test_DISABLE() ->
 	%%
 	%% This is the socket which will be used for sending commands and receiving notifications messages
 	%%

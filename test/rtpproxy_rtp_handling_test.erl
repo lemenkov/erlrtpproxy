@@ -241,7 +241,7 @@ rtpproxy_rtp_handling_active_true_test_() ->
 		]
 	}.
 
-rtpproxy_rtp_handling_rebuildrtp_true_test_() ->
+rtpproxy_rtp_handling_rebuildrtp_true_test_DISABLE() ->
 	%%
 	%% This is the socket which will be used for sending commands and receiving notifications messages
 	%%

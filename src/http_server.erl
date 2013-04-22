@@ -66,7 +66,7 @@ dump_query(RawQuery) ->
 			{RP, CID, MID, TID, LA, RA, SSRC, Payload, RxBytes, RxPackets, TxBytes, TxPackets, Sr, Rr} ||
 			{{media_channel_sup, _, _}, SP, _, _} <- supervisor:which_children(media_sup),
 			{{phy, CID, MID, TID}, RP, _, _} <- supervisor:which_children(SP),
-			{LA, {RI, _, _} = RA, SSRC, Payload, RxBytes, RxPackets, TxBytes, TxPackets, Sr, Rr} <- [gen_server:call(RP, get_stats)],
+			{LA, {RI, _, _} = RA, SSRC, Payload, RxBytes, RxPackets, TxBytes, TxPackets, _TxBytes2, _TxPackets2, Sr, Rr} <- [gen_server:call(RP, get_stats)],
 			filter(C, CID),
 			filter(M, MID),
 			filter(T, TID),
