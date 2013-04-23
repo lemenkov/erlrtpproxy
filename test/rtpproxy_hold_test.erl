@@ -140,7 +140,7 @@ rtpproxy_rtp_old_hold_via_invite_test_DISABLE() ->
 		]
 	}.
 
-rtpproxy_rtp_new_hold_test_() ->
+rtpproxy_rtp_new_hold_test_DISABLE() ->
 	%%
 	%% This is the socket which will be used for sending commands and receiving notifications messages
 	%%
