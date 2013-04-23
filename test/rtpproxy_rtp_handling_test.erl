@@ -241,7 +241,7 @@ rtpproxy_rtp_handling_active_true_test_() ->
 		]
 	}.
 
-rtpproxy_rtp_handling_rebuildrtp_true_test_DISABLE() ->
+rtpproxy_rtp_handling_rebuildrtp_true_test_() ->
 	%%
 	%% This is the socket which will be used for sending commands and receiving notifications messages
 	%%
@@ -280,7 +280,6 @@ rtpproxy_rtp_handling_rebuildrtp_true_test_DISABLE() ->
 				%%
 
 				test_utils:set_default_opts(),
-				application:set_env(rtpproxy, rebuildrtp, true),
 
 				%%
 				%% Start rtpproxy
@@ -448,9 +447,6 @@ rtpproxy_rtp_handling_rebuildrtp_false_true_switch_test_() ->
 
 						{ok, RtpHello11} = rtp:decode(Bin00),
 						{ok, RtpHello00} = rtp:decode(Bin11),
-
-						% Now lets set "rebuild RTP" to true and ensure it won't affect the existing call
-						application:set_env(rtpproxy, rebuildrtp, true),
 
 						RtpHello000 = #rtp{payload_type = 0, sequence_number = 3, timestamp = 200, ssrc = 123456, payload = <<"hello from Alice">>},
 						RtpHello111 = #rtp{payload_type = 0, sequence_number = 3, timestamp = 200, ssrc = 654321, payload = <<"hello from Bob">>},

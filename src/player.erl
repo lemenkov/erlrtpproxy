@@ -41,7 +41,6 @@
 		ssize,
 		sn = 0,
 		repeats,
-		rebuildrtp,
 		starttime
 	}
 ).

@@ -145,12 +145,11 @@ start_media(#cmd{callid = C, mediaid = M, from = #party{tag = T}, params = Param
 			{ok, I} = application:get_env(rtpproxy, internal), I
 	end,
 
-	{ok, RebuildRtp} = application:get_env(rtpproxy, rebuildrtp),
 	{ok, TimeoutEarly} = application:get_env(rtpproxy, ttl_early),
 	{ok, Timeout} = application:get_env(rtpproxy, ttl),
 	{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
 	{ok, ActiveStrategy} = application:get_env(rtpproxy, active),
-	Params1 = Params ++ [{port, 0}, {ip, Ip}, {rebuildrtp, RebuildRtp}, {timeout_early, TimeoutEarly*1000}, {timeout, Timeout*1000}, {sendrecv, SendRecvStrategy}, {active, ActiveStrategy}],
+	Params1 = Params ++ [{port, 0}, {ip, Ip}, {timeout_early, TimeoutEarly*1000}, {timeout, Timeout*1000}, {sendrecv, SendRecvStrategy}, {active, ActiveStrategy}],
 
 	% ..and start RTP socket module
 	Ret0 = supervisor:start_child(SupervisorPid,

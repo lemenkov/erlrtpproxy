@@ -101,7 +101,7 @@ dump_query(RawQuery) ->
 	mochijson2:encode([{http_query,  Query}, {num, length(List)}, {calllegs, Result}]).
 
 get_params() ->
-	Params = [ttl, ttl_early, rebuildrtp, ignore_start, ignore_stop, sendrecv, active],
+	Params = [ttl, ttl_early, ignore_start, ignore_stop, sendrecv, active],
 	Nodes = pool:get_nodes(),
 	JSON = lists:map(fun(Node) ->
 				[{node, Node}, {params, lists:map(fun(X) -> {ok, Y} = rpc:call(Node, application, get_env, [rtpproxy, X]), {X, Y} end, Params)}]
@@ -152,10 +152,6 @@ decode_kv({"ttl", T}) ->
 	{ttl, list_to_integer(T)};
 decode_kv({"ttl_early", T}) ->
 	{ttl_early, list_to_integer(T)};
-decode_kv({"rebuildrtp", "true"}) ->
-	{rebuildrtp, true};
-decode_kv({"rebuildrtp", "false"}) ->
-	{rebuildrtp, false};
 decode_kv({"ignore_start", "true"}) ->
 	{ignore_start, true};
 decode_kv({"ignore_start", "false"}) ->
