@@ -33,15 +33,15 @@ init([C, _M]) ->
 		vend_attrs = [{?Cisco, [{?h323_connect_time, date_time_fmt()}]}]
 	},
 	eradius_acc:acc_start(Req),
-	error_logger:info_msg("RADIUS notify backend: ~p - started at ~p~n", [self(), node()]),
+	error_logger:info_msg("RADIUS notify backend: started at ~p with CallID: ~s~n", [node(), C]),
 	{ok, #state{tref = TRef, req = Req}}.
 
 handle_call(Call, _From, State) ->
-	error_logger:error_msg("RADIUS notify backend: ~p - strange call: ~p~n", [self(), Call]),
+	error_logger:error_msg("RADIUS notify backend: strange call: ~p~n", [Call]),
 	{stop, {error, {unknown_call, Call}}, State}.
 
 handle_cast(Cast, State) ->
-	error_logger:error_msg("RADIUS notify backend: ~p - strange cast: ~p~n", [self(), Cast]),
+	error_logger:error_msg("RADIUS notify backend: strange cast: ~p~n", [Cast]),
 	{stop, {error, {unknown_cast, Cast}}, State}.
 
 handle_info(interim_update, #state{req = Req} = State) ->
@@ -49,10 +49,11 @@ handle_info(interim_update, #state{req = Req} = State) ->
 	LoginTime = to_now(Req#rad_accreq.login_time),
 	SessTime = to_seconds(CurrTime) - to_seconds(LoginTime),
 	eradius_acc:acc_update(Req#rad_accreq{session_time = SessTime}),
+	error_logger:info_msg("RADIUS notify backend: interim_update~n"),
 	{noreply, State};
 
 handle_info(Info, State) ->
-	error_logger:error_msg("RADIUS notify backend: ~p - strange info: ~p~n", [self(), Info]),
+	error_logger:error_msg("RADIUS notify backend: strange info: ~p~n", [Info]),
 	{stop, {error, {unknown_info, Info}}, State}.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -66,7 +67,7 @@ terminate(Reason, #state{tref = TRef, req = Req0}) ->
 	eradius_acc:acc_stop(Req2),
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	timer:cancel(TRef),
-	error_logger:info_msg("RADIUS notify backend: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
+	error_logger:info_msg("RADIUS notify backend: terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 %% Internal functions %%

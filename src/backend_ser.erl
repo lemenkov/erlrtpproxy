@@ -41,15 +41,15 @@ start_link() ->
 
 init (_) ->
 	process_flag(trap_exit, true),
-	error_logger:info_msg("SER backend: ~p - started at ~p~n", [self(), node()]),
+	error_logger:info_msg("SER backend: started at ~p~n", [node()]),
 	{ok, []}.
 
 handle_call(Call, _From, State) ->
-	error_logger:error_msg("SER backend: ~p - strange call: ~p~n", [self(), Call]),
+	error_logger:error_msg("SER backend: strange call: ~p~n", [Call]),
 	{stop, {error, {unknown_call, Call}}, State}.
 
 handle_cast({reply, Cmd = #cmd{origin = #origin{type = ser, ip = Ip, port = Port}}, {Addr1, Addr2}}, State) ->
-	error_logger:info_msg("SER reply ~p~n", [{Addr1, Addr2}]),
+	error_logger:info_msg("SER backend: reply ~p~n", [{Addr1, Addr2}]),
 	Data = ser_proto:encode(#response{cookie = Cmd#cmd.cookie, origin = Cmd#cmd.origin, type = reply, data = {Addr1, Addr2}}),
 	gen_server:cast(listener, {msg, Data, Ip, Port}),
 	{noreply, State};
@@ -61,19 +61,19 @@ handle_cast({msg, Msg, Ip, Port}, State) ->
 			% see available versions here:
 			% http://sippy.git.sourceforge.net/git/gitweb.cgi?p=sippy/rtpproxy;a=blob;f=rtpp_command.c#l58
 			% We provide only basic functionality, currently.
-			error_logger:info_msg("SER cmd V~n"),
+			error_logger:info_msg("SER backend: cmd V~n"),
 			Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = {version, <<"20040107">>}}),
 			gen_server:cast(listener, {msg, Data, Ip, Port});
 		#cmd{cookie = Cookie, origin = Origin, type = ?CMD_VF, params=Version} ->
 			% Request additional rtpproxy protocol extensions
-			error_logger:info_msg("SER cmd VF: ~s~n", [Version]),
+			error_logger:info_msg("SER backend: cmd VF: ~s~n", [Version]),
 			Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = supported}),
 			gen_server:cast(listener, {msg, Data, Ip, Port});
 		#cmd{origin = Origin, type = ?CMD_L} = Cmd ->
-			error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
+			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
 			rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, type = ?CMD_U});
 		#cmd{origin = Origin, type = ?CMD_U} = Cmd ->
-			error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
+			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
 			NotifyParams = proplists:get_value(notify, Cmd#cmd.params),
 			case NotifyParams of
 				undefined ->
@@ -91,50 +91,50 @@ handle_cast({msg, Msg, Ip, Port}, State) ->
 					end
 			end;
 		#cmd{cookie = Cookie, origin = Origin} = Cmd ->
-			error_logger:info_msg("SER cmd: ~p~n", [Cmd]),
+			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
 			Ret =  rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}}),
 			case Ret of
 				{ok, {stats, Number}} ->
-					error_logger:info_msg("SER reply stats (short)~n"),
+					error_logger:info_msg("SER backend: reply stats (short)~n"),
 					Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = Ret}),
 					gen_server:cast(listener, {msg, Data, Ip, Port});
 				{ok, {stats, NumberTotal, NumberActive}} ->
-					error_logger:info_msg("SER reply stats (full)~n"),
+					error_logger:info_msg("SER backend: reply stats (full)~n"),
 					Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = {ok, {stats, NumberTotal, NumberActive}}}),
 					gen_server:cast(listener, {msg, Data, Ip, Port});
 				ok ->
-					error_logger:info_msg("SER reply ok (~p)~n", [Cmd]),
+					error_logger:info_msg("SER backend: reply ok (~p)~n", [Cmd]),
 					Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = ok}),
 					gen_server:cast(listener, {msg, Data, Ip, Port});
 				{error, notfound} ->
-					error_logger:info_msg("SER reply {error, notfound) (~p)~n", [Cmd]),
+					error_logger:info_msg("SER backend: reply {error, notfound) (~p)~n", [Cmd]),
 					Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = error, data = notfound}),
 					gen_server:cast(listener, {msg, Data, Ip, Port});
 				_ ->
-					error_logger:info_msg("SER cmd RET: ~p~n", [Ret])
+					error_logger:info_msg("SER backend: cmd RET: ~p~n", [Ret])
 			end
 	catch
 		throw:{error_syntax, ErrorMsg} when is_list(ErrorMsg) ->
-			error_logger:error_msg("Bad syntax. [~s -> ~s]~n", [Msg, ErrorMsg]),
+			error_logger:error_msg("SER backend: error bad syntax. [~s -> ~s]~n", [Msg, ErrorMsg]),
 			Data = ser_proto:encode({error, syntax, Msg}),
 			gen_server:cast(listener, {msg, Data, Ip, Port});
 		throw:{error_syntax, {ErrorMsg, ErrorData}} when is_list(ErrorMsg) ->
-			error_logger:error_msg("Bad syntax. [~s -> ~s==~p]~n", [Msg, ErrorMsg, ErrorData]),
+			error_logger:error_msg("SER backend: error bad syntax. [~s -> ~s==~p]~n", [Msg, ErrorMsg, ErrorData]),
 			Data = ser_proto:encode({error, syntax, Msg}),
 			gen_server:cast(listener, {msg, Data, Ip, Port});
 		E:C ->
-			error_logger:error_msg("Exception. [~s -> ~p:~p]~n", [Msg, E, C]),
+			error_logger:error_msg("SER backend: error exception. [~s -> ~p:~p]~n", [Msg, E, C]),
 			Data = ser_proto:encode({error, syntax, Msg}),
 			gen_server:cast(listener, {msg, Data, Ip, Port})
 	end,
 	{noreply, State};
 
 handle_cast(Cast, State) ->
-	error_logger:error_msg("SER backend: ~p - strange cast: ~p~n", [self(), Cast]),
+	error_logger:error_msg("SER backend: strange cast: ~p~n", [Cast]),
 	{stop, {error, {unknown_cast, Cast}}, State}.
 
 handle_info(Info, State) ->
-	error_logger:error_msg("SER backend: ~p - strange info: ~p~n", [self(), Info]),
+	error_logger:error_msg("SER backend: strange info: ~p~n", [Info]),
 	{stop, {error, {unknown_info, Info}}, State}.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -142,4 +142,4 @@ code_change(_OldVsn, State, _Extra) ->
 
 terminate(Reason, _) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
-	error_logger:info_msg("SER backend: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
+	error_logger:info_msg("SER backend: terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).

@@ -34,11 +34,11 @@
 init([C, M, T]) ->
 	process_flag(trap_exit, true),
 	Filename = "/tmp/capture_cid_" ++ to_list(C) ++ "_mid_" ++ to_list(M) ++ "_tag_" ++ to_list(T),
-	error_logger:info_msg("file writer: ~p - started at ~p.~n", [self(), node()]),
+	error_logger:info_msg("file writer: started at ~p.~n", [node()]),
 	{ok, {filename, Filename}}.
 
 handle_call(Call, _From, State) ->
-	error_logger:error_msg("File Writer: ~p - strange call [~p]", [self(), Call]),
+	error_logger:error_msg("file writer: strange call [~p]", [Call]),
 	{stop, {error, {unknown_call, Call}}, State}.
 
 handle_cast({Pkt, _, _}, State) when is_binary(Pkt) ->
@@ -54,11 +54,11 @@ handle_cast({#rtp{payload = Payload}, _, _}, Fd) ->
 	{noreply, Fd};
 
 handle_cast(Cast, State) ->
-	error_logger:error_msg("file writer: ~p - strange cast: ~p.~n", [self(), Cast]),
+	error_logger:error_msg("file writer: strange cast: ~p.~n", [Cast]),
 	{stop, {error, {unknown_cast, Cast}}, State}.
 
 handle_info(Info, State) ->
-	error_logger:error_msg("file writer: ~p - strange info: ~p.~n", [self(), Info]),
+	error_logger:error_msg("file writer: strange info: ~p.~n", [Info]),
 	{stop, {error, {unknown_info, Info}}, State}.
 
 code_change(_OldVsn, State, _Extra) ->
@@ -66,11 +66,11 @@ code_change(_OldVsn, State, _Extra) ->
 
 terminate(Reason, {filename, _}) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
-	error_logger:info_msg("file writer: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]);
+	error_logger:info_msg("file writer: terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]);
 terminate(Reason, Fd) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	file:close(Fd),
-	error_logger:info_msg("file writer: ~p - terminated due to reason [~p] (allocated ~b bytes)", [self(), Reason, Bytes]).
+	error_logger:info_msg("file writer: terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 %% Internal functions %%
