@@ -54,6 +54,19 @@ cmd_v_test_() ->
 		}
 	].
 
+cmd_v_malformed_opensips_1_9_0_test_() ->
+	Cmd = #cmd{
+			type = ?CMD_V,
+			cookie = <<"24390_0">>,
+			origin = #origin{type = ser, pid = self()}
+		},
+	CmdBin = <<"24390_0 V", 0:8, 0:8, 0:8, 0:8, 0:8, 0:8>>,
+	[
+		{"decoding from binary",
+			fun() -> ?assertEqual(Cmd, ser_proto:decode(CmdBin)) end
+		}
+	].
+
 cmd_vf_test_() ->
 	Cmd = #cmd{
 			type = ?CMD_VF,
