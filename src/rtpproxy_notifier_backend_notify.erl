@@ -36,7 +36,7 @@ init([NotifyInfo]) ->
 
 handle_call(Call, _From, State) ->
 	error_logger:error_msg("SER notify backend: ~p - strange call: ~p~n", [self(), Call]),
-	{reply, {error, unknown_call}, State}.
+	{stop, {error, unknown_call}, State}.
 
 handle_cast(Cast, State) ->
 	error_logger:error_msg("SER notify backend: ~p - strange cast: ~p~n", [self(), Cast]),
