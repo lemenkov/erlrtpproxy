@@ -64,6 +64,7 @@ handle_call(Call, _From, State) ->
 
 handle_cast({msg, Msg, Ip, Port}, {Parent, Fd}) ->
 	gen_udp:send(Fd, Ip, Port, Msg),
+	error_logger:error_msg("UDP listener: reply ~p sent to ~s:~b~n", [Msg, inet_parse:ntoa(Ip), Port]),
 	{noreply, {Parent, Fd}};
 
 handle_cast(Cast, State) ->
@@ -73,6 +74,7 @@ handle_cast(Cast, State) ->
 % Fd from which message arrived must be equal to Fd from our state
 handle_info({udp, Fd, Ip, Port, Msg}, {Parent, Fd}) ->
 	gen_server:cast(Parent, {msg, Msg, Ip, Port}),
+	error_logger:error_msg("UDP listener: command ~p recv from ~s:~b~n", [Msg, inet_parse:ntoa(Ip), Port]),
 	{noreply, {Parent, Fd}};
 
 handle_info(Info, State) ->

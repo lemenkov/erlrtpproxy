@@ -85,6 +85,7 @@ handle_cast({msg, Msg, Ip, Port}, State = #state{clients=Clients}) ->
 		error -> ok;
 		Fd -> gen_tcp:send(Fd, Msg)
 	end,
+	error_logger:error_msg("TCP listener: reply ~p sent to ~s:~b~n", [Msg, inet_parse:ntoa(Ip), Port]),
 	{noreply, State};
 
 handle_cast(Cast, State) ->
@@ -95,6 +96,7 @@ handle_info({tcp, Client, Msg}, #state{parent = Parent} = State) ->
 	inet:setopts(Client, [{active, once}, {packet, line}, binary]),
 	{ok, {Ip, Port}} = inet:peername(Client),
 	gen_server:cast(Parent, {msg, Msg, Ip, Port}),
+	error_logger:error_msg("TCP listener: command ~p recv from ~s:~b~n", [Msg, inet_parse:ntoa(Ip), Port]),
 	{noreply, State};
 
 handle_info({tcp_closed, Client}, State = #state{clients=Clients}) ->
