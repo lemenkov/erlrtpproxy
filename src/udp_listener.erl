@@ -35,7 +35,7 @@ start(Args) ->
 start_link(Args) ->
 	gen_server:start_link({local, listener}, ?MODULE, Args, []).
 
-init ([Parent, {I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
+init ([Backend, {I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
 	is_integer(I0), I0 >= 0, I0 < 65535,
 	is_integer(I1), I1 >= 0, I1 < 65535,
 	is_integer(I2), I2 >= 0, I2 < 65535,
@@ -47,8 +47,8 @@ init ([Parent, {I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
 	process_flag(trap_exit, true),
 	{ok, Fd} = gen_udp:open(Port, [{ip, IPv6}, {active, true}, binary, inet6]),
 	error_logger:info_msg("UDP listener: started at [~s:~w]~n", [inet_parse:ntoa(IPv6), Port]),
-	{ok, {Parent, Fd}};
-init ([Parent, {I0, I1, I2, I3} = IPv4, Port]) when
+	{ok, {Backend, Fd}};
+init ([Backend, {I0, I1, I2, I3} = IPv4, Port]) when
 	is_integer(I0), I0 >= 0, I0 < 256,
 	is_integer(I1), I1 >= 0, I1 < 256,
 	is_integer(I2), I2 >= 0, I2 < 256,
@@ -56,26 +56,32 @@ init ([Parent, {I0, I1, I2, I3} = IPv4, Port]) when
 	process_flag(trap_exit, true),
 	{ok, Fd} = gen_udp:open(Port, [{ip, IPv4}, {active, true}, binary]),
 	error_logger:info_msg("UDP listener: started at [~s:~w]~n", [inet_parse:ntoa(IPv4), Port]),
-	{ok, {Parent, Fd}}.
+	{ok, {Backend, Fd}}.
 
 handle_call(Call, _From, State) ->
 	error_logger:error_msg("UDP listener: strange call: ~p~n", [Call]),
 	{stop, {error, {unknown_call, Call}}, State}.
 
-handle_cast({msg, Msg, Ip, Port}, {Parent, Fd}) ->
+handle_cast({reply, Cmd, Reply}, {Backend, Fd}) ->
+	{Msg, Ip, Port} = Backend:reply(Cmd, Reply),
 	gen_udp:send(Fd, Ip, Port, Msg),
 	error_logger:error_msg("UDP listener: reply ~p sent to ~s:~b~n", [Msg, inet_parse:ntoa(Ip), Port]),
-	{noreply, {Parent, Fd}};
+	{noreply, {Backend, Fd}};
 
 handle_cast(Cast, State) ->
 	error_logger:error_msg("UDP listener: strange cast: ~p~n", [Cast]),
 	{stop, {error, {unknown_cast, Cast}}, State}.
 
 % Fd from which message arrived must be equal to Fd from our state
-handle_info({udp, Fd, Ip, Port, Msg}, {Parent, Fd}) ->
-	gen_server:cast(Parent, {msg, Msg, Ip, Port}),
+handle_info({udp, Fd, Ip, Port, Msg}, {Backend, Fd}) ->
 	error_logger:error_msg("UDP listener: command ~p recv from ~s:~b~n", [Msg, inet_parse:ntoa(Ip), Port]),
-	{noreply, {Parent, Fd}};
+	case Backend:command(Msg, Ip, Port) of
+		{Data, Ip, Port} ->
+			gen_udp:send(Fd, Ip, Port, Data),
+			error_logger:error_msg("UDP listener: reply ~p sent to ~s:~b~n", [Data, inet_parse:ntoa(Ip), Port]);
+		_ -> ok
+	end,
+	{noreply, {Backend, Fd}};
 
 handle_info(Info, State) ->
 	error_logger:error_msg("UDP listener: strange info: ~p~n", [Info]),

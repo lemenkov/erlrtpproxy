@@ -36,7 +36,7 @@
 -export([code_change/3]).
 
 -record(state, {
-	parent,
+	backend,
 	listener,
 	acceptor,
 	clients = []
@@ -47,7 +47,7 @@ start(Args) ->
 start_link(Args) ->
 	gen_server:start_link({local, listener}, ?MODULE, Args, []).
 
-init ([Parent, {I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
+init ([Backend, {I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
 	is_integer(I0), I0 >= 0, I0 < 65535,
 	is_integer(I1), I1 >= 0, I1 < 65535,
 	is_integer(I2), I2 >= 0, I2 < 65535,
@@ -61,9 +61,9 @@ init ([Parent, {I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
 	{ok, Socket} = gen_tcp:listen(Port, Opts),
 	{ok, Ref} = prim_inet:async_accept(Socket, -1),
 	error_logger:info_msg("TCP listener: started at [~s:~w]~n", [inet_parse:ntoa(IPv6), Port]),
-	{ok, #state{parent = Parent, listener = Socket, acceptor = Ref}};
+	{ok, #state{backend = Backend, listener = Socket, acceptor = Ref}};
 
-init ([Parent, {I0, I1, I2, I3} = IPv4, Port]) when
+init ([Backend, {I0, I1, I2, I3} = IPv4, Port]) when
 	is_integer(I0), I0 >= 0, I0 < 256,
 	is_integer(I1), I1 >= 0, I1 < 256,
 	is_integer(I2), I2 >= 0, I2 < 256,
@@ -73,17 +73,18 @@ init ([Parent, {I0, I1, I2, I3} = IPv4, Port]) when
 	{ok, Socket} = gen_tcp:listen(Port, Opts),
 	{ok, Ref} = prim_inet:async_accept(Socket, -1),
 	error_logger:info_msg("TCP listener: started at [~s:~w]~n", [inet_parse:ntoa(IPv4), Port]),
-	{ok, #state{parent = Parent, listener = Socket, acceptor = Ref}}.
+	{ok, #state{backend = Backend, listener = Socket, acceptor = Ref}}.
 
 handle_call(Call, _From, State) ->
 	error_logger:error_msg("TCP listener: strange call: ~p~n", [Call]),
 	{stop, {error, {unknown_call, Call}}, State}.
 
-handle_cast({msg, Msg, Ip, Port}, State = #state{clients=Clients}) ->
+handle_cast({reply, Cmd, Reply}, State = #state{backend = Backend, clients=Clients}) ->
+	{Msg, Ip, Port} = Backend:reply(Cmd, Reply),
 	% Select proper client
 	case get_socket(Clients, Ip, Port) of
 		error -> ok;
-		Fd -> gen_tcp:send(Fd, Msg)
+		Client -> gen_tcp:send(Client, Msg)
 	end,
 	error_logger:error_msg("TCP listener: reply ~p sent to ~s:~b~n", [Msg, inet_parse:ntoa(Ip), Port]),
 	{noreply, State};
@@ -92,11 +93,16 @@ handle_cast(Cast, State) ->
 	error_logger:error_msg("TCP listener: strange cast: ~p~n", [Cast]),
 	{stop, {error, {unknown_cast, Cast}}, State}.
 
-handle_info({tcp, Client, Msg}, #state{parent = Parent} = State) ->
+handle_info({tcp, Client, Msg}, #state{backend = Backend} = State) ->
 	inet:setopts(Client, [{active, once}, {packet, line}, binary]),
 	{ok, {Ip, Port}} = inet:peername(Client),
-	gen_server:cast(Parent, {msg, Msg, Ip, Port}),
 	error_logger:error_msg("TCP listener: command ~p recv from ~s:~b~n", [Msg, inet_parse:ntoa(Ip), Port]),
+	case Backend:command(Msg, Ip, Port) of
+		{Data, _, _} ->
+			gen_tcp:send(Client, Data),
+			error_logger:error_msg("TCP listener: reply ~p sent to ~s:~b~n", [Msg, inet_parse:ntoa(Ip), Port]);
+		_ -> ok
+	end,
 	{noreply, State};
 
 handle_info({tcp_closed, Client}, State = #state{clients=Clients}) ->

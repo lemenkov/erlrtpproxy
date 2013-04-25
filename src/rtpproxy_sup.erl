@@ -35,16 +35,17 @@ init(rtpproxy_sup) ->
 	% Load generic erlrtpproxy controlling interface listener
 	{ok, {Proto, IpStr, Port}} = application:get_env(rtpproxy, listen),
 	{ok, Ip} = inet_parse:address(IpStr),
-	ListenerProcess = case Proto of
-		tcp ->
-			?CHILD(tcp_listener, [backend_ser, Ip, Port]);
-		udp ->
-			?CHILD(udp_listener, [backend_ser, Ip, Port])
-	end,
 
 	% Load protocol backend (only SER is supported)
 	BackendProcess = case application:get_env(rtpproxy, backend) of
-		{ok, ser} -> ?CHILD(backend_ser)
+		{ok, ser} -> backend_ser
+	end,
+
+	ListenerProcess = case Proto of
+		tcp ->
+			?CHILD(tcp_listener, [BackendProcess, Ip, Port]);
+		udp ->
+			?CHILD(udp_listener, [BackendProcess, Ip, Port])
 	end,
 
 	% Load storage for mmap-ed files
@@ -58,6 +59,6 @@ init(rtpproxy_sup) ->
 		_ -> []
 	end,
 
-	Children = [ListenerProcess, BackendProcess] ++ HttpProcess ++ [StorageProcess],
+	Children = [ListenerProcess] ++ HttpProcess ++ [StorageProcess],
 
 	{ok, {SupFlags, Children}}.
