@@ -65,7 +65,7 @@ handle_call(Call, _From, State) ->
 handle_cast({reply, Cmd, Reply}, {Backend, Fd}) ->
 	{Msg, Ip, Port} = Backend:reply(Cmd, Reply),
 	gen_udp:send(Fd, Ip, Port, Msg),
-	error_logger:error_msg("UDP listener: reply ~p sent to ~s:~b~n", [Msg, inet_parse:ntoa(Ip), Port]),
+	error_logger:error_msg("UDP listener: reply ~s sent to ~s:~b~n", [Msg, inet_parse:ntoa(Ip), Port]),
 	{noreply, {Backend, Fd}};
 
 handle_cast(Cast, State) ->
@@ -74,11 +74,11 @@ handle_cast(Cast, State) ->
 
 % Fd from which message arrived must be equal to Fd from our state
 handle_info({udp, Fd, Ip, Port, Msg}, {Backend, Fd}) ->
-	error_logger:error_msg("UDP listener: command ~p recv from ~s:~b~n", [Msg, inet_parse:ntoa(Ip), Port]),
+	error_logger:error_msg("UDP listener: command ~s recv from ~s:~b~n", [Msg, inet_parse:ntoa(Ip), Port]),
 	case Backend:command(Msg, Ip, Port) of
 		{Data, Ip, Port} ->
 			gen_udp:send(Fd, Ip, Port, Data),
-			error_logger:error_msg("UDP listener: reply ~p sent to ~s:~b~n", [Data, inet_parse:ntoa(Ip), Port]);
+			error_logger:error_msg("UDP listener: reply ~s sent to ~s:~b~n", [Data, inet_parse:ntoa(Ip), Port]);
 		_ -> ok
 	end,
 	{noreply, {Backend, Fd}};
