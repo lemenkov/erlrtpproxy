@@ -223,7 +223,10 @@ get_other_gen_rtp_channel(C, M, T) ->
 	[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M],
 	case [ P || {{phy, CID, MID, TID}, P, _, _} <- supervisor:which_children(SupervisorPid), CID == C, MID == M, TID /= T] of
 		[] -> null;
-		[RtpPid] -> RtpPid
+		[RtpPid] -> RtpPid;
+		% 18x/200 from a different direction
+		% FIXME we should stop this pair and restart it again
+		[RtpPid | _] -> RtpPid
 	end.
 
 get_pid({ok, Pid}) -> Pid;
