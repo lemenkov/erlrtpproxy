@@ -69,8 +69,8 @@ terminate(Reason, #state{tref = TRef, notify = NotifyInfo, fd = {Module, Fd}}) -
 %%%%%%%%%%%%%%%%%%%%%%%%
 
 send(gen_tcp, Fd, [{addr,{Ip,Port}},{tag,NotifyTag}]) ->
-	gen_tcp:send(Fd, NotifyTag),
+	prim_inet:send(Fd, NotifyTag),
 	error_logger:info_msg("SER notify backend: ~w sent to tcp:~s:~b~n", [NotifyTag, inet_parse:ntoa(Ip), Port]);
 send(gen_udp, Fd, [{addr,{Ip,Port}},{tag,NotifyTag}]) ->
-	gen_udp:send(Fd, Ip, Port, NotifyTag),
+	prim_inet:sendto(Fd, Ip, Port, NotifyTag),
 	error_logger:info_msg("SER notify backend: ~w sent to udp:~s:~b~n", [NotifyTag, inet_parse:ntoa(Ip), Port]).

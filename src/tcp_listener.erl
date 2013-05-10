@@ -84,7 +84,7 @@ handle_cast({reply, Cmd, Reply}, State = #state{backend = Backend, clients=Clien
 	% Select proper client
 	case get_socket(Clients, Ip, Port) of
 		error -> ok;
-		Client -> gen_tcp:send(Client, Msg)
+		Client -> prim_inet:send(Client, Msg)
 	end,
 	error_logger:error_msg("TCP listener: reply ~s sent to ~s:~b~n", [Msg, inet_parse:ntoa(Ip), Port]),
 	{noreply, State};
@@ -99,7 +99,7 @@ handle_info({tcp, Client, Msg}, #state{backend = Backend} = State) ->
 	error_logger:error_msg("TCP listener: command ~s recv from ~s:~b~n", [Msg, inet_parse:ntoa(Ip), Port]),
 	case Backend:command(Msg, Ip, Port) of
 		{Data, _, _} ->
-			gen_tcp:send(Client, Data),
+			prim_inet:send(Client, Data),
 			error_logger:error_msg("TCP listener: reply ~s sent to ~s:~b~n", [Msg, inet_parse:ntoa(Ip), Port]);
 		_ -> ok
 	end,
