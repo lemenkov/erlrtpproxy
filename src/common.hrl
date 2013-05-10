@@ -6,7 +6,8 @@
 		mediaid=0,
 		from=null,
 		to=null,
-		params=null
+		params=null,
+		timestamp = null
 	}).
 
 -record(response, {

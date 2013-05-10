@@ -24,12 +24,12 @@
 -module(backend_ser).
 -author('lemenkov@gmail.com').
 
--export([command/3]).
+-export([command/4]).
 -export([reply/2]).
 
 -include("common.hrl").
 
-command(Msg, Ip, Port) ->
+command(Msg, Ip, Port, Begin) ->
 	try ser_proto:decode(Msg) of
 		#cmd{cookie = Cookie, origin = Origin, type = ?CMD_V} ->
 			% Request basic supported rtpproxy protocol version
@@ -46,30 +46,30 @@ command(Msg, Ip, Port) ->
 			{Data, Ip, Port};
 		#cmd{origin = Origin, type = ?CMD_L} = Cmd ->
 			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
-			rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, type = ?CMD_U}),
+			rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, type = ?CMD_U, timestamp = Begin}),
 			ok;
 		#cmd{origin = Origin, type = ?CMD_U} = Cmd ->
 			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
 			NotifyParams = proplists:get_value(notify, Cmd#cmd.params),
 			case NotifyParams of
 				undefined ->
-					rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}});
+					rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, timestamp = Begin});
 				_ ->
 					case proplists:get_value(addr, NotifyParams) of
 						{_,_} ->
-							rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}});
+							rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, timestamp = Begin});
 						P when is_integer(P) ->
 							NotifyTag = proplists:get_value(tag, NotifyParams),
 							% Assume that the IP is the same as the origin of command
 							NewNotifyParams = [{notify, [{addr, {Ip, P}}, {tag, NotifyTag}]}],
 							NewParams = proplists:delete(notify, Cmd#cmd.params) ++ NewNotifyParams,
-							rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, params = NewParams})
+							rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, params = NewParams, timestamp = Begin})
 					end
 			end,
 			ok;
 		#cmd{cookie = Cookie, origin = Origin} = Cmd ->
 			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
-			Ret =  rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}}),
+			Ret =  rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, timestamp = Begin}),
 			case Ret of
 				{ok, {stats, Number}} ->
 					error_logger:info_msg("SER backend: reply stats (short)~n"),

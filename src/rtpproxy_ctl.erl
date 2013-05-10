@@ -44,7 +44,7 @@ start() ->
 
 stop() ->
 	%% Stop erlrtpproxy gracefully
-	rtpproxy_ctl:command(#cmd{type = ?CMD_X}),
+	rtpproxy_ctl:command(#cmd{type = ?CMD_X, timestamp = os:timestamp()}),
 	%% Stop all slave nodes
 	pool:stop(),
 	%% Stop main node
