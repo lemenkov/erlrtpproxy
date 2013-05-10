@@ -94,13 +94,14 @@ handle_cast(Cast, State) ->
 	{stop, {error, {unknown_cast, Cast}}, State}.
 
 handle_info({tcp, Client, Msg}, #state{backend = Backend} = State) ->
+	Begin = os:timestamp(),
 	inet:setopts(Client, [{active, once}, {packet, line}, binary]),
 	{ok, {Ip, Port}} = inet:peername(Client),
 	error_logger:error_msg("TCP listener: command ~s recv from ~s:~b~n", [Msg, inet_parse:ntoa(Ip), Port]),
 	case Backend:command(Msg, Ip, Port) of
 		{Data, _, _} ->
 			prim_inet:send(Client, Data),
-			error_logger:error_msg("TCP listener: reply ~s sent to ~s:~b~n", [Msg, inet_parse:ntoa(Ip), Port]);
+			error_logger:error_msg("TCP listener: reply ~s sent to ~s:~b (elapsed time: ~b msec)~n", [Data, inet_parse:ntoa(Ip), Port, (timer:now_diff(os:timestamp(), Begin)+500) div 1000]);
 		_ -> ok
 	end,
 	{noreply, State};

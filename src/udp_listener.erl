@@ -74,11 +74,12 @@ handle_cast(Cast, State) ->
 
 % Fd from which message arrived must be equal to Fd from our state
 handle_info({udp, Fd, Ip, Port, Msg}, {Backend, Fd}) ->
+	Begin = os:timestamp(),
 	error_logger:error_msg("UDP listener: command ~s recv from ~s:~b~n", [Msg, inet_parse:ntoa(Ip), Port]),
 	case Backend:command(Msg, Ip, Port) of
 		{Data, Ip, Port} ->
 			prim_inet:sendto(Fd, Ip, Port, Data),
-			error_logger:error_msg("UDP listener: reply ~s sent to ~s:~b~n", [Data, inet_parse:ntoa(Ip), Port]);
+			error_logger:error_msg("UDP listener: reply ~s sent to ~s:~b (elapsed time: ~b msec)~n", [Data, inet_parse:ntoa(Ip), Port, (timer:now_diff(os:timestamp(), Begin)+500) div 1000]);
 		_ -> ok
 	end,
 	{noreply, {Backend, Fd}};
