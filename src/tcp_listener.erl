@@ -100,7 +100,7 @@ handle_info({tcp, Client, Msg}, #state{backend = Backend} = State) ->
 	Begin = {MegaSecs, Secs, MicroSecs} = os:timestamp(),
 	inet:setopts(Client, [{active, once}, {packet, line}, binary]),
 	{ok, {Ip, Port}} = inet:peername(Client),
-	error_logger:error_msg("TCP listener: command ~s recv from ~s:~b~n", [Msg, inet_parse:ntoa(Ip), Port]),
+	error_logger:error_msg("TCP listener: command ~s recv from ~s:~b~n", [<< <<X>> || <<X>> <= Msg, X /= 0, X /= $\n>>, inet_parse:ntoa(Ip), Port]),
 	case Backend:command(Msg, Ip, Port, Begin) of
 		{Data, _, _} ->
 			prim_inet:send(Client, Data),

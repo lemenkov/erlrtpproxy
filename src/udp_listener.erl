@@ -78,7 +78,7 @@ handle_cast(Cast, State) ->
 % Fd from which message arrived must be equal to Fd from our state
 handle_info({udp, Fd, Ip, Port, Msg}, {Backend, Fd}) ->
 	Begin = {MegaSecs, Secs, MicroSecs} = os:timestamp(),
-	error_logger:error_msg("UDP listener: command ~s recv from ~s:~b at ~f~n", [Msg, inet_parse:ntoa(Ip), Port, MegaSecs*1000000+Secs+MicroSecs/1000000]),
+	error_logger:error_msg("UDP listener: command ~s recv from ~s:~b at ~f~n", [<< <<X>> || <<X>> <= Msg, X /= 0, X /= $\n>>, inet_parse:ntoa(Ip), Port, MegaSecs*1000000+Secs+MicroSecs/1000000]),
 	case Backend:command(Msg, Ip, Port, Begin) of
 		{Data, Ip, Port} ->
 			prim_inet:sendto(Fd, Ip, Port, Data),
