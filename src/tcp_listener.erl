@@ -88,7 +88,8 @@ handle_cast({reply, Cmd, Reply}, State = #state{backend = Backend, clients=Clien
 		error -> ok;
 		Client -> prim_inet:send(Client, Msg)
 	end,
-	error_logger:error_msg("TCP listener: reply ~s sent to ~s:~b (elapsed time: ~b microsec)~n", [Msg, inet_parse:ntoa(Ip), Port, timer:now_diff(os:timestamp(), Cmd#cmd.timestamp)]),
+	End = {MegaSecs, Secs, MicroSecs} = os:timestamp(),
+	error_logger:error_msg("TCP listener: reply ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [Msg, inet_parse:ntoa(Ip), Port, MegaSecs*1000000+Secs+MicroSecs/1000000, timer:now_diff(End, Cmd#cmd.timestamp)]),
 	{noreply, State};
 
 handle_cast(Cast, State) ->
@@ -96,14 +97,15 @@ handle_cast(Cast, State) ->
 	{stop, {error, {unknown_cast, Cast}}, State}.
 
 handle_info({tcp, Client, Msg}, #state{backend = Backend} = State) ->
-	Begin = os:timestamp(),
+	Begin = {MegaSecs, Secs, MicroSecs} = os:timestamp(),
 	inet:setopts(Client, [{active, once}, {packet, line}, binary]),
 	{ok, {Ip, Port}} = inet:peername(Client),
 	error_logger:error_msg("TCP listener: command ~s recv from ~s:~b~n", [Msg, inet_parse:ntoa(Ip), Port]),
 	case Backend:command(Msg, Ip, Port, Begin) of
 		{Data, _, _} ->
 			prim_inet:send(Client, Data),
-			error_logger:error_msg("TCP listener: reply ~s sent to ~s:~b (elapsed time: ~b microsec)~n", [Data, inet_parse:ntoa(Ip), Port, timer:now_diff(os:timestamp(), Begin)]);
+			End = {MegaSecs1, Secs1, MicroSecs1} = os:timestamp(),
+			error_logger:error_msg("TCP listener: reply ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [Data, inet_parse:ntoa(Ip), Port, MegaSecs1*1000000+Secs1+MicroSecs1/1000000, timer:now_diff(End, Begin)]);
 		_ -> ok
 	end,
 	{noreply, State};

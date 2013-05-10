@@ -67,7 +67,8 @@ handle_call(Call, _From, State) ->
 handle_cast({reply, Cmd, Reply}, {Backend, Fd}) ->
 	{Msg, Ip, Port} = Backend:reply(Cmd, Reply),
 	prim_inet:sendto(Fd, Ip, Port, Msg),
-	error_logger:error_msg("UDP listener: reply ~s sent to ~s:~b (elapsed time: ~b microsec)~n", [Msg, inet_parse:ntoa(Ip), Port, timer:now_diff(os:timestamp(), Cmd#cmd.timestamp)]),
+	End = {MegaSecs, Secs, MicroSecs} = os:timestamp(),
+	error_logger:error_msg("UDP listener: reply ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [Msg, inet_parse:ntoa(Ip), Port, MegaSecs*1000000+Secs+MicroSecs/1000000, timer:now_diff(End, Cmd#cmd.timestamp)]),
 	{noreply, {Backend, Fd}};
 
 handle_cast(Cast, State) ->
@@ -76,12 +77,13 @@ handle_cast(Cast, State) ->
 
 % Fd from which message arrived must be equal to Fd from our state
 handle_info({udp, Fd, Ip, Port, Msg}, {Backend, Fd}) ->
-	Begin = os:timestamp(),
-	error_logger:error_msg("UDP listener: command ~s recv from ~s:~b~n", [Msg, inet_parse:ntoa(Ip), Port]),
+	Begin = {MegaSecs, Secs, MicroSecs} = os:timestamp(),
+	error_logger:error_msg("UDP listener: command ~s recv from ~s:~b at ~f~n", [Msg, inet_parse:ntoa(Ip), Port, MegaSecs*1000000+Secs+MicroSecs/1000000]),
 	case Backend:command(Msg, Ip, Port, Begin) of
 		{Data, Ip, Port} ->
 			prim_inet:sendto(Fd, Ip, Port, Data),
-			error_logger:error_msg("UDP listener: reply ~s sent to ~s:~b (elapsed time: ~b microsec)~n", [Data, inet_parse:ntoa(Ip), Port, timer:now_diff(os:timestamp(), Begin)]);
+			End = {MegaSecs1, Secs1, MicroSecs1} = os:timestamp(),
+			error_logger:error_msg("UDP listener: reply ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [Data, inet_parse:ntoa(Ip), Port, MegaSecs1*1000000+Secs1+MicroSecs1/1000000, timer:now_diff(End, Begin)]);
 		_ -> ok
 	end,
 	{noreply, {Backend, Fd}};
