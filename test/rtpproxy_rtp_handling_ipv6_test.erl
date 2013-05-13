@@ -39,7 +39,7 @@
 -define(RTPPROXY_IP6, {0,0,0,0,0,0,0,1}).
 -define(RTPPROXY_PORT, 33333).
 
-rtpproxy_rtp_handling_v6_to_v6_test_DISABLE() ->
+rtpproxy_rtp_handling_v6_to_v6_test_() ->
 	%%
 	%% This is the socket which will be used for sending commands and receiving notifications messages
 	%%
@@ -141,7 +141,7 @@ rtpproxy_rtp_handling_v6_to_v6_test_DISABLE() ->
 		]
 	}.
 
-rtpproxy_rtp_handling_v6_to_v4_test_DISABLE() ->
+rtpproxy_rtp_handling_v6_to_v4_test_() ->
 	%%
 	%% This is the socket which will be used for sending commands and receiving notifications messages
 	%%
