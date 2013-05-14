@@ -47,7 +47,7 @@ init ([Backend, {I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
 	is_integer(I6), I6 >= 0, I6 < 65535,
 	is_integer(I7), I7 >= 0, I7 < 65535 ->
 	process_flag(trap_exit, true),
-	{ok, Fd} = gen_udp:open(Port, [{ip, IPv6}, {active, true}, binary, inet6]),
+	{ok, Fd} = gen_udp:open(Port, [{ip, IPv6}, {active, once}, binary, inet6]),
 	error_logger:info_msg("UDP listener: started at [~s:~w]~n", [inet_parse:ntoa(IPv6), Port]),
 	{ok, {Backend, Fd}};
 init ([Backend, {I0, I1, I2, I3} = IPv4, Port]) when
@@ -56,7 +56,7 @@ init ([Backend, {I0, I1, I2, I3} = IPv4, Port]) when
 	is_integer(I2), I2 >= 0, I2 < 256,
 	is_integer(I3), I3 >= 0, I3 < 256 ->
 	process_flag(trap_exit, true),
-	{ok, Fd} = gen_udp:open(Port, [{ip, IPv4}, {active, true}, binary]),
+	{ok, Fd} = gen_udp:open(Port, [{ip, IPv4}, {active, once}, binary]),
 	error_logger:info_msg("UDP listener: started at [~s:~w]~n", [inet_parse:ntoa(IPv4), Port]),
 	{ok, {Backend, Fd}}.
 
@@ -86,6 +86,7 @@ handle_info({udp, Fd, Ip, Port, Msg}, {Backend, Fd}) ->
 			error_logger:error_msg("UDP listener: reply ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [Data, inet_parse:ntoa(Ip), Port, MegaSecs1*1000000+Secs1+MicroSecs1/1000000, timer:now_diff(End, Begin)]);
 		_ -> ok
 	end,
+	inet:setopts(Fd, [{active, once}]),
 	{noreply, {Backend, Fd}};
 
 handle_info(Info, State) ->
