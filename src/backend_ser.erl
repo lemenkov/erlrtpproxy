@@ -36,20 +36,20 @@ command(Msg, Ip, Port, Begin) ->
 			% see available versions here:
 			% http://sippy.git.sourceforge.net/git/gitweb.cgi?p=sippy/rtpproxy;a=blob;f=rtpp_command.c#l58
 			% We provide only basic functionality, currently.
-			error_logger:info_msg("SER backend: cmd V~n"),
+%			error_logger:info_msg("SER backend: cmd V~n"),
 			Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = {version, <<"20040107">>}}),
 			{Data, Ip, Port};
 		#cmd{cookie = Cookie, origin = Origin, type = ?CMD_VF, params=Version} ->
 			% Request additional rtpproxy protocol extensions
-			error_logger:info_msg("SER backend: cmd VF: ~s~n", [Version]),
+%			error_logger:info_msg("SER backend: cmd VF: ~s~n", [Version]),
 			Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = supported}),
 			{Data, Ip, Port};
 		#cmd{origin = Origin, type = ?CMD_L} = Cmd ->
-			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
+%			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
 			rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, type = ?CMD_U, timestamp = Begin}),
 			ok;
 		#cmd{origin = Origin, type = ?CMD_U} = Cmd ->
-			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
+%			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
 			NotifyParams = proplists:get_value(notify, Cmd#cmd.params),
 			case NotifyParams of
 				undefined ->
@@ -68,27 +68,27 @@ command(Msg, Ip, Port, Begin) ->
 			end,
 			ok;
 		#cmd{cookie = Cookie, origin = Origin} = Cmd ->
-			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
+%			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
 			Ret =  rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, timestamp = Begin}),
 			case Ret of
 				{ok, {stats, Number}} ->
-					error_logger:info_msg("SER backend: reply stats (short)~n"),
+%					error_logger:info_msg("SER backend: reply stats (short)~n"),
 					Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = Ret}),
 					{Data, Ip, Port};
 				{ok, {stats, NumberTotal, NumberActive}} ->
-					error_logger:info_msg("SER backend: reply stats (full)~n"),
+%					error_logger:info_msg("SER backend: reply stats (full)~n"),
 					Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = {ok, {stats, NumberTotal, NumberActive}}}),
 					{Data, Ip, Port};
 				ok ->
-					error_logger:info_msg("SER backend: reply ok (~p)~n", [Cmd]),
+%					error_logger:info_msg("SER backend: reply ok (~p)~n", [Cmd]),
 					Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = ok}),
 					{Data, Ip, Port};
 				{error, notfound} ->
-					error_logger:info_msg("SER backend: reply {error, notfound) (~p)~n", [Cmd]),
+%					error_logger:info_msg("SER backend: reply {error, notfound) (~p)~n", [Cmd]),
 					Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = error, data = notfound}),
 					{Data, Ip, Port};
 				_ ->
-					error_logger:info_msg("SER backend: cmd RET: ~p~n", [Ret]),
+%					error_logger:info_msg("SER backend: cmd RET: ~p~n", [Ret]),
 					ok
 			end
 	catch
@@ -107,6 +107,6 @@ command(Msg, Ip, Port, Begin) ->
 	end.
 
 reply(Cmd = #cmd{origin = #origin{type = ser, ip = Ip, port = Port}}, {Addr1, Addr2}) ->
-	error_logger:info_msg("SER backend: reply ~p~n", [{Addr1, Addr2}]),
+%	error_logger:info_msg("SER backend: reply ~p~n", [{Addr1, Addr2}]),
 	Data = ser_proto:encode(#response{cookie = Cmd#cmd.cookie, origin = Cmd#cmd.origin, type = reply, data = {Addr1, Addr2}}),
 	{Data, Ip, Port}.
