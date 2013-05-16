@@ -31,7 +31,7 @@ init([NotifyInfo]) ->
 			IgnoreStart orelse send(gen_udp, F, NotifyInfo),
 			{gen_udp, F}
 	end,
-	error_logger:info_msg("SER notify backend: started at ~p~n", [node()]),
+	error_logger:warning_msg("SER notify backend: started at ~p~n", [node()]),
 	{ok, #state{tref = TRef, notify = NotifyInfo, fd = {Module, Fd}}}.
 
 handle_call(Call, _From, State) ->
@@ -62,7 +62,7 @@ terminate(Reason, #state{tref = TRef, notify = NotifyInfo, fd = {Module, Fd}}) -
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	timer:cancel(TRef),
 	Module:close(Fd),
-	error_logger:info_msg("SER notify backend: terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
+	error_logger:warning_msg("SER notify backend: terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 %% Internal functions %%

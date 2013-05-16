@@ -33,7 +33,7 @@ init([C, _M]) ->
 		vend_attrs = [{?Cisco, [{?h323_connect_time, date_time_fmt()}]}]
 	},
 	eradius_acc:acc_start(Req),
-	error_logger:info_msg("RADIUS notify backend: started at ~p with CallID: ~s~n", [node(), C]),
+	error_logger:warning_msg("RADIUS notify backend: started at ~p with CallID: ~s~n", [node(), C]),
 	{ok, #state{tref = TRef, req = Req}}.
 
 handle_call(Call, _From, State) ->
@@ -67,7 +67,7 @@ terminate(Reason, #state{tref = TRef, req = Req0}) ->
 	eradius_acc:acc_stop(Req2),
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	timer:cancel(TRef),
-	error_logger:info_msg("RADIUS notify backend: terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
+	error_logger:warning_msg("RADIUS notify backend: terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 %% Internal functions %%

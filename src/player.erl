@@ -63,7 +63,7 @@ init([Subcriber, [CodecInfo | _], FN, Playcount]) ->
 		_ -> FN ++ FileExt
 	end,
 	{ok, {Fd, Size}} = gen_server:call(storage, {get, Filename}),
-	error_logger:info_msg("player: started to play \"~s\", ~b times~n", [Filename ++ FileExt, Playcount]),
+	error_logger:warning_msg("player: started to play \"~s\", ~b times~n", [Filename ++ FileExt, Playcount]),
 	{ok, #state{
 			subscriber = Subcriber,
 			tref	= TRef,
@@ -112,4 +112,4 @@ code_change(_OldVsn, State, _Extra) ->
 terminate(Reason, #state{tref = TRef}) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	timer:cancel(TRef),
-	error_logger:info_msg("player: terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
+	error_logger:warning_msg("player: terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).

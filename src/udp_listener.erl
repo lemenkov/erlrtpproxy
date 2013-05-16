@@ -48,7 +48,7 @@ init ([Backend, {I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
 	is_integer(I7), I7 >= 0, I7 < 65535 ->
 	process_flag(trap_exit, true),
 	{ok, Fd} = gen_udp:open(Port, [{ip, IPv6}, {active, once}, binary, inet6]),
-	error_logger:info_msg("UDP listener: started at [~s:~w]~n", [inet_parse:ntoa(IPv6), Port]),
+	error_logger:warning_msg("UDP listener: started at [~s:~w]~n", [inet_parse:ntoa(IPv6), Port]),
 	{ok, {Backend, Fd}};
 init ([Backend, {I0, I1, I2, I3} = IPv4, Port]) when
 	is_integer(I0), I0 >= 0, I0 < 256,
@@ -57,7 +57,7 @@ init ([Backend, {I0, I1, I2, I3} = IPv4, Port]) when
 	is_integer(I3), I3 >= 0, I3 < 256 ->
 	process_flag(trap_exit, true),
 	{ok, Fd} = gen_udp:open(Port, [{ip, IPv4}, {active, once}, binary]),
-	error_logger:info_msg("UDP listener: started at [~s:~w]~n", [inet_parse:ntoa(IPv4), Port]),
+	error_logger:warning_msg("UDP listener: started at [~s:~w]~n", [inet_parse:ntoa(IPv4), Port]),
 	{ok, {Backend, Fd}}.
 
 handle_call(Call, _From, State) ->
@@ -68,7 +68,7 @@ handle_cast({reply, Cmd, Reply}, {Backend, Fd}) ->
 	{Msg, Ip, Port} = Backend:reply(Cmd, Reply),
 	prim_inet:sendto(Fd, Ip, Port, Msg),
 	End = {MegaSecs, Secs, MicroSecs} = os:timestamp(),
-	error_logger:error_msg("UDP listener: reply ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [Msg, inet_parse:ntoa(Ip), Port, MegaSecs*1000000+Secs+MicroSecs/1000000, timer:now_diff(End, Cmd#cmd.timestamp)]),
+	error_logger:info_msg("UDP listener: reply ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [Msg, inet_parse:ntoa(Ip), Port, MegaSecs*1000000+Secs+MicroSecs/1000000, timer:now_diff(End, Cmd#cmd.timestamp)]),
 	{noreply, {Backend, Fd}};
 
 handle_cast(Cast, State) ->
@@ -78,12 +78,12 @@ handle_cast(Cast, State) ->
 % Fd from which message arrived must be equal to Fd from our state
 handle_info({udp, Fd, Ip, Port, Msg}, {Backend, Fd}) ->
 	Begin = {MegaSecs, Secs, MicroSecs} = os:timestamp(),
-	error_logger:error_msg("UDP listener: command ~s recv from ~s:~b at ~f~n", [<< <<X>> || <<X>> <= Msg, X /= 0, X /= $\n>>, inet_parse:ntoa(Ip), Port, MegaSecs*1000000+Secs+MicroSecs/1000000]),
+	error_logger:info_msg("UDP listener: command ~s recv from ~s:~b at ~f~n", [<< <<X>> || <<X>> <= Msg, X /= 0, X /= $\n>>, inet_parse:ntoa(Ip), Port, MegaSecs*1000000+Secs+MicroSecs/1000000]),
 	case Backend:command(Msg, Ip, Port, Begin) of
 		{Data, Ip, Port} ->
 			prim_inet:sendto(Fd, Ip, Port, Data),
 			End = {MegaSecs1, Secs1, MicroSecs1} = os:timestamp(),
-			error_logger:error_msg("UDP listener: reply ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [Data, inet_parse:ntoa(Ip), Port, MegaSecs1*1000000+Secs1+MicroSecs1/1000000, timer:now_diff(End, Begin)]);
+			error_logger:info_msg("UDP listener: reply ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [Data, inet_parse:ntoa(Ip), Port, MegaSecs1*1000000+Secs1+MicroSecs1/1000000, timer:now_diff(End, Begin)]);
 		_ -> ok
 	end,
 	inet:setopts(Fd, [{active, once}]),
@@ -99,4 +99,4 @@ code_change(_OldVsn, State, _Extra) ->
 terminate(Reason, {_, Fd}) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	gen_udp:close(Fd),
-	error_logger:info_msg("UDP listener: terminated due to reason: ~p (allocated ~b bytes)", [Reason, Bytes]).
+	error_logger:warning_msg("UDP listener: terminated due to reason: ~p (allocated ~b bytes)", [Reason, Bytes]).

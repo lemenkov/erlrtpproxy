@@ -62,7 +62,7 @@ init ([Backend, {I0, I1, I2, I3, I4, I5, I6, I7} = IPv6, Port]) when
 	Opts = [{ip, IPv6}, binary, {packet, line}, {reuseaddr, true}, {keepalive, true}, {backlog, 30}, {active, false}, inet6],
 	{ok, Socket} = gen_tcp:listen(Port, Opts),
 	{ok, Ref} = prim_inet:async_accept(Socket, -1),
-	error_logger:info_msg("TCP listener: started at [~s:~w]~n", [inet_parse:ntoa(IPv6), Port]),
+	error_logger:warning_msg("TCP listener: started at [~s:~w]~n", [inet_parse:ntoa(IPv6), Port]),
 	{ok, #state{backend = Backend, listener = Socket, acceptor = Ref}};
 
 init ([Backend, {I0, I1, I2, I3} = IPv4, Port]) when
@@ -74,7 +74,7 @@ init ([Backend, {I0, I1, I2, I3} = IPv4, Port]) when
 	Opts = [{ip, IPv4}, binary, {packet, line}, {reuseaddr, true}, {keepalive, true}, {backlog, 30}, {active, false}],
 	{ok, Socket} = gen_tcp:listen(Port, Opts),
 	{ok, Ref} = prim_inet:async_accept(Socket, -1),
-	error_logger:info_msg("TCP listener: started at [~s:~w]~n", [inet_parse:ntoa(IPv4), Port]),
+	error_logger:warning_msg("TCP listener: started at [~s:~w]~n", [inet_parse:ntoa(IPv4), Port]),
 	{ok, #state{backend = Backend, listener = Socket, acceptor = Ref}}.
 
 handle_call(Call, _From, State) ->
@@ -89,7 +89,7 @@ handle_cast({reply, Cmd, Reply}, State = #state{backend = Backend, clients=Clien
 		Client -> prim_inet:send(Client, Msg)
 	end,
 	End = {MegaSecs, Secs, MicroSecs} = os:timestamp(),
-	error_logger:error_msg("TCP listener: reply ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [Msg, inet_parse:ntoa(Ip), Port, MegaSecs*1000000+Secs+MicroSecs/1000000, timer:now_diff(End, Cmd#cmd.timestamp)]),
+	error_logger:info_msg("TCP listener: reply ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [Msg, inet_parse:ntoa(Ip), Port, MegaSecs*1000000+Secs+MicroSecs/1000000, timer:now_diff(End, Cmd#cmd.timestamp)]),
 	{noreply, State};
 
 handle_cast(Cast, State) ->
@@ -100,12 +100,12 @@ handle_info({tcp, Client, Msg}, #state{backend = Backend} = State) ->
 	Begin = {MegaSecs, Secs, MicroSecs} = os:timestamp(),
 	inet:setopts(Client, [{active, once}, {packet, line}, binary]),
 	{ok, {Ip, Port}} = inet:peername(Client),
-	error_logger:error_msg("TCP listener: command ~s recv from ~s:~b~n", [<< <<X>> || <<X>> <= Msg, X /= 0, X /= $\n>>, inet_parse:ntoa(Ip), Port]),
+	error_logger:info_msg("TCP listener: command ~s recv from ~s:~b~n", [<< <<X>> || <<X>> <= Msg, X /= 0, X /= $\n>>, inet_parse:ntoa(Ip), Port]),
 	case Backend:command(Msg, Ip, Port, Begin) of
 		{Data, _, _} ->
 			prim_inet:send(Client, Data),
 			End = {MegaSecs1, Secs1, MicroSecs1} = os:timestamp(),
-			error_logger:error_msg("TCP listener: reply ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [Data, inet_parse:ntoa(Ip), Port, MegaSecs1*1000000+Secs1+MicroSecs1/1000000, timer:now_diff(End, Begin)]);
+			error_logger:info_msg("TCP listener: reply ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [Data, inet_parse:ntoa(Ip), Port, MegaSecs1*1000000+Secs1+MicroSecs1/1000000, timer:now_diff(End, Begin)]);
 		_ -> ok
 	end,
 	{noreply, State};
@@ -145,7 +145,7 @@ terminate(Reason, #state{listener = Listener, clients = Clients}) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	gen_tcp:close(Listener),
 	lists:map(fun gen_tcp:close/1, Clients),
-	error_logger:info_msg("TCP listener: terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
+	error_logger:warning_msg("TCP listener: terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 %% Internal functions %%

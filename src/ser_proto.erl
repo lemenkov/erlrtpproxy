@@ -526,7 +526,7 @@ decode_params([$C|Rest], Result) ->
 	case string:span(Rest, "0123456789,") of
 		0 ->
 			% Bogus - skip incomplete modifier
-			error_logger:error_msg("Found C parameter w/o necessary values - skipping~n"),
+			error_logger:warning_msg("Found C parameter w/o necessary values - skipping~n"),
 			decode_params(Rest, Result);
 		Ret ->
 			Rest1 = string:substr(Rest, Ret + 1),
@@ -559,7 +559,7 @@ decode_params([$L|Rest], Result) ->
 	case string:span(Rest, "0123456789.") of
 		0 ->
 			% Bogus - skip incomplete modifier
-			error_logger:error_msg("Found L parameter w/o necessary values - skipping~n"),
+			error_logger:warning_msg("Found L parameter w/o necessary values - skipping~n"),
 			decode_params(Rest, Result);
 		Ret ->
 			Rest1 = string:substr(Rest, Ret + 1),
@@ -571,7 +571,7 @@ decode_params([$R|Rest], Result) ->
 	case string:span(Rest, "0123456789.") of
 		0 ->
 			% Bogus - skip incomplete modifier
-			error_logger:error_msg("Found R parameter w/o necessary values - skipping~n"),
+			error_logger:warning_msg("Found R parameter w/o necessary values - skipping~n"),
 			decode_params(Rest, Result);
 		Ret ->
 			Rest1 = string:substr(Rest, Ret + 1),
@@ -591,7 +591,7 @@ decode_params([$Z|Rest], Result) ->
 	case cut_number(Rest) of
 		{error, _} ->
 			% Bogus - skip incomplete modifier
-			error_logger:error_msg("Found Z parameter w/o necessary values - skipping~n"),
+			error_logger:warning_msg("Found Z parameter w/o necessary values - skipping~n"),
 			decode_params(Rest, Result);
 		{Value, Rest1} ->
 			decode_params(Rest1, ensure_alone(Result, repacketize, Value))
@@ -611,7 +611,7 @@ decode_params([$T|Rest], Result) ->
 	case cut_number(Rest) of
 		{error, _} ->
 			% Bogus - skip incomplete modifier
-			error_logger:error_msg("Found T parameter w/o necessary values - skipping~n"),
+			error_logger:warning_msg("Found T parameter w/o necessary values - skipping~n"),
 			decode_params(Rest, Result);
 		{Value, Rest1} ->
 			decode_params(Rest1, ensure_alone(Result, transcode, rtp_utils:get_codec_from_payload(Value)))
@@ -628,7 +628,7 @@ decode_params([$D|Rest], Result) ->
 	case cut_number(Rest) of
 		{error, _} ->
 			% Bogus - skip incomplete modifier
-			error_logger:error_msg("Found D parameter w/o necessary values - skipping~n"),
+			error_logger:warning_msg("Found D parameter w/o necessary values - skipping~n"),
 			decode_params(Rest, Result);
 		{Value, Rest1} ->
 			decode_params(Rest1, ensure_alone(Result, dtmf, Value))
@@ -647,7 +647,7 @@ decode_params([$M|Rest], Result) ->
 
 % Unknown parameter - just skip it
 decode_params([Unknown|Rest], Result) ->
-	error_logger:error_msg("Unsupported parameter while encoding: [~p]~n", [Unknown]),
+	error_logger:warning_msg("Unsupported parameter while encoding: [~p]~n", [Unknown]),
 	decode_params(Rest, Result).
 
 encode_params(Params) ->
@@ -685,7 +685,7 @@ encode_params([{codecs, Codecs}|[]], Result) ->
 encode_params([{codecs, Codecs}|Rest], Result) ->
 	encode_params(Rest ++ [{codecs, Codecs}], Result);
 encode_params([Unknown|Rest], Result) ->
-	error_logger:error_msg("Unsupported parameter while encoding: [~p]~n", [Unknown]),
+	error_logger:warning_msg("Unsupported parameter while encoding: [~p]~n", [Unknown]),
 	encode_params(Rest, Result).
 
 print_codecs([session]) ->

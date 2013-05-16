@@ -34,7 +34,7 @@
 init([C, M, T]) ->
 	process_flag(trap_exit, true),
 	Filename = "/tmp/capture_cid_" ++ to_list(C) ++ "_mid_" ++ to_list(M) ++ "_tag_" ++ to_list(T),
-	error_logger:info_msg("file writer: started at ~p.~n", [node()]),
+	error_logger:warning_msg("file writer: started at ~p.~n", [node()]),
 	{ok, {filename, Filename}}.
 
 handle_call(Call, _From, State) ->
@@ -66,11 +66,11 @@ code_change(_OldVsn, State, _Extra) ->
 
 terminate(Reason, {filename, _}) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
-	error_logger:info_msg("file writer: terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]);
+	error_logger:warning_msg("file writer: terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]);
 terminate(Reason, Fd) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	file:close(Fd),
-	error_logger:info_msg("file writer: terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
+	error_logger:warning_msg("file writer: terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 %% Internal functions %%

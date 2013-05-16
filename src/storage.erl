@@ -38,7 +38,7 @@ start_link() ->
 init(_) ->
 	process_flag(trap_exit, true),
 	Ets = ets:new(mmap, [public, named_table]),
-        error_logger:info_msg("storage: started at ~p.~n", [node()]),
+        error_logger:warning_msg("storage: started at ~p.~n", [node()]),
 	{ok, Ets}.
 
 handle_call({get, Filename}, _From, Ets) ->
@@ -71,4 +71,4 @@ code_change(_OldVsn, State, _Extra) ->
 terminate(Reason, Ets) ->
 	{memory, Bytes} = erlang:process_info(self(), memory),
 	lists:foreach(fun([X]) -> file:close(X) end, ets:match(Ets, {'_', {'$1', '_'}})),
-	error_logger:info_msg("storage backend: terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
+	error_logger:warning_msg("storage backend: terminated due to reason [~p] (allocated ~b bytes)", [Reason, Bytes]).
