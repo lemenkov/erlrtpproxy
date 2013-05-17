@@ -33,7 +33,8 @@ start() ->
 	%% Start our pool
 	Nodes = [node()|pool:start(rtpproxy, " -config " ++ ConfigPath ++ " ")],
 
-	%% Replace logger with erlsyslog
+	%% Replace logger with erlsyslog and remove default tty handler
+	rpc:multicall(Nodes, error_logger, tty, [false]),
 	rpc:multicall(Nodes, error_logger, add_report_handler, [erlsyslog]),
 
 	%% Load necessary config files
