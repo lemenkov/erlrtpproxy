@@ -230,5 +230,5 @@ get_pid({ok, Pid}) -> Pid;
 get_pid({ok, Pid, _}) -> Pid;
 get_pid({error, {already_started, Pid}}) -> Pid.
 
-safe_call(null, Message) -> ok;
+safe_call(null, _Message) -> ok;
 safe_call(Pid, Message) -> gen_server:call(Pid, Message).
