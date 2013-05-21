@@ -50,22 +50,26 @@ command(Msg, Ip, Port, Begin) ->
 			ok;
 		#cmd{origin = Origin, type = ?CMD_U} = Cmd ->
 			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
-			NotifyParams = proplists:get_value(notify, Cmd#cmd.params),
-			case NotifyParams of
-				undefined ->
-					rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, timestamp = Begin});
-				_ ->
-					case proplists:get_value(addr, NotifyParams) of
-						{_,_} ->
+			spawn(
+				fun() ->
+					NotifyParams = proplists:get_value(notify, Cmd#cmd.params),
+					case NotifyParams of
+						undefined ->
 							rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, timestamp = Begin});
-						P when is_integer(P) ->
-							NotifyTag = proplists:get_value(tag, NotifyParams),
-							% Assume that the IP is the same as the origin of command
-							NewNotifyParams = [{notify, [{addr, {Ip, P}}, {tag, NotifyTag}]}],
-							NewParams = proplists:delete(notify, Cmd#cmd.params) ++ NewNotifyParams,
-							rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, params = NewParams, timestamp = Begin})
+						_ ->
+							case proplists:get_value(addr, NotifyParams) of
+								{_,_} ->
+									rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, timestamp = Begin});
+								P when is_integer(P) ->
+									NotifyTag = proplists:get_value(tag, NotifyParams),
+									% Assume that the IP is the same as the origin of command
+									NewNotifyParams = [{notify, [{addr, {Ip, P}}, {tag, NotifyTag}]}],
+									NewParams = proplists:delete(notify, Cmd#cmd.params) ++ NewNotifyParams,
+									rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, params = NewParams, timestamp = Begin})
+							end
 					end
-			end,
+				end
+			),
 			ok;
 		#cmd{cookie = Cookie, origin = Origin} = Cmd ->
 			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
