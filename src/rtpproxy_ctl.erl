@@ -90,10 +90,10 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 		}
 	),
 	SupervisorPid = case SupRet of
-		{ok, Pid} ->
-			Pid;
-		{error, {already_started, Pid}} ->
-			Pid
+		{ok, P} ->
+			P;
+		{error, {already_started, P}} ->
+			P
 	end,
 
 	% Check if we need to start recording
