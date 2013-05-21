@@ -131,13 +131,19 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 
 	% Check and load (if configured) notification backends
 	case application:get_env(rtpproxy, radacct_servers) of
-		{ok, _} -> start_notify_radius(C,M);
+		{ok, _} -> supervisor:start_child(
+				SupervisorPid,
+				{{notify_radius, C, M}, {gen_server, start_link, [rtpproxy_notifier_backend_radius, [C, M], []]}, temporary, 5000, worker, [rtpproxy_notifier_backend_radius]}
+			);
 		_ -> ok
 	end,
 	case application:get_env(rtpproxy, notify_servers) of
 		{ok, _} ->
 			NotifyInfo = proplists:get_value(notify, Params, []),
-			start_notify_openser(C,M,NotifyInfo);
+			supervisor:start_child(
+				SupervisorPid,
+				{{notify_openser, C, M}, {gen_server, start_link, [rtpproxy_notifier_backend_notify, [NotifyInfo], []]}, temporary, 5000, worker, [rtpproxy_notifier_backend_notify]}
+			);
 		_ -> ok
 	end,
 
@@ -202,21 +208,6 @@ start_recorder(C, M, T) ->
 	RtpPid = get_gen_rtp_channel(C, M, T),
 	safe_call(RtpPid, {rtp_subscriber, {set, RecorderPid}}),
 	ok.
-
-start_notify_radius(C, M) ->
-	[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M],
-	supervisor:start_child(SupervisorPid,
-			{{notify_radius, C, M}, {gen_server, start_link, [rtpproxy_notifier_backend_radius, [C, M], []]}, temporary, 5000, worker, [rtpproxy_notifier_backend_radius]}
-	),
-	ok.
-
-start_notify_openser(C, M, NotifyInfo) ->
-	[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M],
-	supervisor:start_child(SupervisorPid,
-			{{notify_openser, C, M}, {gen_server, start_link, [rtpproxy_notifier_backend_notify, [NotifyInfo], []]}, temporary, 5000, worker, [rtpproxy_notifier_backend_notify]}
-	),
-	ok.
-
 
 get_gen_rtp_channel(C, M, T) ->
 	[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M],
