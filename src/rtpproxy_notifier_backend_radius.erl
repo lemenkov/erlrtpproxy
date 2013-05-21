@@ -20,21 +20,8 @@
 
 init([C, _M]) ->
 	process_flag(trap_exit, true),
-	{ok, Timeout} = application:get_env(rtpproxy, ttl),
-	{ok, TRef} = timer:send_interval(Timeout*1000, interim_update),
-	eradius_dict:start(),
-	eradius_dict:load_tables(["dictionary", "dictionary_cisco", "dictionary_rfc2865", "dictionary_rfc2866"]),
-	eradius_acc:start(),
-	{ok, RadAcctServers} = application:get_env(rtpproxy, radacct_servers),
-	Req = #rad_accreq{
-		servers = RadAcctServers,
-		login_time = os:timestamp(),
-		std_attrs=[{?Acct_Session_Id, C}],
-		vend_attrs = [{?Cisco, [{?h323_connect_time, date_time_fmt()}]}]
-	},
-	eradius_acc:acc_start(Req),
-	error_logger:warning_msg("RADIUS notify backend: started at ~p with CallID: ~s~n", [node(), C]),
-	{ok, #state{tref = TRef, req = Req}}.
+	self() ! {init, C},
+	{ok, #state{}}.
 
 handle_call(Call, _From, State) ->
 	error_logger:error_msg("RADIUS notify backend: strange call: ~p~n", [Call]),
@@ -51,6 +38,23 @@ handle_info(interim_update, #state{req = Req} = State) ->
 	eradius_acc:acc_update(Req#rad_accreq{session_time = SessTime}),
 	error_logger:info_msg("RADIUS notify backend: interim_update~n"),
 	{noreply, State};
+
+handle_info({init, C}, _) ->
+	{ok, Timeout} = application:get_env(rtpproxy, ttl),
+	{ok, TRef} = timer:send_interval(Timeout*1000, interim_update),
+	eradius_dict:start(),
+	eradius_dict:load_tables(["dictionary", "dictionary_cisco", "dictionary_rfc2865", "dictionary_rfc2866"]),
+	eradius_acc:start(),
+	{ok, RadAcctServers} = application:get_env(rtpproxy, radacct_servers),
+	Req = #rad_accreq{
+		servers = RadAcctServers,
+		login_time = os:timestamp(),
+		std_attrs=[{?Acct_Session_Id, C}],
+		vend_attrs = [{?Cisco, [{?h323_connect_time, date_time_fmt()}]}]
+	},
+	eradius_acc:acc_start(Req),
+	error_logger:warning_msg("RADIUS notify backend: started at ~p with CallID: ~s~n", [node(), C]),
+	{noreply, #state{tref = TRef, req = Req}};
 
 handle_info(Info, State) ->
 	error_logger:error_msg("RADIUS notify backend: strange info: ~p~n", [Info]),

@@ -17,22 +17,8 @@
 
 init([NotifyInfo]) ->
 	process_flag(trap_exit, true),
-	{ok, Timeout} = application:get_env(rtpproxy, ttl),
-	{ok, TRef} = timer:send_interval(Timeout*1000, interim_update),
-	{ok, IgnoreStart} = application:get_env(rtpproxy, ignore_start),
-	{Module, Fd} = case application:get_env(rtpproxy, notify_servers) of
-		{ok, tcp} ->
-			[{addr,{Ip,Port}},{tag,_}] = NotifyInfo,
-			{ok, F} = gen_tcp:connect(Ip, Port, [binary, {active, true}]),
-			% Don't send "start" via TCP notification - incompatible with OpenSER
-			{gen_tcp, F};
-		{ok, udp} ->
-			{ok, F} = gen_udp:open(0, [binary, {active, true}]),
-			IgnoreStart orelse send(gen_udp, F, NotifyInfo),
-			{gen_udp, F}
-	end,
-	error_logger:warning_msg("SER notify backend: started at ~p~n", [node()]),
-	{ok, #state{tref = TRef, notify = NotifyInfo, fd = {Module, Fd}}}.
+	self() ! {init, NotifyInfo},
+	{ok, #state{}}.
 
 handle_call(Call, _From, State) ->
 	error_logger:error_msg("SER notify backend: strange call: ~p~n", [Call]),
@@ -48,6 +34,24 @@ handle_info(interim_update, #state{fd = {gen_tcp, _}} = State) ->
 handle_info(interim_update, #state{notify = NotifyInfo, fd = {gen_udp, Fd}} = State) ->
 	send(gen_udp, Fd, NotifyInfo),
 	{noreply, State};
+
+handle_info({init, NotifyInfo}, _) ->
+	{ok, Timeout} = application:get_env(rtpproxy, ttl),
+	{ok, TRef} = timer:send_interval(Timeout*1000, interim_update),
+	{ok, IgnoreStart} = application:get_env(rtpproxy, ignore_start),
+	{Module, Fd} = case application:get_env(rtpproxy, notify_servers) of
+		{ok, tcp} ->
+			[{addr,{Ip,Port}},{tag,_}] = NotifyInfo,
+			{ok, F} = gen_tcp:connect(Ip, Port, [binary, {active, true}]),
+			% Don't send "start" via TCP notification - incompatible with OpenSER
+			{gen_tcp, F};
+		{ok, udp} ->
+			{ok, F} = gen_udp:open(0, [binary, {active, true}]),
+			IgnoreStart orelse send(gen_udp, F, NotifyInfo),
+			{gen_udp, F}
+	end,
+	error_logger:warning_msg("SER notify backend: started at ~p~n", [node()]),
+	{noreply, #state{tref = TRef, notify = NotifyInfo, fd = {Module, Fd}}};
 
 handle_info(Info, State) ->
 	error_logger:error_msg("SER notify backend: strange info: ~p~n", [Info]),
