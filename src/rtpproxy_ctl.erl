@@ -138,9 +138,9 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 		_ -> ok
 	end,
 	case application:get_env(rtpproxy, notify_servers) of
-		{ok, _} ->
+		{ok, NotifyType} ->
 			NotifyInfo = proplists:get_value(notify, Params, []),
-			supervisor:start_child(
+			((NotifyInfo == []) and (NotifyType == tcp)) orelse supervisor:start_child(
 				SupervisorPid,
 				{{notify_openser, C, M}, {gen_server, start_link, [rtpproxy_notifier_backend_notify, [NotifyInfo], []]}, temporary, 5000, worker, [rtpproxy_notifier_backend_notify]}
 			);
