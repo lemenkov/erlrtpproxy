@@ -89,7 +89,12 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 			[rtpproxy_sup]
 		}
 	),
-	SupervisorPid = get_pid(SupRet),
+	SupervisorPid = case SupRet of
+		{ok, Pid} ->
+			Pid;
+		{error, {already_started, Pid}} ->
+			Pid
+	end,
 
 	% Check if we need to start recording
 	proplists:get_value(copy, Params, false) andalso start_recorder(C, M, T),
