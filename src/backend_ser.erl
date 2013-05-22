@@ -46,7 +46,11 @@ command(Msg, Ip, Port, Begin) ->
 			{Data, Ip, Port};
 		#cmd{origin = Origin, type = ?CMD_L} = Cmd ->
 			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
-			rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, type = ?CMD_U, timestamp = Begin}),
+			spawn(
+				fun() ->
+					rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, type = ?CMD_U, timestamp = Begin})
+				end
+			),
 			ok;
 		#cmd{origin = Origin, type = ?CMD_U} = Cmd ->
 			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
