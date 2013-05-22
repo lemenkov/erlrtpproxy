@@ -62,10 +62,16 @@ command(#cmd{type = ?CMD_X}) ->
 	ok;
 
 command(#cmd{type = ?CMD_D, callid = C}) ->
-	SIDs = [SID || {SID = {media_channel_sup, CID, _},_,_,_} <- supervisor:which_children(media_sup), CID == C],
-	case SIDs of [] -> {error, notfound};
-		_ -> lists:foreach(fun(X) -> supervisor:terminate_child(media_sup, X) end, SIDs), ok
-	end;
+	spawn(
+		fun() ->
+			SIDs = [SID || {SID = {media_channel_sup, CID, _},_,_,_} <- supervisor:which_children(media_sup), CID == C],
+			case SIDs of
+				[] -> {error, notfound};
+				_ -> lists:foreach(fun(X) -> supervisor:terminate_child(media_sup, X) end, SIDs), ok
+			end
+		end
+	),
+	ok;
 
 % DEPRECATED. Use HTTP-JSON.
 command(#cmd{type = ?CMD_I}) ->
