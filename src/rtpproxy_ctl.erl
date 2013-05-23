@@ -106,31 +106,49 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 	% Check if we need to start recording
 	proplists:get_value(copy, Params, false) andalso start_recorder(SupervisorPid, C, M, T),
 
-	% Determine options...
-	Ip = case {proplists:get_value(local, Params), proplists:get_value(remote, Params), proplists:get_value(ipv6, Params)} of
-		{_, _, true} ->
-			{ok, I} = application:get_env(rtpproxy, ipv6), I;
-		{undefined, _, _} ->
-			{ok, I} = application:get_env(rtpproxy, external), I;
-		{{_,_,_,_}, undefined, _} ->
-			{ok, I} = application:get_env(rtpproxy, internal), I
-	end,
+	% Start RTP handler
+	spawn(
+		fun() ->
+			% Determine options...
+			Ip = case {proplists:get_value(local, Params), proplists:get_value(remote, Params), proplists:get_value(ipv6, Params)} of
+				{_, _, true} ->
+					{ok, I} = application:get_env(rtpproxy, ipv6), I;
+				{undefined, _, _} ->
+					{ok, I} = application:get_env(rtpproxy, external), I;
+				{{_,_,_,_}, undefined, _} ->
+					{ok, I} = application:get_env(rtpproxy, internal), I
+			end,
 
-	{ok, TimeoutEarly} = application:get_env(rtpproxy, ttl_early),
-	{ok, Timeout} = application:get_env(rtpproxy, ttl),
-	{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
-	{ok, ActiveStrategy} = application:get_env(rtpproxy, active),
-	Params1 = Params ++ [{port, 0}, {ip, Ip}, {timeout_early, TimeoutEarly*1000}, {timeout, Timeout*1000}, {sendrecv, SendRecvStrategy}, {active, ActiveStrategy}],
+			{ok, TimeoutEarly} = application:get_env(rtpproxy, ttl_early),
+			{ok, Timeout} = application:get_env(rtpproxy, ttl),
+			{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
+			{ok, ActiveStrategy} = application:get_env(rtpproxy, active),
+			Params1 = Params ++ [{port, 0}, {ip, Ip}, {timeout_early, TimeoutEarly*1000}, {timeout, Timeout*1000}, {sendrecv, SendRecvStrategy}, {active, ActiveStrategy}],
 
-	% ..and start RTP socket module
-	Ret0 = supervisor:start_child(SupervisorPid,
-		{{phy, C, M, T}, {gen_server, start_link, [gen_rtp_channel, [Params1], []]}, permanent, 5000, worker, [gen_rtp_channel]}
+			% ..and start RTP socket module
+			Ret0 = supervisor:start_child(SupervisorPid,
+				{{phy, C, M, T}, {gen_server, start_link, [gen_rtp_channel, [Params1], []]}, permanent, 5000, worker, [gen_rtp_channel]}
+			),
+			RtpPid0 = get_pid(Ret0),
+			{_, {Ip, RtpPort, RtcpPort}, _} = gen_server:call(RtpPid0, get_phy),
+%			gen_server:cast(RtpPid, {update, Params ++ [{sendrecv, SendRecvStrategy}]}),
+%			gen_server:cast(RtpPid, {update, [{sendrecv, SendRecvStrategy}, {prefill, {Ip, Addr}}]}),
+			gen_server:cast(Pid, {reply, Cmd, {{Ip, RtpPort}, {Ip, RtcpPort}}}),
+
+			case SupRet of
+				{error, _} ->
+					% That's a 2nd side
+
+					% Set RTP path
+					RtpPid1 = get_other_gen_rtp_channel(SupervisorPid, C, M, T),
+					safe_call(RtpPid0, {rtp_subscriber, {set, RtpPid1}}),
+					safe_call(RtpPid1, {rtp_subscriber, {set, RtpPid0}}),
+					ok;
+				_ ->
+					ok
+			end
+		end
 	),
-	RtpPid0 = get_pid(Ret0),
-	{_, {Ip, RtpPort, RtcpPort}, _} = gen_server:call(RtpPid0, get_phy),
-%	gen_server:cast(RtpPid, {update, Params ++ [{sendrecv, SendRecvStrategy}]}),
-%	gen_server:cast(RtpPid, {update, [{sendrecv, SendRecvStrategy}, {prefill, {Ip, Addr}}]}),
-	gen_server:cast(Pid, {reply, Cmd, {{Ip, RtpPort}, {Ip, RtcpPort}}}),
 
 	% Check and load (if configured) notification backends
 	case application:get_env(rtpproxy, radacct_servers) of
@@ -148,19 +166,6 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 				{{notify_openser, C, M}, {gen_server, start_link, [rtpproxy_notifier_backend_notify, [NotifyInfo], []]}, temporary, 5000, worker, [rtpproxy_notifier_backend_notify]}
 			);
 		_ -> ok
-	end,
-
-	case SupRet of
-		{error, _} ->
-			% That's a 2nd side
-
-			% Set RTP path
-			RtpPid1 = get_other_gen_rtp_channel(SupervisorPid, C, M, T),
-			safe_call(RtpPid0, {rtp_subscriber, {set, RtpPid1}}),
-			safe_call(RtpPid1, {rtp_subscriber, {set, RtpPid0}}),
-			ok;
-		_ ->
-			ok
 	end,
 	{ok, sent};
 
