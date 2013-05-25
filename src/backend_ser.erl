@@ -37,13 +37,13 @@ command(Msg, Ip, Port, Begin) ->
 			% http://sippy.git.sourceforge.net/git/gitweb.cgi?p=sippy/rtpproxy;a=blob;f=rtpp_command.c#l58
 			% We provide only basic functionality, currently.
 			error_logger:info_msg("SER backend: cmd V~n"),
-			Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = {version, <<"20040107">>}}),
-			{Data, Ip, Port};
+%			Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = {version, <<"20040107">>}}),
+			{<<Cookie/binary, "20040107\n">>, Ip, Port};
 		#cmd{cookie = Cookie, origin = Origin, type = ?CMD_VF, params=Version} ->
 			% Request additional rtpproxy protocol extensions
 			error_logger:info_msg("SER backend: cmd VF: ~s~n", [Version]),
-			Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = supported}),
-			{Data, Ip, Port};
+%			Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = supported}),
+			{<<Cookie/binary, " 1\n">>, Ip, Port};
 		#cmd{origin = Origin, type = ?CMD_L} = Cmd ->
 			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
 			spawn(
