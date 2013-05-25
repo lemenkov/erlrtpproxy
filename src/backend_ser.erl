@@ -31,7 +31,7 @@
 
 command(Msg, Ip, Port, Begin) ->
 	try ser_proto:decode(Msg) of
-		#cmd{cookie = Cookie, origin = Origin, type = ?CMD_V} ->
+		#cmd{cookie = Cookie, type = ?CMD_V} ->
 			% Request basic supported rtpproxy protocol version
 			% see available versions here:
 			% http://sippy.git.sourceforge.net/git/gitweb.cgi?p=sippy/rtpproxy;a=blob;f=rtpp_command.c#l58
@@ -39,7 +39,7 @@ command(Msg, Ip, Port, Begin) ->
 			error_logger:info_msg("SER backend: cmd V~n"),
 %			Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = {version, <<"20040107">>}}),
 			{<<Cookie/binary, "20040107\n">>, Ip, Port};
-		#cmd{cookie = Cookie, origin = Origin, type = ?CMD_VF, params=Version} ->
+		#cmd{cookie = Cookie, type = ?CMD_VF, params=Version} ->
 			% Request additional rtpproxy protocol extensions
 			error_logger:info_msg("SER backend: cmd VF: ~s~n", [Version]),
 %			Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = supported}),
