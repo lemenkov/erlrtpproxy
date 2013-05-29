@@ -70,7 +70,7 @@ rtpproxy_rtp_handling_v6_to_v6_test_() ->
 				%% Set node name
 				%%
 
-				net_kernel:start(['erlrtpproxy_payload_test@localhost', longnames]),
+				net_kernel:start(['erlrtpproxy_rtp_handling_ipv6_test@localhost', longnames]),
 
 				%%
 				%% Set necessary options
@@ -172,7 +172,7 @@ rtpproxy_rtp_handling_v6_to_v4_test_() ->
 				%% Set node name
 				%%
 
-				net_kernel:start(['erlrtpproxy_payload_test@localhost', longnames]),
+				net_kernel:start(['erlrtpproxy_rtp_handling_ipv6_test@localhost', longnames]),
 
 				%%
 				%% Set necessary options

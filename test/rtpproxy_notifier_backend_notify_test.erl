@@ -58,7 +58,7 @@ rtpproxy_notifier_backend_notify_udp_test_DISABLE() ->
 				%% Set node name
 				%%
 
-				net_kernel:start(['rtpproxy_notifier_test@localhost', longnames]),
+				net_kernel:start(['rtpproxy_notifier_backend_notify_udp_test@localhost', longnames]),
 
 				%%
 				%% Set necessary options
@@ -128,7 +128,7 @@ rtpproxy_notifier_backend_notify_tcp_test_DISABLE() ->
 				%% Set node name
 				%%
 
-				net_kernel:start(['rtpproxy_notifier_test@localhost', longnames]),
+				net_kernel:start(['rtpproxy_notifier_backend_notify_tcp_test@localhost', longnames]),
 
 				%%
 				%% Set necessary options
@@ -207,7 +207,7 @@ rtpproxy_notifier_backend_notify_tcp_two_addresses_test_DISABLE() ->
 				%% Set node name
 				%%
 
-				net_kernel:start(['rtpproxy_notifier_test@localhost', longnames]),
+				net_kernel:start(['rtpproxy_notifier_backend_notify_tcp_two_addresses_test@localhost', longnames]),
 
 				%%
 				%% Set necessary options

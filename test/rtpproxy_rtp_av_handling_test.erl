@@ -82,7 +82,7 @@ rtpproxy_rtp_handling_test_() ->
 				%% Set node name
 				%%
 
-				net_kernel:start(['erlrtpproxy_payload_test@localhost', longnames]),
+				net_kernel:start(['erlrtpproxy_av_handling_test@localhost', longnames]),
 
 				%%
 				%% Set necessary options

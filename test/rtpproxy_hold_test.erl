@@ -71,7 +71,7 @@ rtpproxy_rtp_old_hold_via_invite_test_() ->
 				%% Set node name
 				%%
 
-				net_kernel:start(['erlrtpproxy_payload_test@localhost', longnames]),
+				net_kernel:start(['erlrtpproxy_rtp_old_hold_via_invite_test@localhost', longnames]),
 
 				%%
 				%% Set necessary options
@@ -173,7 +173,7 @@ rtpproxy_rtp_new_hold_test_DISABLE() ->
 				%% Set node name
 				%%
 
-				net_kernel:start(['erlrtpproxy_payload_test@localhost', longnames]),
+				net_kernel:start(['erlrtpproxy_rtp_new_hold_test@localhost', longnames]),
 
 				%%
 				%% Set necessary options

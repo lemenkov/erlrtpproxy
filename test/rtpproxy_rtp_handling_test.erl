@@ -69,7 +69,7 @@ rtpproxy_rtp_handling_active_once_test_() ->
 				%% Set node name
 				%%
 
-				net_kernel:start(['erlrtpproxy_payload_test@localhost', longnames]),
+				net_kernel:start(['erlrtpproxy_rtp_handling_active_once_test@localhost', longnames]),
 
 				%%
 				%% Set necessary options
@@ -170,7 +170,7 @@ rtpproxy_rtp_handling_active_true_test_() ->
 				%% Set node name
 				%%
 
-				net_kernel:start(['erlrtpproxy_payload_test@localhost', longnames]),
+				net_kernel:start(['erlrtpproxy_rtp_handling_active_tru_test@localhost', longnames]),
 
 				%%
 				%% Set necessary options
@@ -272,7 +272,7 @@ rtpproxy_rtp_handling_rebuildrtp_true_test_() ->
 				%% Set node name
 				%%
 
-				net_kernel:start(['erlrtpproxy_payload_test@localhost', longnames]),
+				net_kernel:start(['erlrtpproxy_rtp_handling_rebuildrtp_true_test@localhost', longnames]),
 
 				%%
 				%% Set necessary options
@@ -382,7 +382,7 @@ rtpproxy_rtp_handling_rebuildrtp_false_true_switch_test_() ->
 				%% Set node name
 				%%
 
-				net_kernel:start(['erlrtpproxy_payload_test@localhost', longnames]),
+				net_kernel:start(['erlrtpproxy_rtp_handling_rebuildrtp_false_true_switch_test@localhost', longnames]),
 
 				%%
 				%% Set necessary options
