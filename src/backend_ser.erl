@@ -46,34 +46,26 @@ command(Msg, Ip, Port, Begin) ->
 			{<<Cookie/binary, " 1\n">>, Ip, Port};
 		#cmd{origin = Origin, type = ?CMD_L} = Cmd ->
 			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
-			spawn(
-				fun() ->
-					rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, type = ?CMD_U, timestamp = Begin})
-				end
-			),
+			spawn(rtpproxy_ctl, command, [Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, type = ?CMD_U, timestamp = Begin}]),
 			ok;
 		#cmd{origin = Origin, type = ?CMD_U} = Cmd ->
 			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
-			spawn(
-				fun() ->
-					NotifyParams = proplists:get_value(notify, Cmd#cmd.params),
-					case NotifyParams of
-						undefined ->
-							rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, timestamp = Begin});
-						_ ->
-							case proplists:get_value(addr, NotifyParams) of
-								{_,_} ->
-									rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, timestamp = Begin});
-								P when is_integer(P) ->
-									NotifyTag = proplists:get_value(tag, NotifyParams),
-									% Assume that the IP is the same as the origin of command
-									NewNotifyParams = [{notify, [{addr, {Ip, P}}, {tag, NotifyTag}]}],
-									NewParams = proplists:delete(notify, Cmd#cmd.params) ++ NewNotifyParams,
-									rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, params = NewParams, timestamp = Begin})
-							end
+			NotifyParams = proplists:get_value(notify, Cmd#cmd.params),
+			case NotifyParams of
+				undefined ->
+					spawn(rtpproxy_ctl, command, [Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, timestamp = Begin}]);
+				_ ->
+					case proplists:get_value(addr, NotifyParams) of
+						{_,_} ->
+							spawn(rtpproxy_ctl, command, [Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, timestamp = Begin}]);
+						P when is_integer(P) ->
+							NotifyTag = proplists:get_value(tag, NotifyParams),
+							% Assume that the IP is the same as the origin of command
+							NewNotifyParams = [{notify, [{addr, {Ip, P}}, {tag, NotifyTag}]}],
+							NewParams = proplists:delete(notify, Cmd#cmd.params) ++ NewNotifyParams,
+							spawn(rtpproxy_ctl, command, [Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, params = NewParams, timestamp = Begin}])
 					end
-				end
-			),
+			end,
 			ok;
 		#cmd{cookie = Cookie, origin = Origin} = Cmd ->
 			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
