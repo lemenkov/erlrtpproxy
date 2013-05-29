@@ -24,12 +24,12 @@
 -module(backend_ser).
 -author('lemenkov@gmail.com').
 
--export([command/4]).
+-export([command/5]).
 -export([reply/2]).
 
 -include("common.hrl").
 
-command(Msg, Ip, Port, Begin) ->
+command(Msg, Fd, Ip, Port, Begin) ->
 	try ser_proto:decode(Msg) of
 		#cmd{cookie = Cookie, type = ?CMD_V} ->
 			% Request basic supported rtpproxy protocol version
@@ -46,30 +46,30 @@ command(Msg, Ip, Port, Begin) ->
 			{<<Cookie/binary, " 1\n">>, Ip, Port};
 		#cmd{origin = Origin, type = ?CMD_L} = Cmd ->
 			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
-			spawn(rtpproxy_ctl, command, [Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, type = ?CMD_U, timestamp = Begin}]),
+			spawn(rtpproxy_ctl, command, [Cmd#cmd{origin = Origin#origin{fd = Fd, ip=Ip, port=Port}, type = ?CMD_U, timestamp = Begin}]),
 			ok;
 		#cmd{origin = Origin, type = ?CMD_U} = Cmd ->
 			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
 			NotifyParams = proplists:get_value(notify, Cmd#cmd.params),
 			case NotifyParams of
 				undefined ->
-					spawn(rtpproxy_ctl, command, [Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, timestamp = Begin}]);
+					spawn(rtpproxy_ctl, command, [Cmd#cmd{origin = Origin#origin{fd = Fd, ip=Ip, port=Port}, timestamp = Begin}]);
 				_ ->
 					case proplists:get_value(addr, NotifyParams) of
 						{_,_} ->
-							spawn(rtpproxy_ctl, command, [Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, timestamp = Begin}]);
+							spawn(rtpproxy_ctl, command, [Cmd#cmd{origin = Origin#origin{fd = Fd, ip=Ip, port=Port}, timestamp = Begin}]);
 						P when is_integer(P) ->
 							NotifyTag = proplists:get_value(tag, NotifyParams),
 							% Assume that the IP is the same as the origin of command
 							NewNotifyParams = [{notify, [{addr, {Ip, P}}, {tag, NotifyTag}]}],
 							NewParams = proplists:delete(notify, Cmd#cmd.params) ++ NewNotifyParams,
-							spawn(rtpproxy_ctl, command, [Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, params = NewParams, timestamp = Begin}])
+							spawn(rtpproxy_ctl, command, [Cmd#cmd{origin = Origin#origin{fd = Fd, ip=Ip, port=Port}, params = NewParams, timestamp = Begin}])
 					end
 			end,
 			ok;
 		#cmd{cookie = Cookie, origin = Origin} = Cmd ->
 			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
-			Ret =  rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{ip=Ip, port=Port}, timestamp = Begin}),
+			Ret =  rtpproxy_ctl:command(Cmd#cmd{origin = Origin#origin{fd = Fd, ip=Ip, port=Port}, timestamp = Begin}),
 			case Ret of
 				{ok, {stats, Number}} ->
 					error_logger:info_msg("SER backend: reply stats (short)~n"),
@@ -106,7 +106,15 @@ command(Msg, Ip, Port, Begin) ->
 			{Data, Ip, Port}
 	end.
 
-reply(Cmd = #cmd{origin = #origin{type = ser, ip = Ip, port = Port}}, {Addr1, Addr2}) ->
-	error_logger:info_msg("SER backend: reply ~p~n", [{Addr1, Addr2}]),
-	Data = ser_proto:encode(#response{cookie = Cmd#cmd.cookie, origin = Cmd#cmd.origin, type = reply, data = {Addr1, Addr2}}),
-	{Data, Ip, Port}.
+reply(Cmd = #cmd{cookie = Cookie, callid = CallId, timestamp = TS, origin = #origin{type = ser, fd = {Type, Fd}, ip = Ip, port = Port}}, {{Ip0, Port0}, _}) ->
+	Begin = {MegaSecs, Secs, MicroSecs} = os:timestamp(),
+	error_logger:info_msg("SER backend: reply ~s recv at ~f (elapsed time: ~b microsec)~n", [CallId, MegaSecs*1000000+Secs+MicroSecs/1000000, timer:now_diff(Begin, TS)]),
+	I = list_to_binary(inet_parse:ntoa(Ip0)),
+	P = list_to_binary(integer_to_list(Port0)),
+	case Type of
+		udp -> prim_inet:sendto(Fd, Ip, Port, <<Cookie/binary, " ", P/binary, " ", I/binary, "\n">>);
+		tcp -> prim_inet:send(Fd, <<Cookie/binary, " ", P/binary, " ", I/binary, "\n">>)
+	end,
+	End = {MegaSecs1, Secs1, MicroSecs1} = os:timestamp(),
+	error_logger:info_msg("SER backend: reply ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [<<Cookie/binary, " ", P/binary, " ", I/binary, "\n">>, inet_parse:ntoa(Ip), Port, MegaSecs1*1000000+Secs1+MicroSecs1/1000000, timer:now_diff(End, TS)]),
+	ok.

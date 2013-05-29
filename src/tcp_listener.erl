@@ -81,17 +81,6 @@ handle_call(Call, _From, State) ->
 	error_logger:error_msg("TCP listener: strange call: ~p~n", [Call]),
 	{stop, {error, {unknown_call, Call}}, State}.
 
-handle_cast({reply, Cmd, Reply}, State = #state{backend = Backend, clients=Clients}) ->
-	{Msg, Ip, Port} = Backend:reply(Cmd, Reply),
-	% Select proper client
-	case get_socket(Clients, Ip, Port) of
-		error -> ok;
-		Client -> prim_inet:send(Client, Msg)
-	end,
-	End = {MegaSecs, Secs, MicroSecs} = os:timestamp(),
-	error_logger:info_msg("TCP listener: reply ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [Msg, inet_parse:ntoa(Ip), Port, MegaSecs*1000000+Secs+MicroSecs/1000000, timer:now_diff(End, Cmd#cmd.timestamp)]),
-	{noreply, State};
-
 handle_cast(Cast, State) ->
 	error_logger:error_msg("TCP listener: strange cast: ~p~n", [Cast]),
 	{stop, {error, {unknown_cast, Cast}}, State}.
@@ -99,15 +88,17 @@ handle_cast(Cast, State) ->
 handle_info({tcp, Client, Msg}, #state{backend = Backend} = State) ->
 	Begin = {MegaSecs, Secs, MicroSecs} = os:timestamp(),
 	inet:setopts(Client, [{active, once}, {packet, line}, binary]),
-	{ok, {Ip, Port}} = inet:peername(Client),
-	error_logger:info_msg("TCP listener: command ~s recv from ~s:~b~n", [<< <<X>> || <<X>> <= Msg, X /= 0, X /= $\n>>, inet_parse:ntoa(Ip), Port]),
-	case Backend:command(Msg, Ip, Port, Begin) of
-		{Data, _, _} ->
-			prim_inet:send(Client, Data),
-			End = {MegaSecs1, Secs1, MicroSecs1} = os:timestamp(),
-			error_logger:info_msg("TCP listener: reply ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [Data, inet_parse:ntoa(Ip), Port, MegaSecs1*1000000+Secs1+MicroSecs1/1000000, timer:now_diff(End, Begin)]);
-		_ -> ok
-	end,
+	spawn(fun() ->
+		{ok, {Ip, Port}} = inet:peername(Client),
+		error_logger:info_msg("TCP listener: command ~s recv from ~s:~b at ~f~n", [<< <<X>> || <<X>> <= Msg, X /= 0, X /= $\n>>, inet_parse:ntoa(Ip), Port, MegaSecs*1000000+Secs+MicroSecs/1000000]),
+		case Backend:command(Msg, {tcp, Client}, Ip, Port, Begin) of
+			{Data, _, _} ->
+				prim_inet:send(Client, Data),
+				End = {MegaSecs1, Secs1, MicroSecs1} = os:timestamp(),
+				error_logger:info_msg("TCP listener: reply ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [Data, inet_parse:ntoa(Ip), Port, MegaSecs1*1000000+Secs1+MicroSecs1/1000000, timer:now_diff(End, Begin)]);
+			_ -> ok
+		end
+	end),
 	{noreply, State};
 
 handle_info({tcp_closed, Client}, State = #state{clients=Clients}) ->
@@ -159,12 +150,4 @@ set_sockopt(ListSock, CliSocket) ->
 	of
 		ok -> ok;
 		Error -> gen_tcp:close(CliSocket), Error
-	end.
-
-get_socket([], _, _) ->
-	error;
-get_socket([S | Rest], Ip, Port) ->
-	case inet:peername(S) of
-		{ok, {Ip, Port}} -> S;
-		_ -> get_socket(Rest, Ip, Port)
 	end.

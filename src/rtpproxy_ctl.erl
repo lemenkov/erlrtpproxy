@@ -82,7 +82,7 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr
 	[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M],
 	RtpPid = get_gen_rtp_channel(SupervisorPid, C, M, T),
 	{_, {_, RtpPort, RtcpPort}, _} = gen_server:call(RtpPid, get_phy),
-	gen_server:cast(Pid, {reply, Cmd, {{{0,0,0,0}, RtpPort}, {{0,0,0,0}, RtcpPort}}}),
+	backend_ser:reply(Cmd, {{{0,0,0,0}, RtpPort}, {{0,0,0,0}, RtcpPort}}),
 	{ok, sent};
 
 command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, params = Params, origin = #origin{pid = Pid}} = Cmd) ->
@@ -133,7 +133,7 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 			{_, {Ip, RtpPort, RtcpPort}, _} = gen_server:call(RtpPid0, get_phy),
 %			gen_server:cast(RtpPid, {update, Params ++ [{sendrecv, SendRecvStrategy}]}),
 %			gen_server:cast(RtpPid, {update, [{sendrecv, SendRecvStrategy}, {prefill, {Ip, Addr}}]}),
-			gen_server:cast(Pid, {reply, Cmd, {{Ip, RtpPort}, {Ip, RtcpPort}}}),
+			backend_ser:reply(Cmd, {{Ip, RtpPort}, {Ip, RtcpPort}}),
 
 			case SupRet of
 				{error, _} ->

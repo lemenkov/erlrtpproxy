@@ -66,13 +66,13 @@ ser_udp_test_() ->
 								type = message_u,
 								callid = <<"0003e30c-callid01@192.168.0.100">>
 							} = Cmd) ->
-							gen_server:cast(Pid, {reply, Cmd, {{{192,168,0,1}, 12000}, {{192,168,0,1}, 12001}}});
+							backend_ser:reply(Cmd, {{{192,168,0,1}, 12000}, {{192,168,0,1}, 12001}});
 						(#cmd{
 								origin=#origin{pid = Pid},
 								type = message_u,
 								callid = <<"0003e30c-callid02@192.168.0.100">>
 							} = Cmd) ->
-							gen_server:cast(Pid, {reply, Cmd, {{{192,168,0,1}, 12000}, {{192,168,0,1}, 12001}}});
+							backend_ser:reply(Cmd, {{{192,168,0,1}, 12000}, {{192,168,0,1}, 12001}});
 						(#cmd{
 								origin=#origin{pid = Pid},
 								type = message_i,
@@ -272,13 +272,13 @@ ser_tcp_test_() ->
 								type = message_u,
 								callid = <<"0003e30c-callid01@192.168.0.100">>
 							} = Cmd) ->
-							gen_server:cast(Pid, {reply, Cmd, {{{192,168,0,1}, 12000}, {{192,168,0,1}, 12001}}});
+							backend_ser:reply(Cmd, {{{192,168,0,1}, 12000}, {{192,168,0,1}, 12001}});
 						(#cmd{
 								origin=#origin{pid = Pid},
 								type = message_u,
 								callid = <<"0003e30c-callid02@192.168.0.100">>
 							} = Cmd) ->
-							gen_server:cast(Pid, {reply, Cmd, {{{192,168,0,1}, 12000}, {{192,168,0,1}, 12001}}});
+							backend_ser:reply(Cmd, {{{192,168,0,1}, 12000}, {{192,168,0,1}, 12001}});
 						(#cmd{
 								origin=#origin{pid = Pid},
 								type = message_i,

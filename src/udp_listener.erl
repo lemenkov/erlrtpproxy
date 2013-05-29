@@ -64,13 +64,6 @@ handle_call(Call, _From, State) ->
 	error_logger:error_msg("UDP listener: strange call: ~p~n", [Call]),
 	{stop, {error, {unknown_call, Call}}, State}.
 
-handle_cast({reply, Cmd, Reply}, {Backend, Fd}) ->
-	{Msg, Ip, Port} = Backend:reply(Cmd, Reply),
-	prim_inet:sendto(Fd, Ip, Port, Msg),
-	End = {MegaSecs, Secs, MicroSecs} = os:timestamp(),
-	error_logger:info_msg("UDP listener: reply ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [Msg, inet_parse:ntoa(Ip), Port, MegaSecs*1000000+Secs+MicroSecs/1000000, timer:now_diff(End, Cmd#cmd.timestamp)]),
-	{noreply, {Backend, Fd}};
-
 handle_cast(Cast, State) ->
 	error_logger:error_msg("UDP listener: strange cast: ~p~n", [Cast]),
 	{stop, {error, {unknown_cast, Cast}}, State}.
@@ -78,14 +71,16 @@ handle_cast(Cast, State) ->
 % Fd from which message arrived must be equal to Fd from our state
 handle_info({udp, Fd, Ip, Port, Msg}, {Backend, Fd}) ->
 	Begin = {MegaSecs, Secs, MicroSecs} = os:timestamp(),
-	error_logger:info_msg("UDP listener: command ~s recv from ~s:~b at ~f~n", [<< <<X>> || <<X>> <= Msg, X /= 0, X /= $\n>>, inet_parse:ntoa(Ip), Port, MegaSecs*1000000+Secs+MicroSecs/1000000]),
-	case Backend:command(Msg, Ip, Port, Begin) of
-		{Data, Ip, Port} ->
-			prim_inet:sendto(Fd, Ip, Port, Data),
-			End = {MegaSecs1, Secs1, MicroSecs1} = os:timestamp(),
-			error_logger:info_msg("UDP listener: reply ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [Data, inet_parse:ntoa(Ip), Port, MegaSecs1*1000000+Secs1+MicroSecs1/1000000, timer:now_diff(End, Begin)]);
-		_ -> ok
-	end,
+	spawn(fun() ->
+		error_logger:info_msg("UDP listener: command ~s recv from ~s:~b at ~f~n", [<< <<X>> || <<X>> <= Msg, X /= 0, X /= $\n>>, inet_parse:ntoa(Ip), Port, MegaSecs*1000000+Secs+MicroSecs/1000000]),
+		case Backend:command(Msg, {udp, Fd}, Ip, Port, Begin) of
+			{Data, Ip, Port} ->
+				prim_inet:sendto(Fd, Ip, Port, Data),
+				End = {MegaSecs1, Secs1, MicroSecs1} = os:timestamp(),
+				error_logger:info_msg("UDP listener: reply ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [Data, inet_parse:ntoa(Ip), Port, MegaSecs1*1000000+Secs1+MicroSecs1/1000000, timer:now_diff(End, Begin)]);
+			_ -> ok
+		end
+	end),
 	{noreply, {Backend, Fd}};
 
 handle_info(Info, State) ->
