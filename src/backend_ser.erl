@@ -38,7 +38,7 @@ command(Msg, Ip, Port, Begin) ->
 			% We provide only basic functionality, currently.
 			error_logger:info_msg("SER backend: cmd V~n"),
 %			Data = ser_proto:encode(#response{cookie = Cookie, origin = Origin, type = reply, data = {version, <<"20040107">>}}),
-			{<<Cookie/binary, "20040107\n">>, Ip, Port};
+			{<<Cookie/binary, " 20040107\n">>, Ip, Port};
 		#cmd{cookie = Cookie, type = ?CMD_VF, params=Version} ->
 			% Request additional rtpproxy protocol extensions
 			error_logger:info_msg("SER backend: cmd VF: ~s~n", [Version]),
