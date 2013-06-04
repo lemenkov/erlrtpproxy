@@ -56,23 +56,23 @@ decode(Msg) when is_binary(Msg) ->
 
 encode({error, syntax, Msg}) when is_binary(Msg) ->
 	[Cookie|_] = binary_split(Msg, $ ),
-	<<Cookie/binary, <<" E1\n">>/binary>>;
+	<<Cookie/binary, " E1\n">>;
 encode({error, software, Msg}) when is_binary(Msg) ->
 	[Cookie|_] = binary_split(Msg, $ ),
-	<<Cookie/binary, <<" E7\n">>/binary>>;
+	<<Cookie/binary, " E7\n">>;
 encode(#response{cookie = Cookie, type = reply, data = ok}) ->
-	<<Cookie/binary, <<" 0\n">>/binary>>;
+	<<Cookie/binary, " 0\n">>;
 encode(#response{cookie = Cookie, type = reply, data = {ok, {stats, Number}}}) when is_integer(Number) ->
 	N = list_to_binary(integer_to_list(Number)),
-	<<Cookie/binary, <<" active sessions: ">>/binary, N/binary, <<"\n">>/binary>>;
+	<<Cookie/binary, " active sessions: ", N/binary, "\n">>;
 encode(#response{cookie = Cookie, type = reply, data = {ok, {stats, NumberTotal, NumberActive}}}) when is_integer(NumberTotal), is_integer(NumberActive) ->
 	Nt = list_to_binary(integer_to_list(NumberTotal)),
 	Na = list_to_binary(integer_to_list(NumberActive)),
-	<<Cookie/binary, <<" sessions created: ">>/binary, Nt/binary, <<" active sessions: ">>/binary, Na/binary, <<"\n">>/binary>>;
+	<<Cookie/binary, " sessions created: ", Nt/binary, " active sessions: ", Na/binary, "\n">>;
 encode(#response{cookie = Cookie, type = reply, data = supported}) ->
-	<<Cookie/binary, <<" 1\n">>/binary>>;
+	<<Cookie/binary, " 1\n">>;
 encode(#response{cookie = Cookie, type = reply, data = {version, Version}}) when is_binary(Version) ->
-	<<Cookie/binary, <<" ">>/binary, Version/binary, <<"\n">>/binary>>;
+	<<Cookie/binary, " ", Version/binary, "\n">>;
 encode(#response{cookie = Cookie, type = reply, data = {{{I0,I1,I2,I3} = IPv4, Port}, _}}) when
 	is_integer(I0), I0 >= 0, I0 < 256,
 	is_integer(I1), I1 >= 0, I1 < 256,
@@ -80,7 +80,7 @@ encode(#response{cookie = Cookie, type = reply, data = {{{I0,I1,I2,I3} = IPv4, P
 	is_integer(I3), I3 >= 0, I3 < 256 ->
 	I = list_to_binary(inet_parse:ntoa(IPv4)),
 	P = list_to_binary(integer_to_list(Port)),
-	<<Cookie/binary, <<" ">>/binary, P/binary, <<" ">>/binary, I/binary, <<"\n">>/binary>>;
+	<<Cookie/binary, " ", P/binary, " ", I/binary, "\n">>;
 encode(#response{cookie = Cookie, type = reply, data = {{{I0,I1,I2,I3,I4,I5,I6,I7} = IPv6, Port}, _}}) when
 	is_integer(I0), I0 >= 0, I0 < 65535,
 	is_integer(I1), I1 >= 0, I1 < 65535,
@@ -92,47 +92,47 @@ encode(#response{cookie = Cookie, type = reply, data = {{{I0,I1,I2,I3,I4,I5,I6,I
 	is_integer(I7), I7 >= 0, I7 < 65535 ->
 	I = list_to_binary(inet_parse:ntoa(IPv6)),
 	P = list_to_binary(integer_to_list(Port)),
-	<<Cookie/binary, <<" ">>/binary, P/binary, <<" ">>/binary, I/binary, <<"\n">>/binary>>;
+	<<Cookie/binary, " ", P/binary, " ", I/binary, "\n">>;
 encode(#response{cookie = Cookie, type = error, data = syntax}) ->
-	<<Cookie/binary, <<" E1\n">>/binary>>;
+	<<Cookie/binary, " E1\n">>;
 encode(#response{cookie = Cookie, type = error, data = software}) ->
-	<<Cookie/binary, <<" E7\n">>/binary>>;
+	<<Cookie/binary, " E7\n">>;
 encode(#response{cookie = Cookie, type = error, data = notfound}) ->
-	<<Cookie/binary, <<" E8\n">>/binary>>;
+	<<Cookie/binary, " E8\n">>;
 encode(#response{} = Unknown) ->
 	error_logger:error_msg("Unknown response: ~p~n", [Unknown]),
 	throw({error_syntax, "Unknown (or unsupported) #response"});
 
 encode(#cmd{cookie = Cookie, type = ?CMD_V}) ->
-	<<Cookie/binary, <<" V\n">>/binary>>;
+	<<Cookie/binary, " V\n">>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_VF, params = Version}) ->
-	<<Cookie/binary, <<" VF ">>/binary, Version/binary, <<"\n">>/binary>>;
+	<<Cookie/binary, " VF ", Version/binary, "\n">>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag, addr = {GuessIp, GuessPort}}, to = null, params = Params}) ->
 	ParamsBin = encode_params(Params),
 	Ip = list_to_binary(inet_parse:ntoa(GuessIp)),
 	Port = list_to_binary(io_lib:format("~b", [GuessPort])),
 	FT = print_tag_mediaid(FromTag, MediaId),
-	<<Cookie/binary, <<" U">>/binary, ParamsBin/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Ip/binary, <<" ">>/binary, Port/binary, <<" ">>/binary, FT/binary, <<"\n">>/binary>>;
+	<<Cookie/binary, " U", ParamsBin/binary, " ", CallId/binary, " ", Ip/binary, " ", Port/binary, " ", FT/binary, "\n">>;
 encode(#cmd{cookie = Cookie, type = ?CMD_U, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag, addr = Addr}, to = #party{tag = ToTag}, params = Params}) ->
 	ParamsBin = encode_params(Params),
 	BinAddr = binary_print_addr(Addr),
 	FT = print_tag_mediaid(FromTag, MediaId),
 	TT = print_tag_mediaid(ToTag, MediaId),
-	<<Cookie/binary, <<" U">>/binary, ParamsBin/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, BinAddr/binary, <<" ">>/binary, FT/binary, <<" ">>/binary, TT/binary, <<"\n">>/binary>>;
+	<<Cookie/binary, " U", ParamsBin/binary, " ", CallId/binary, " ", BinAddr/binary, " ", FT/binary, " ", TT/binary, "\n">>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_L, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag, addr = Addr}, to = #party{tag = ToTag}, params = Params}) ->
 	ParamsBin = encode_params(Params),
 	BinAddr = binary_print_addr(Addr),
 	FT = print_tag_mediaid(FromTag, MediaId),
 	TT = print_tag_mediaid(ToTag, MediaId),
-	<<Cookie/binary, <<" L">>/binary, ParamsBin/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, BinAddr/binary, <<" ">>/binary, TT/binary, <<" ">>/binary, FT/binary, <<"\n">>/binary>>;
+	<<Cookie/binary, <<" L">>/binary, ParamsBin/binary, " ", CallId/binary, " ", BinAddr/binary, " ", TT/binary, " ", FT/binary, "\n">>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_D, callid = CallId, from = #party{tag = FromTag}, to = null}) ->
-	<<Cookie/binary, <<" D ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<"\n">>/binary>>;
+	<<Cookie/binary, <<" D ">>/binary, CallId/binary, " ", FromTag/binary, "\n">>;
 encode(#cmd{cookie = Cookie, type = ?CMD_D, callid = CallId, from = #party{tag = FromTag}, to = #party{tag = ToTag}}) ->
-	<<Cookie/binary, <<" D ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<" ">>/binary, ToTag/binary, <<"\n">>/binary>>;
+	<<Cookie/binary, <<" D ">>/binary, CallId/binary, " ", FromTag/binary, " ", ToTag/binary, "\n">>;
 
 encode(
 	#cmd{
@@ -151,7 +151,7 @@ encode(
 	P = list_to_binary(io_lib:format("~b", [Playcount])),
 	C = list_to_binary(print_codecs(Codecs)),
 	FT = print_tag_mediaid(FromTag, MediaId),
-	<<Cookie/binary, <<" P">>/binary, P/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Filename/binary, <<" ">>/binary, C/binary, <<" ">>/binary, FT/binary, <<"\n">>/binary>>;
+	<<Cookie/binary, <<" P">>/binary, P/binary, " ", CallId/binary, " ", Filename/binary, " ", C/binary, " ", FT/binary, "\n">>;
 encode(
 	#cmd{
 		cookie = Cookie,
@@ -170,25 +170,25 @@ encode(
 	C = list_to_binary(print_codecs(Codecs)),
 	FT = print_tag_mediaid(FromTag, MediaId),
 	TT = print_tag_mediaid(ToTag, MediaId),
-	<<Cookie/binary, <<" P">>/binary, P/binary, <<" ">>/binary, CallId/binary, <<" ">>/binary, Filename/binary, <<" ">>/binary, C/binary, <<" ">>/binary, FT/binary, <<" ">>/binary, TT/binary, <<"\n">>/binary>>;
+	<<Cookie/binary, <<" P">>/binary, P/binary, " ", CallId/binary, " ", Filename/binary, " ", C/binary, " ", FT/binary, " ", TT/binary, "\n">>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_S, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag}, to = null}) ->
 	FT = print_tag_mediaid(FromTag, MediaId),
-	<<Cookie/binary, <<" S ">>/binary, CallId/binary, <<" ">>/binary, FT/binary, <<"\n">>/binary>>;
+	<<Cookie/binary, <<" S ">>/binary, CallId/binary, " ", FT/binary, "\n">>;
 encode(#cmd{cookie = Cookie, type = ?CMD_S, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag}, to = #party{tag = ToTag}}) ->
 	FT = print_tag_mediaid(FromTag, MediaId),
 	TT = print_tag_mediaid(ToTag, MediaId),
-	<<Cookie/binary, <<" S ">>/binary, CallId/binary, <<" ">>/binary, FT/binary, <<" ">>/binary, TT/binary, <<"\n">>/binary>>;
+	<<Cookie/binary, <<" S ">>/binary, CallId/binary, " ", FT/binary, " ", TT/binary, "\n">>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_R, callid = CallId, from = #party{tag = FromTag}, to = null}) ->
-	<<Cookie/binary, <<" R ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<"\n">>/binary>>;
+	<<Cookie/binary, <<" R ">>/binary, CallId/binary, " ", FromTag/binary, "\n">>;
 encode(#cmd{cookie = Cookie, type = ?CMD_R, callid = CallId, from = #party{tag = FromTag}, to = #party{tag = ToTag}}) ->
-	<<Cookie/binary, <<" R ">>/binary, CallId/binary, <<" ">>/binary, FromTag/binary, <<" ">>/binary, ToTag/binary, <<"\n">>/binary>>;
+	<<Cookie/binary, <<" R ">>/binary, CallId/binary, " ", FromTag/binary, " ", ToTag/binary, "\n">>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_Q, callid = CallId, mediaid = MediaId, from = #party{tag = FromTag}, to = #party{tag = ToTag}}) ->
 	FT = print_tag_mediaid(FromTag, MediaId),
 	TT = print_tag_mediaid(ToTag, MediaId),
-	<<Cookie/binary, <<" Q ">>/binary, CallId/binary, <<" ">>/binary, FT/binary, <<" ">>/binary, TT/binary, <<"\n">>/binary>>;
+	<<Cookie/binary, <<" Q ">>/binary, CallId/binary, " ", FT/binary, " ", TT/binary, "\n">>;
 
 encode(#cmd{cookie = Cookie, type = ?CMD_X}) ->
 	<<Cookie/binary, <<" X\n">>/binary>>;
@@ -744,7 +744,7 @@ binary_split(Head, <<OtherVal:8, Rest/binary>>, Val, Result) ->
 binary_print_addr({Ip, Port}) ->
 	BinIp = list_to_binary(inet_parse:ntoa(Ip)),
 	BinPort = list_to_binary(io_lib:format("~b", [Port])),
-	<<BinIp/binary, <<" ">>/binary, BinPort/binary>>;
+	<<BinIp/binary, " ", BinPort/binary>>;
 binary_print_addr(null) ->
 	<<"127.0.0.1 10000">>.
 
