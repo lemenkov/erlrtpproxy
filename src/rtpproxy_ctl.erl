@@ -109,7 +109,10 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 
 	{SupervisorPid, Port} = case SupRet of
 		{ok, P} ->
-			{P, 0};
+			random:seed(os:timestamp()),
+			RP = 2*(random:uniform(32767)+512),
+			spawn(backend_ser, reply, [Cmd, {{Ip, RP}, {Ip, RP+1}}]),
+			{P, RP};
 		{error, {already_started, P}} ->
 			{P, 0}
 	end,
@@ -135,7 +138,7 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 			{_, {Ip, RtpPort, RtcpPort}, _} = gen_server:call(RtpPid0, get_phy),
 %			gen_server:cast(RtpPid, {update, Params ++ [{sendrecv, SendRecvStrategy}]}),
 %			gen_server:cast(RtpPid, {update, [{sendrecv, SendRecvStrategy}, {prefill, {Ip, Addr}}]}),
-			backend_ser:reply(Cmd, {{Ip, RtpPort}, {Ip, RtcpPort}}),
+			Port == 0 andalso spawn(backend_ser, reply, [Cmd, {{Ip, RtpPort}, {Ip, RtcpPort}}]),
 
 			case SupRet of
 				{error, _} ->
