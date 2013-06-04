@@ -107,8 +107,6 @@ command(Msg, Fd, Ip, Port, Begin) ->
 	end.
 
 reply(Cmd = #cmd{cookie = Cookie, callid = CallId, timestamp = TS, origin = #origin{type = ser, fd = {Type, Fd}, ip = Ip, port = Port}}, {{Ip0, Port0}, _}) ->
-	Begin = {MegaSecs, Secs, MicroSecs} = os:timestamp(),
-	error_logger:info_msg("SER backend: reply ~s recv at ~f (elapsed time: ~b microsec)~n", [CallId, MegaSecs*1000000+Secs+MicroSecs/1000000, timer:now_diff(Begin, TS)]),
 	I = list_to_binary(inet_parse:ntoa(Ip0)),
 	P = list_to_binary(integer_to_list(Port0)),
 	case Type of
@@ -116,5 +114,5 @@ reply(Cmd = #cmd{cookie = Cookie, callid = CallId, timestamp = TS, origin = #ori
 		tcp -> prim_inet:send(Fd, <<Cookie/binary, " ", P/binary, " ", I/binary, "\n">>)
 	end,
 	End = {MegaSecs1, Secs1, MicroSecs1} = os:timestamp(),
-	error_logger:info_msg("SER backend: reply ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [<<Cookie/binary, " ", P/binary, " ", I/binary, "\n">>, inet_parse:ntoa(Ip), Port, MegaSecs1*1000000+Secs1+MicroSecs1/1000000, timer:now_diff(End, TS)]),
+	error_logger:info_msg("SER backend: reply ~s ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [<<Cookie/binary, " ", P/binary, " ", I/binary, "\n">>, CallId, inet_parse:ntoa(Ip), Port, MegaSecs1*1000000+Secs1+MicroSecs1/1000000, timer:now_diff(End, TS)]),
 	ok.
