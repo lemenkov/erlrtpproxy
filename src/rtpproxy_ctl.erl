@@ -96,6 +96,17 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 			[rtpproxy_sup]
 		}
 	),
+
+	% Determine IP...
+	Ip = case {proplists:get_value(local, Params), proplists:get_value(remote, Params), proplists:get_value(ipv6, Params)} of
+		{_, _, true} ->
+			{ok, I} = application:get_env(rtpproxy, ipv6), I;
+		{undefined, _, _} ->
+			{ok, I} = application:get_env(rtpproxy, external), I;
+		{{_,_,_,_}, undefined, _} ->
+			{ok, I} = application:get_env(rtpproxy, internal), I
+	end,
+
 	SupervisorPid = case SupRet of
 		{ok, P} ->
 			P;
@@ -110,15 +121,6 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 	spawn(
 		fun() ->
 			% Determine options...
-			Ip = case {proplists:get_value(local, Params), proplists:get_value(remote, Params), proplists:get_value(ipv6, Params)} of
-				{_, _, true} ->
-					{ok, I} = application:get_env(rtpproxy, ipv6), I;
-				{undefined, _, _} ->
-					{ok, I} = application:get_env(rtpproxy, external), I;
-				{{_,_,_,_}, undefined, _} ->
-					{ok, I} = application:get_env(rtpproxy, internal), I
-			end,
-
 			{ok, TimeoutEarly} = application:get_env(rtpproxy, ttl_early),
 			{ok, Timeout} = application:get_env(rtpproxy, ttl),
 			{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
