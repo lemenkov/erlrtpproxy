@@ -107,11 +107,11 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 			{ok, I} = application:get_env(rtpproxy, internal), I
 	end,
 
-	SupervisorPid = case SupRet of
+	{SupervisorPid, Port} = case SupRet of
 		{ok, P} ->
-			P;
+			{P, 0};
 		{error, {already_started, P}} ->
-			P
+			{P, 0}
 	end,
 
 	% Check if we need to start recording
@@ -125,7 +125,7 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 			{ok, Timeout} = application:get_env(rtpproxy, ttl),
 			{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
 			{ok, ActiveStrategy} = application:get_env(rtpproxy, active),
-			Params1 = Params ++ [{port, 0}, {ip, Ip}, {timeout_early, TimeoutEarly*1000}, {timeout, Timeout*1000}, {sendrecv, SendRecvStrategy}, {active, ActiveStrategy}],
+			Params1 = Params ++ [{port, Port}, {ip, Ip}, {timeout_early, TimeoutEarly*1000}, {timeout, Timeout*1000}, {sendrecv, SendRecvStrategy}, {active, ActiveStrategy}],
 
 			% ..and start RTP socket module
 			Ret0 = supervisor:start_child(SupervisorPid,
