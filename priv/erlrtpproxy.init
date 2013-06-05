@@ -27,6 +27,7 @@ ERL_PARAMETERS="+K true +W w"
 ERL_NODE="127.0.0.1"
 USER="erlrtpproxy"
 RSH="ssh"
+WD="/var/lib/erlrtpproxy"
 
 [ -f /etc/sysconfig/$prog ] && . /etc/sysconfig/$prog
 
@@ -39,7 +40,7 @@ start() {
 	fi
 
 	# cd to a writable directory to allow gproc store its global data
-	cd /var/lib/erlrtpproxy
+	cd $WD
 
 	daemon --user $USER \
 		"erl"  "$ERL_PARAMETERS \
