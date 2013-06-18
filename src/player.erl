@@ -99,7 +99,7 @@ handle_info(send, #state{subscriber = Subscriber, marker = Marker, sn = Sequence
 			extension = null,
 			payload = Payload
 		},
-	gen_server:cast(Subscriber, {rtp:encode(Pkt), null, null}),
+	Subscriber ! {rtp:encode(Pkt), null, null},
 	{noreply, State#state{marker = 0, sn = SequenceNumber + 1}};
 
 handle_info(Info, State) ->
