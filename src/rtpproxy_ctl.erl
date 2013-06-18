@@ -28,17 +28,12 @@
 -include("common.hrl").
 
 start() ->
-	{ok,[[ConfigPath]]} = init:get_argument(config),
-
-	%% Start our pool
-	Nodes = [node()|pool:start(rtpproxy, " -config " ++ ConfigPath ++ " ")],
-
 	%% Replace logger with erlsyslog and remove default tty handler
-	rpc:multicall(Nodes, error_logger, tty, [false]),
-	rpc:multicall(Nodes, error_logger, add_report_handler, [erlsyslog]),
+	error_logger:tty(false),
+	error_logger:add_report_handler(erlsyslog),
 
 	%% Load necessary config files
-	rpc:multicall(Nodes, application, load, [rtpproxy]),
+	application:load(rtpproxy),
 
 	%% Load main module
 	application:start(rtpproxy).
@@ -46,8 +41,6 @@ start() ->
 stop() ->
 	%% Stop erlrtpproxy gracefully
 	rtpproxy_ctl:command(#cmd{type = ?CMD_X, timestamp = os:timestamp()}),
-	%% Stop all slave nodes
-	pool:stop(),
 	%% Stop main node
 	init:stop().
 
