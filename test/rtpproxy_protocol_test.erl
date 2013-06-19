@@ -217,11 +217,8 @@ rtpproxy_protocol_test_() ->
 							#response{
 								cookie = <<"24393_4">>,
 								origin = null,
-								% FIXME this actually violates protocol
-%								type = error,
-%								data = notfound
-								type = reply,
-								data = ok
+								type = error,
+								data = notfound
 							},
 							ser_proto:decode(Answer)) end
 			},
