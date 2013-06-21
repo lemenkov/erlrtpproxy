@@ -10,19 +10,14 @@
 -define(CHILD(I,P), {I, {I, start_link, [P]}, transient, 5000, worker, [I]}).
 -define(CHILD(N,I,P), {N, {I, start_link, [P]}, transient, 5000, worker, [I]}).
 
-init(media_channel_sup) ->
+init({C, M}) ->
 	RestartStrategy = one_for_all,
 	MaxRestarts = 0,
 	MaxTimeBetweenRestarts = 1, % in seconds
 	SupFlags = {RestartStrategy, MaxRestarts, MaxTimeBetweenRestarts},
 
-	{ok, {SupFlags, []}};
-
-init(media_sup) ->
-	RestartStrategy = one_for_one,
-	MaxRestarts = 10,
-	MaxTimeBetweenRestarts = 1, % in seconds
-	SupFlags = {RestartStrategy, MaxRestarts, MaxTimeBetweenRestarts},
+	error_logger:warning_msg("SUP START ~p~n", [self()]),
+	gproc:add_local_name({C, M}),
 
 	{ok, {SupFlags, []}};
 
@@ -59,6 +54,8 @@ init(rtpproxy_sup) ->
 		_ -> []
 	end,
 
-	Children = [ListenerProcess] ++ HttpProcess ++ [StorageProcess],
+	Tracker = {streams, {gen_tracker, start_link, [streams]}, permanent, infinity, supervisor, []},
+
+	Children = [Tracker, ListenerProcess] ++ HttpProcess ++ [StorageProcess],
 
 	{ok, {SupFlags, Children}}.

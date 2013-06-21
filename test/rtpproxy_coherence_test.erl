@@ -39,7 +39,7 @@
 -define(RTPPROXY_PORT, 33333).
 
 % Create a call and wait for timeout
-rtpproxy_coherence_test_() ->
+rtpproxy_coherence_test_DISABLE() ->
 	%%
 	%% This is the socket which will be used for sending commands and receiving notifications messages
 	%%
