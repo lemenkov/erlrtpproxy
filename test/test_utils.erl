@@ -37,7 +37,6 @@
 -define(RTPPROXY_PORT, 33333).
 
 start() ->
-	application:start(gproc),
 	%% Load main module
 	application:start(rtpproxy).
 
@@ -73,5 +72,4 @@ set_default_opts() ->
 
 stop() ->
 	application:stop(rtpproxy),
-	application:stop(gproc),
 	net_kernel:stop().
