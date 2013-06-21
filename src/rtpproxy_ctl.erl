@@ -32,9 +32,6 @@ start() ->
 	error_logger:tty(false),
 	error_logger:add_report_handler(erlsyslog),
 
-	%% Run gproc
-	application:start(gproc),
-
 	%% Load necessary config files
 	application:load(rtpproxy),
 
