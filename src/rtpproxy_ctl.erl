@@ -83,7 +83,7 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 			{ok, I} = application:get_env(rtpproxy, internal), I
 	end,
 
-	SupervisorPid = case gen_tracker:find(streams, {C, M}) of
+	case gen_tracker:find(streams, {C, M}) of
 		undefined ->
 			{ok, SP} = gen_tracker:find_or_open(streams, {{C, M}, {supervisor, start_link, [rtpproxy_sup, {C, M, T}]}, temporary, 5000, supervisor, [rtpproxy_sup]}),
 			% Start RTP handler
@@ -137,9 +137,9 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 					end
 				end
 			),
-			SP;
-		{ok, SP} ->
-			SP
+			ok;
+		{ok, _} ->
+			ok
 	end,
 
 	Port = case gen_tracker:getattr(streams, {C, M}, T) of
