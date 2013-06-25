@@ -51,40 +51,28 @@ save_config(ConfigPath) ->
 
 % Simply stop all active sessions
 command(#cmd{type = ?CMD_X}) ->
-	[supervisor:terminate_child(media_sup, SID) || {SID,_,_,_} <- supervisor:which_children(media_sup)],
+	[gen_tracker:terminate_child(streams, Name) || {Name, _}  <- gen_tracker:list(streams)],
 	ok;
 
 command(#cmd{type = ?CMD_D, callid = C}) ->
-	SIDs = [SID || {SID = {media_channel_sup, CID, _},_,_,_} <- supervisor:which_children(media_sup), CID == C],
-	case SIDs of
+	Names = [Name || {Name = {CID,_}, _}  <- gen_tracker:list(streams), CID == C],
+	case Names of
 		[] -> {error, notfound};
-		_ -> lists:foreach(fun(X) -> supervisor:terminate_child(media_sup, X) end, SIDs)
+		_ -> [gen_tracker:terminate_child(streams, Name) || Name <- Names], ok
 	end;
 
 % DEPRECATED. Use HTTP-JSON.
 command(#cmd{type = ?CMD_I}) ->
-	{ok, {stats, length(supervisor:which_children(media_sup))}};
+	{ok, {stats, length(gen_tracker:list(streams))}};
 
 command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr = {{0,0,0,0}, _}}, origin = #origin{pid = Pid}} = Cmd) ->
 	% Old music-on-hold - FIXME - should start CMD_P actually
-	[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M],
-	RtpPid = get_gen_rtp_channel(SupervisorPid, C, M, T),
-	{_, {_, RtpPort, RtcpPort}, _} = gen_server:call(RtpPid, get_phy),
-	backend_ser:reply(Cmd, {{{0,0,0,0}, RtpPort}, {{0,0,0,0}, RtcpPort}}),
+	{ok, Role} = gen_tracker:getattr(streams, {C, M}, T),
+	{ok, Port} = gen_tracker:getattr(streams, {C, M}, Role),
+	backend_ser:reply(Cmd, {{{0,0,0,0}, Port}, {{0,0,0,0}, Port+1}}),
 	{ok, sent};
 
 command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, params = Params, origin = #origin{pid = Pid}} = Cmd) ->
-	SupRet = supervisor:start_child(media_sup,
-		{
-			{media_channel_sup, C, M},
-			{supervisor, start_link, [rtpproxy_sup, media_channel_sup]},
-			temporary,
-			5000,
-			supervisor,
-			[rtpproxy_sup]
-		}
-	),
-
 	% Determine IP...
 	Ip = case {proplists:get_value(local, Params), proplists:get_value(remote, Params), proplists:get_value(ipv6, Params)} of
 		{_, _, true} ->
@@ -95,100 +83,108 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 			{ok, I} = application:get_env(rtpproxy, internal), I
 	end,
 
-	{SupervisorPid, Port} = case SupRet of
-		{ok, P} ->
-			random:seed(os:timestamp()),
-			RP = 2*(512+random:uniform(32767-512)),
-			spawn(backend_ser, reply, [Cmd, {{Ip, RP}, {Ip, RP+1}}]),
-			{P, RP};
-		{error, {already_started, P}} ->
-			{P, 0}
-	end,
+	SupervisorPid = case gen_tracker:find(streams, {C, M}) of
+		undefined ->
+			{ok, SP} = gen_tracker:find_or_open(streams, {{C, M}, {supervisor, start_link, [rtpproxy_sup, {C, M, T}]}, temporary, 5000, supervisor, [rtpproxy_sup]}),
+			% Start RTP handler
+			spawn(
+				fun() ->
+					% Determine options...
+					{ok, TimeoutEarly} = application:get_env(rtpproxy, ttl_early),
+					{ok, Timeout} = application:get_env(rtpproxy, ttl),
+					{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
+					{ok, ActiveStrategy} = application:get_env(rtpproxy, active),
+					{ok, P1} = gen_tracker:getattr(streams, {C,M}, caller),
+					{ok, P2} = gen_tracker:getattr(streams, {C,M}, callee),
+					Params1 = Params ++ [{port, P1}, {ip, Ip}, {timeout_early, TimeoutEarly*1000}, {timeout, Timeout*1000}, {sendrecv, SendRecvStrategy}, {active, ActiveStrategy}],
+					Params2 = Params ++ [{port, P2}, {ip, Ip}, {timeout_early, TimeoutEarly*1000}, {timeout, Timeout*1000}, {sendrecv, SendRecvStrategy}, {active, ActiveStrategy}],
 
-	% Check if we need to start recording
-	proplists:get_value(copy, Params, false) andalso start_recorder(SupervisorPid, C, M, T),
+					% ..and start RTP socket modules
+					{ok, RtpPid1} = supervisor:start_child(SP,
+						{{phy, C, M, caller}, {gen_server, start_link, [gen_rtp_channel, [Params1], []]}, permanent, 5000, worker, [gen_rtp_channel]}
+					),
+					error_logger:error_msg("ADDED caller: ~p (~p:~p:~p)~n", [RtpPid1, C, M, T]),
+					{ok, RtpPid2} = supervisor:start_child(SP,
+						{{phy, C, M, callee}, {gen_server, start_link, [gen_rtp_channel, [Params2], []]}, permanent, 5000, worker, [gen_rtp_channel]}
+					),
+					error_logger:error_msg("ADDED callee: ~p (~p:~p:~p)~n", [RtpPid1, C, M, T]),
 
-	% Start RTP handler
-	spawn(
-		fun() ->
-			% Determine options...
-			{ok, TimeoutEarly} = application:get_env(rtpproxy, ttl_early),
-			{ok, Timeout} = application:get_env(rtpproxy, ttl),
-			{ok, SendRecvStrategy} = application:get_env(rtpproxy, sendrecv),
-			{ok, ActiveStrategy} = application:get_env(rtpproxy, active),
-			Params1 = Params ++ [{port, Port}, {ip, Ip}, {timeout_early, TimeoutEarly*1000}, {timeout, Timeout*1000}, {sendrecv, SendRecvStrategy}, {active, ActiveStrategy}],
+%					gen_server:cast(RtpPid, {update, Params ++ [{sendrecv, SendRecvStrategy}]}),
+%					gen_server:cast(RtpPid, {update, [{sendrecv, SendRecvStrategy}, {prefill, {Ip, Addr}}]}),
 
-			% ..and start RTP socket module
-			Ret0 = supervisor:start_child(SupervisorPid,
-				{{phy, C, M, T}, {gen_server, start_link, [gen_rtp_channel, [Params1], []]}, permanent, 5000, worker, [gen_rtp_channel]}
+					gen_server:call(RtpPid1, {rtp_subscriber, {set, RtpPid2}}),
+					gen_server:call(RtpPid2, {rtp_subscriber, {set, RtpPid1}}),
+
+					% Check if we need to start recording
+					proplists:get_value(copy, Params, false) andalso start_recorder(SP, C, M, T),
+
+					% Check and load (if configured) notification backends
+					case application:get_env(rtpproxy, radacct_servers) of
+						{ok, _} -> supervisor:start_child(
+								SP,
+								{{notify_radius, C, M}, {gen_server, start_link, [rtpproxy_notifier_backend_radius, [C, M], []]}, temporary, 5000, worker, [rtpproxy_notifier_backend_radius]}
+							);
+						_ -> ok
+					end,
+					case application:get_env(rtpproxy, notify_servers) of
+						{ok, NotifyType} ->
+							NotifyInfo = proplists:get_value(notify, Params, []),
+							((NotifyInfo == []) and (NotifyType == tcp)) orelse supervisor:start_child(
+								SP,
+								{{notify_openser, C, M}, {gen_server, start_link, [rtpproxy_notifier_backend_notify, [NotifyInfo], []]}, temporary, 5000, worker, [rtpproxy_notifier_backend_notify]}
+							);
+						_ -> ok
+					end
+				end
 			),
-			RtpPid0 = get_pid(Ret0),
-			{_, {Ip, RtpPort, RtcpPort}, _} = gen_server:call(RtpPid0, get_phy),
-%			gen_server:cast(RtpPid, {update, Params ++ [{sendrecv, SendRecvStrategy}]}),
-%			gen_server:cast(RtpPid, {update, [{sendrecv, SendRecvStrategy}, {prefill, {Ip, Addr}}]}),
-			Port == 0 andalso spawn(backend_ser, reply, [Cmd, {{Ip, RtpPort}, {Ip, RtcpPort}}]),
-
-			case SupRet of
-				{error, _} ->
-					% That's a 2nd side
-
-					% Set RTP path
-					RtpPid1 = get_other_gen_rtp_channel(SupervisorPid, C, M, T),
-					safe_call(RtpPid0, {rtp_subscriber, {set, RtpPid1}}),
-					safe_call(RtpPid1, {rtp_subscriber, {set, RtpPid0}}),
-					ok;
-				_ ->
-					ok
-			end
-		end
-	),
-
-	% Check and load (if configured) notification backends
-	case application:get_env(rtpproxy, radacct_servers) of
-		{ok, _} -> supervisor:start_child(
-				SupervisorPid,
-				{{notify_radius, C, M}, {gen_server, start_link, [rtpproxy_notifier_backend_radius, [C, M], []]}, temporary, 5000, worker, [rtpproxy_notifier_backend_radius]}
-			);
-		_ -> ok
+			SP;
+		{ok, SP} ->
+			SP
 	end,
-	case application:get_env(rtpproxy, notify_servers) of
-		{ok, NotifyType} ->
-			NotifyInfo = proplists:get_value(notify, Params, []),
-			((NotifyInfo == []) and (NotifyType == tcp)) orelse supervisor:start_child(
-				SupervisorPid,
-				{{notify_openser, C, M}, {gen_server, start_link, [rtpproxy_notifier_backend_notify, [NotifyInfo], []]}, temporary, 5000, worker, [rtpproxy_notifier_backend_notify]}
-			);
-		_ -> ok
+
+	Port = case gen_tracker:getattr(streams, {C, M}, T) of
+		{ok, Role} ->
+			{ok, P} = gen_tracker:getattr(streams, {C, M}, Role),
+			P;
+		undefined ->
+			{ok, P} = gen_tracker:getattr(streams, {C,M}, callee),
+			gen_tracker:setattr(streams, {C,M}, [{T, callee}]),
+			P
 	end,
+
+	spawn(backend_ser, reply, [Cmd, {{Ip, Port}, {Ip, Port+1}}]),
+
 	{ok, sent};
 
 command(#cmd{type = ?CMD_P, callid = C, mediaid = M, to = #party{tag = T}, params = Params}) ->
-	[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M],
-	RtpPid0 = get_gen_rtp_channel(SupervisorPid, C, M, T),
-	RtpPid1 = get_other_gen_rtp_channel(SupervisorPid, C, M, T),
+	{ok, SupervisorPid} = gen_tracker:find(streams, {C, M}),
+	RtpPid1 = gen_tracker:find(streams, {C, M, T}),
+	RtpPid2 = gen_tracker:find(streams, {C, M, {other,T}}),
 	Ret = supervisor:start_child(SupervisorPid,
 		% FIXME we should ignore payload type sent by OpenSIPS/B2BUA and append one currently in use
-		{{player, C, M, T}, {gen_server, start_link, [player, [RtpPid0, proplists:get_value(codecs, Params, {'PCMU',8000,1}), binary_to_list(proplists:get_value(filename, Params, <<"default">>)), proplists:get_value(playcount, Params, 0)], []]}, temporary, 5000, worker, [player]}
+		{{player, C, M, T}, {gen_server, start_link, [player, [RtpPid1, proplists:get_value(codecs, Params, {'PCMU',8000,1}), binary_to_list(proplists:get_value(filename, Params, <<"default">>)), proplists:get_value(playcount, Params, 0)], []]}, temporary, 5000, worker, [player]}
 	),
-	gen_server:cast(RtpPid0, {keepalive, disable}),
 	gen_server:cast(RtpPid1, {keepalive, disable}),
-	safe_call(RtpPid0, {rtp_subscriber, {set, null}}),
-	safe_call(RtpPid1, {rtp_subscriber, {set, null}}),
+	gen_server:cast(RtpPid2, {keepalive, disable}),
+
+	gen_server:call(RtpPid1, {rtp_subscriber, {set, null}}),
+	gen_server:call(RtpPid2, {rtp_subscriber, {set, null}}),
 	ok;
 
 command(#cmd{type = ?CMD_S, callid = C, mediaid = M, to = #party{tag = T}}) ->
-	[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M],
-	RtpPid0 = get_gen_rtp_channel(SupervisorPid, C, M, T),
-	RtpPid1 = get_other_gen_rtp_channel(SupervisorPid, C, M, T),
-	gen_server:cast(RtpPid0, {keepalive, enable}),
+	{ok, SupervisorPid} = gen_tracker:find(streams, {C, M}),
+	RtpPid1 = gen_tracker:find(streams, {C, M, T}),
+	RtpPid2 = gen_tracker:find(streams, {C, M, {other,T}}),
 	gen_server:cast(RtpPid1, {keepalive, enable}),
-	safe_call(RtpPid0, {rtp_subscriber, {set, RtpPid1}}),
-	safe_call(RtpPid1, {rtp_subscriber, {set, RtpPid0}}),
+	gen_server:cast(RtpPid2, {keepalive, enable}),
+
+	gen_server:call(RtpPid1, {rtp_subscriber, {set, RtpPid2}}),
+	gen_server:call(RtpPid2, {rtp_subscriber, {set, RtpPid1}}),
 	supervisor:terminate_child(SupervisorPid, {player, C, M, T}),
 	ok;
 
 command(#cmd{type = ?CMD_R, callid = C}) ->
-	SupervisorPids = [ P || {{media_channel_sup, CID, _}, P, _, _} <- supervisor:which_children(media_sup), CID == C],
+	SupervisorPids = [SID || {{CID,_}, [{pid,SID}|_]}  <- gen_tracker:list(streams), CID == C],
 	[ start_recorder(SupervisorPid,CID,MID,TID) || SupervisorPid <- SupervisorPids, {{media, CID, MID, TID}, _, _, _} <- supervisor:which_children(SupervisorPid)],
 	ok;
 
@@ -205,28 +201,10 @@ start_recorder(SupervisorPid, C, M, T) ->
 			{{recorder, C, M, T}, {gen_server, start_link, [file_writer, [C, M, T], []]}, temporary, 5000, worker, [file_writer]}
 		),
 	RecorderPid = get_pid(Ret),
-	RtpPid = get_gen_rtp_channel(SupervisorPid, C, M, T),
-	safe_call(RtpPid, {rtp_subscriber, {set, RecorderPid}}),
+	RtpPid = gen_tracker:find(streams, {C, M, T}),
+	gen_server:call(RtpPid, {rtp_subscriber, {set, RecorderPid}}),
 	ok.
-
-get_gen_rtp_channel(SupervisorPid, C, M, T) ->
-	case [ P || {{phy, CID, MID, TID}, P, _, _} <- supervisor:which_children(SupervisorPid), CID == C, MID == M, TID == T] of
-		[] -> null;
-		[RtpPid] -> RtpPid
-	end.
-
-get_other_gen_rtp_channel(SupervisorPid, C, M, T) ->
-	case [ P || {{phy, CID, MID, TID}, P, _, _} <- supervisor:which_children(SupervisorPid), CID == C, MID == M, TID /= T] of
-		[] -> null;
-		[RtpPid] -> RtpPid;
-		% 18x/200 from a different direction
-		% FIXME we should stop this pair and restart it again
-		[RtpPid | _] -> RtpPid
-	end.
 
 get_pid({ok, Pid}) -> Pid;
 get_pid({ok, Pid, _}) -> Pid;
 get_pid({error, {already_started, Pid}}) -> Pid.
-
-safe_call(null, _Message) -> ok;
-safe_call(Pid, Message) -> gen_server:call(Pid, Message).

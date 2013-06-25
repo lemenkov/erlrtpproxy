@@ -10,20 +10,22 @@
 -define(CHILD(I,P), {I, {I, start_link, [P]}, transient, 5000, worker, [I]}).
 -define(CHILD(N,I,P), {N, {I, start_link, [P]}, transient, 5000, worker, [I]}).
 
-init(media_channel_sup) ->
+init({C, M, T}) ->
 	RestartStrategy = one_for_all,
 	MaxRestarts = 0,
 	MaxTimeBetweenRestarts = 1, % in seconds
 	SupFlags = {RestartStrategy, MaxRestarts, MaxTimeBetweenRestarts},
 
-	{ok, {SupFlags, []}};
+	% FIXME don't generate them randomly
+	random:seed(os:timestamp()),
+	P1 = 2*(512+random:uniform(32767-512)),
+	P2 = 2*(512+random:uniform(32767-512)),
 
-init(media_sup) ->
-	RestartStrategy = one_for_one,
-	MaxRestarts = 10,
-	MaxTimeBetweenRestarts = 1, % in seconds
-	SupFlags = {RestartStrategy, MaxRestarts, MaxTimeBetweenRestarts},
-
+	gen_tracker:setattr(streams, {C,M}, [
+			{T, caller},
+			{caller, P1},
+			{callee, P2}
+		]),
 	{ok, {SupFlags, []}};
 
 init(rtpproxy_sup) ->
@@ -40,6 +42,8 @@ init(rtpproxy_sup) ->
 	BackendProcess = case application:get_env(rtpproxy, backend) of
 		{ok, ser} -> backend_ser
 	end,
+
+	Tracker = {streams, {gen_tracker, start_link, [streams]}, permanent, infinity, supervisor, [gen_tracker]},
 
 	ListenerProcess = case Proto of
 		tcp ->
@@ -59,6 +63,6 @@ init(rtpproxy_sup) ->
 		_ -> []
 	end,
 
-	Children = [ListenerProcess] ++ HttpProcess ++ [StorageProcess],
+	Children = [Tracker, ListenerProcess] ++ HttpProcess ++ [StorageProcess],
 
 	{ok, {SupFlags, Children}}.
