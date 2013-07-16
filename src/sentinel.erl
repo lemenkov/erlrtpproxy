@@ -39,8 +39,7 @@ handle_info(check, State) ->
 			{memory, MemP} = erlang:process_info(Pid, memory),
 			{message_queue_len, MQL} = erlang:process_info(Pid, message_queue_len),
 			MemT = erlang:memory(processes_used),
-			MemP < MemT*0.5 orelse begin MQL == 0 andalso begin erlang:garbage_collect(Pid), error_logger:warning_msg("sentinel: memory threshold reached: ~b from ~b", [MemP, MemT]) end end,
-			ok
+			gc(Pid, MQL, MemT, MemP)
 	end,
 	{noreply, State};
 
@@ -54,3 +53,16 @@ terminate(Reason, TRef) ->
 
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
+
+%% ------------------------------------------------------------------
+%% gen_server Private Definitions
+%% ------------------------------------------------------------------
+
+%% Run only if message queue is empty and 50% of memory is consumed
+gc(Pid, 0, MemT, MemP) when MemP < MemT * 0.5 ->
+	erlang:garbage_collect(Pid),
+	{memory, NewMemP} = erlang:process_info(Pid, memory),
+	error_logger:warning_msg("sentinel: error_logger memory threshold reached: ~b from ~b (saved ~b)", [MemP, MemT, MemP - NewMemP]),
+	ok;
+gc(_, _, _, _) ->
+	ok.
