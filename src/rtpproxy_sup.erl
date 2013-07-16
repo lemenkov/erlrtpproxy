@@ -59,6 +59,8 @@ init(rtpproxy_sup) ->
 		_ -> []
 	end,
 
-	Children = [ListenerProcess] ++ HttpProcess ++ [StorageProcess],
+	SentinelProcess = ?CHILD(sentinel),
+
+	Children = [ListenerProcess, SentinelProcess] ++ HttpProcess ++ [StorageProcess],
 
 	{ok, {SupFlags, Children}}.
