@@ -46,7 +46,7 @@ command(Msg, Fd, Ip, Port, Begin) ->
 			{<<Cookie/binary, " 1\n">>, Ip, Port};
 		#cmd{origin = Origin, type = ?CMD_L} = Cmd ->
 			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),
-			spawn(rtpproxy_ctl, command, [Cmd#cmd{origin = Origin#origin{fd = Fd, ip=Ip, port=Port}, type = ?CMD_U, timestamp = Begin}]),
+			spawn(rtpproxy_ctl, command, [Cmd#cmd{origin = Origin#origin{fd = Fd, ip=Ip, port=Port}, timestamp = Begin}]),
 			ok;
 		#cmd{origin = Origin, type = ?CMD_U} = Cmd ->
 			error_logger:info_msg("SER backend: cmd: ~p~n", [Cmd]),

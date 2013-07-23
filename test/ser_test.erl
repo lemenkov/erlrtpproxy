@@ -69,6 +69,12 @@ ser_udp_test_() ->
 							backend_ser:reply(Cmd, {{{192,168,0,1}, 12000}, {{192,168,0,1}, 12001}});
 						(#cmd{
 								origin=#origin{pid = Pid},
+								type = message_l,
+								callid = <<"0003e30c-callid01@192.168.0.100">>
+							} = Cmd) ->
+							backend_ser:reply(Cmd, {{{192,168,0,1}, 16000}, {{192,168,0,1}, 16001}});
+						(#cmd{
+								origin=#origin{pid = Pid},
 								type = message_u,
 								callid = <<"0003e30c-callid02@192.168.0.100">>
 							} = Cmd) ->
@@ -273,6 +279,12 @@ ser_tcp_test_() ->
 								callid = <<"0003e30c-callid01@192.168.0.100">>
 							} = Cmd) ->
 							backend_ser:reply(Cmd, {{{192,168,0,1}, 12000}, {{192,168,0,1}, 12001}});
+						(#cmd{
+								origin=#origin{pid = Pid},
+								type = message_l,
+								callid = <<"0003e30c-callid01@192.168.0.100">>
+							} = Cmd) ->
+							backend_ser:reply(Cmd, {{{192,168,0,1}, 16000}, {{192,168,0,1}, 16001}});
 						(#cmd{
 								origin=#origin{pid = Pid},
 								type = message_u,
