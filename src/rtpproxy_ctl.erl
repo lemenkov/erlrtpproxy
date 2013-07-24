@@ -127,19 +127,7 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 %			gen_server:cast(RtpPid, {update, Params ++ [{sendrecv, SendRecvStrategy}]}),
 %			gen_server:cast(RtpPid, {update, [{sendrecv, SendRecvStrategy}, {prefill, {Ip, Addr}}]}),
 			Port == 0 andalso spawn(backend_ser, reply, [Cmd, {{Ip, RtpPort}, {Ip, RtcpPort}}]),
-
-			case SupRet of
-				{error, _} ->
-					% That's a 2nd side
-
-					% Set RTP path
-					RtpPid1 = get_other_gen_rtp_channel(SupervisorPid, C, M, T),
-					safe_call(RtpPid0, {rtp_subscriber, {set, RtpPid1}}),
-					safe_call(RtpPid1, {rtp_subscriber, {set, RtpPid0}}),
-					ok;
-				_ ->
-					ok
-			end
+			ok
 		end
 	),
 
