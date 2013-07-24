@@ -127,19 +127,7 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 %			gen_server:cast(RtpPid, {update, Params ++ [{sendrecv, SendRecvStrategy}]}),
 %			gen_server:cast(RtpPid, {update, [{sendrecv, SendRecvStrategy}, {prefill, {Ip, Addr}}]}),
 			Port == 0 andalso spawn(backend_ser, reply, [Cmd, {{Ip, RtpPort}, {Ip, RtcpPort}}]),
-
-			case SupRet of
-				{error, _} ->
-					% That's a 2nd side
-
-					% Set RTP path
-					RtpPid1 = get_other_gen_rtp_channel(SupervisorPid, C, M, T),
-					safe_call(RtpPid0, {rtp_subscriber, {set, RtpPid1}}),
-					safe_call(RtpPid1, {rtp_subscriber, {set, RtpPid0}}),
-					ok;
-				_ ->
-					ok
-			end
+			ok
 		end
 	),
 
@@ -163,16 +151,7 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 	{ok, sent};
 
 command(#cmd{type = ?CMD_L, callid = C, mediaid = M, from = #party{tag = T}, params = Params, origin = #origin{pid = Pid}} = Cmd) ->
-	SupRet = supervisor:start_child(media_sup,
-		{
-			{media_channel_sup, C, M},
-			{supervisor, start_link, [rtpproxy_sup, media_channel_sup]},
-			temporary,
-			5000,
-			supervisor,
-			[rtpproxy_sup]
-		}
-	),
+	[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M],
 
 	% Determine IP...
 	Ip = case {proplists:get_value(local, Params), proplists:get_value(remote, Params), proplists:get_value(ipv6, Params)} of
@@ -184,15 +163,7 @@ command(#cmd{type = ?CMD_L, callid = C, mediaid = M, from = #party{tag = T}, par
 			{ok, I} = application:get_env(rtpproxy, internal), I
 	end,
 
-	{SupervisorPid, Port} = case SupRet of
-		{ok, P} ->
-			random:seed(os:timestamp()),
-			RP = 2*(512+random:uniform(32767-512)),
-			spawn(backend_ser, reply, [Cmd, {{Ip, RP}, {Ip, RP+1}}]),
-			{P, RP};
-		{error, {already_started, P}} ->
-			{P, 0}
-	end,
+	Port = 0,
 
 	% Check if we need to start recording
 	proplists:get_value(copy, Params, false) andalso start_recorder(SupervisorPid, C, M, T),
@@ -217,38 +188,13 @@ command(#cmd{type = ?CMD_L, callid = C, mediaid = M, from = #party{tag = T}, par
 %			gen_server:cast(RtpPid, {update, [{sendrecv, SendRecvStrategy}, {prefill, {Ip, Addr}}]}),
 			Port == 0 andalso spawn(backend_ser, reply, [Cmd, {{Ip, RtpPort}, {Ip, RtcpPort}}]),
 
-			case SupRet of
-				{error, _} ->
-					% That's a 2nd side
-
-					% Set RTP path
-					RtpPid1 = get_other_gen_rtp_channel(SupervisorPid, C, M, T),
-					safe_call(RtpPid0, {rtp_subscriber, {set, RtpPid1}}),
-					safe_call(RtpPid1, {rtp_subscriber, {set, RtpPid0}}),
-					ok;
-				_ ->
-					ok
-			end
+			% Set RTP path
+			RtpPid1 = get_other_gen_rtp_channel(SupervisorPid, C, M, T),
+			safe_call(RtpPid0, {rtp_subscriber, {set, RtpPid1}}),
+			safe_call(RtpPid1, {rtp_subscriber, {set, RtpPid0}}),
+			ok
 		end
 	),
-
-	% Check and load (if configured) notification backends
-	case application:get_env(rtpproxy, radacct_servers) of
-		{ok, _} -> supervisor:start_child(
-				SupervisorPid,
-				{{notify_radius, C, M}, {gen_server, start_link, [rtpproxy_notifier_backend_radius, [C, M], []]}, temporary, 5000, worker, [rtpproxy_notifier_backend_radius]}
-			);
-		_ -> ok
-	end,
-	case application:get_env(rtpproxy, notify_servers) of
-		{ok, NotifyType} ->
-			NotifyInfo = proplists:get_value(notify, Params, []),
-			((NotifyInfo == []) and (NotifyType == tcp)) orelse supervisor:start_child(
-				SupervisorPid,
-				{{notify_openser, C, M}, {gen_server, start_link, [rtpproxy_notifier_backend_notify, [NotifyInfo], []]}, temporary, 5000, worker, [rtpproxy_notifier_backend_notify]}
-			);
-		_ -> ok
-	end,
 	{ok, sent};
 
 command(#cmd{type = ?CMD_P, callid = C, mediaid = M, to = #party{tag = T}, params = Params}) ->
