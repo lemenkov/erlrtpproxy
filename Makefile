@@ -31,6 +31,7 @@ install: all
 	@test -d $(DESTDIR)$(ERLDIR)/ebin || mkdir -p $(DESTDIR)$(ERLDIR)/ebin
 	@test -d $(DESTDIR)$(prefix)/etc || mkdir -p $(DESTDIR)$(prefix)/etc
 	@test -d $(DESTDIR)$(prefix)/var/lib/erl$(NAME) || mkdir -p $(DESTDIR)$(prefix)/var/lib/erl$(NAME)
+	@test -d $(DESTDIR)$(prefix)/usr/sbin || mkdir -p $(DESTDIR)$(prefix)/usr/sbin
 
 	@install -p -m 0644 $(APP_FILE) $(DESTDIR)$(ERLDIR)/ebin
 	@install -p -m 0644 $(ERL_OBJECTS) $(DESTDIR)$(ERLDIR)/ebin
