@@ -97,10 +97,11 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 
 	{SupervisorPid, Port} = case SupRet of
 		{ok, P} ->
-			random:seed(os:timestamp()),
-			RP = 2*(512+random:uniform(32767-512)),
-			spawn(backend_ser, reply, [Cmd, {{Ip, RP}, {Ip, RP+1}}]),
-			{P, RP};
+%			random:seed(os:timestamp()),
+%			RP = 2*(512+random:uniform(32767-512)),
+%			spawn(backend_ser, reply, [Cmd, {{Ip, RP}, {Ip, RP+1}}]),
+%			{P, RP};
+			{P, 0};
 		{error, {already_started, P}} ->
 			{P, 0}
 	end,
