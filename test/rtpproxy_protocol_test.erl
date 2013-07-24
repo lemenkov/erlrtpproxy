@@ -169,19 +169,19 @@ rtpproxy_protocol_test_() ->
 							},
 							ser_proto:decode(Answer)) end
 			},
-			{"Try to lookup non-existing session (it should create another one)",
-				fun () ->
-						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<"24393_4 Lc0,8,18,101 0003e30c-callid02@192.168.0.100 192.0.43.11 19686 0003e30cc50cd69210b8c36b-0ecf0120;1 1372466422;1\n">>),
-						{ok, {?RTPPROXY_IP, ?RTPPROXY_PORT, Answer}} = gen_udp:recv(Fd, 0),
-						?assertMatch(
-							#response{
-								cookie = <<"24393_4">>,
-								origin = null,
-								type = reply,
-								data = {{{_,_,_,_},_},{{_,_,_,_},_}}
-							},
-							ser_proto:decode(Answer)) end
-			},
+%			{"Try to lookup non-existing session (it should create another one)",
+%				fun () ->
+%						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<"24393_4 Lc0,8,18,101 0003e30c-callid02@192.168.0.100 192.0.43.11 19686 0003e30cc50cd69210b8c36b-0ecf0120;1 1372466422;1\n">>),
+%						{ok, {?RTPPROXY_IP, ?RTPPROXY_PORT, Answer}} = gen_udp:recv(Fd, 0),
+%						?assertMatch(
+%							#response{
+%								cookie = <<"24393_4">>,
+%								origin = null,
+%								type = reply,
+%								data = {{{_,_,_,_},_},{{_,_,_,_},_}}
+%							},
+%							ser_proto:decode(Answer)) end
+%			},
 			{"Request brief statistics",
 				fun () ->
 						gen_udp:send(Fd, ?RTPPROXY_IP, ?RTPPROXY_PORT, <<"356289 Ib\n">>),
