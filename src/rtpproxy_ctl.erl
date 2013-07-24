@@ -231,24 +231,6 @@ command(#cmd{type = ?CMD_L, callid = C, mediaid = M, from = #party{tag = T}, par
 			end
 		end
 	),
-
-	% Check and load (if configured) notification backends
-	case application:get_env(rtpproxy, radacct_servers) of
-		{ok, _} -> supervisor:start_child(
-				SupervisorPid,
-				{{notify_radius, C, M}, {gen_server, start_link, [rtpproxy_notifier_backend_radius, [C, M], []]}, temporary, 5000, worker, [rtpproxy_notifier_backend_radius]}
-			);
-		_ -> ok
-	end,
-	case application:get_env(rtpproxy, notify_servers) of
-		{ok, NotifyType} ->
-			NotifyInfo = proplists:get_value(notify, Params, []),
-			((NotifyInfo == []) and (NotifyType == tcp)) orelse supervisor:start_child(
-				SupervisorPid,
-				{{notify_openser, C, M}, {gen_server, start_link, [rtpproxy_notifier_backend_notify, [NotifyInfo], []]}, temporary, 5000, worker, [rtpproxy_notifier_backend_notify]}
-			);
-		_ -> ok
-	end,
 	{ok, sent};
 
 command(#cmd{type = ?CMD_P, callid = C, mediaid = M, to = #party{tag = T}, params = Params}) ->
