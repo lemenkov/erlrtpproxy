@@ -151,16 +151,7 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 	{ok, sent};
 
 command(#cmd{type = ?CMD_L, callid = C, mediaid = M, from = #party{tag = T}, params = Params, origin = #origin{pid = Pid}} = Cmd) ->
-	SupRet = supervisor:start_child(media_sup,
-		{
-			{media_channel_sup, C, M},
-			{supervisor, start_link, [rtpproxy_sup, media_channel_sup]},
-			temporary,
-			5000,
-			supervisor,
-			[rtpproxy_sup]
-		}
-	),
+	[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M],
 
 	% Determine IP...
 	Ip = case {proplists:get_value(local, Params), proplists:get_value(remote, Params), proplists:get_value(ipv6, Params)} of
@@ -172,15 +163,7 @@ command(#cmd{type = ?CMD_L, callid = C, mediaid = M, from = #party{tag = T}, par
 			{ok, I} = application:get_env(rtpproxy, internal), I
 	end,
 
-	{SupervisorPid, Port} = case SupRet of
-		{ok, P} ->
-			random:seed(os:timestamp()),
-			RP = 2*(512+random:uniform(32767-512)),
-			spawn(backend_ser, reply, [Cmd, {{Ip, RP}, {Ip, RP+1}}]),
-			{P, RP};
-		{error, {already_started, P}} ->
-			{P, 0}
-	end,
+	Port = 0,
 
 	% Check if we need to start recording
 	proplists:get_value(copy, Params, false) andalso start_recorder(SupervisorPid, C, M, T),
