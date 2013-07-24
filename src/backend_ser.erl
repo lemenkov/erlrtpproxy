@@ -115,4 +115,12 @@ reply(Cmd = #cmd{cookie = Cookie, callid = CallId, timestamp = TS, origin = #ori
 	end,
 	End = {MegaSecs1, Secs1, MicroSecs1} = os:timestamp(),
 	error_logger:info_msg("SER backend: reply ~s ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [<<Cookie/binary, " ", P/binary, " ", I/binary, "\n">>, CallId, inet_parse:ntoa(Ip), Port, MegaSecs1*1000000+Secs1+MicroSecs1/1000000, timer:now_diff(End, TS)]),
+	ok;
+reply(Cmd = #cmd{cookie = Cookie, callid = CallId, timestamp = TS, origin = #origin{type = ser, fd = {Type, Fd}, ip = Ip, port = Port}}, {error, notfound}) ->
+	case Type of
+		udp -> prim_inet:sendto(Fd, Ip, Port, <<Cookie/binary, " E8\n">>);
+		tcp -> prim_inet:send(Fd, <<Cookie/binary, " E8\n">>)
+	end,
+	End = {MegaSecs1, Secs1, MicroSecs1} = os:timestamp(),
+	error_logger:info_msg("SER backend: reply ~s sent to ~s:~b at ~f (elapsed time: ~b microsec)~n", [<<Cookie/binary, " E8\n">>, CallId, inet_parse:ntoa(Ip), Port, MegaSecs1*1000000+Secs1+MicroSecs1/1000000, timer:now_diff(End, TS)]),
 	ok.
