@@ -59,7 +59,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% ------------------------------------------------------------------
 
 %% Run only if message queue is empty and 50% of memory is consumed
-gc(Pid, 0, MemT, MemP) when MemP < MemT * 0.5 ->
+gc(Pid, 0, MemT, MemP) when MemP > MemT * 0.5 ->
 	erlang:garbage_collect(Pid),
 	{memory, NewMemP} = erlang:process_info(Pid, memory),
 	error_logger:warning_msg("sentinel: error_logger memory threshold reached: ~b from ~b (saved ~b)", [MemP, MemT, MemP - NewMemP]),
