@@ -69,7 +69,7 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr
 	% Old music-on-hold - FIXME - should start CMD_P actually
 	[SupervisorPid] = [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M],
 	RtpPid = get_gen_rtp_channel(SupervisorPid, C, M, T),
-	{_, {_, RtpPort, RtcpPort}, _} = gen_server:call(RtpPid, get_phy),
+	{_Fd, {_, RtpPort, RtcpPort}, _} = gen_server:call(RtpPid, get_phy),
 	backend_ser:reply(Cmd, {{{0,0,0,0}, RtpPort}, {{0,0,0,0}, RtcpPort}}),
 	{ok, sent};
 
@@ -124,7 +124,7 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 				{{phy, C, M, T}, {gen_server, start_link, [gen_rtp_channel, [Params1], []]}, permanent, 5000, worker, [gen_rtp_channel]}
 			),
 			RtpPid0 = get_pid(Ret0),
-			{_, {Ip, RtpPort, RtcpPort}, _} = gen_server:call(RtpPid0, get_phy),
+			{_Fd, {Ip, RtpPort, RtcpPort}, _} = gen_server:call(RtpPid0, get_phy),
 %			gen_server:cast(RtpPid, {update, Params ++ [{sendrecv, SendRecvStrategy}]}),
 %			gen_server:cast(RtpPid, {update, [{sendrecv, SendRecvStrategy}, {prefill, {Ip, Addr}}]}),
 			Port == 0 andalso spawn(backend_ser, reply, [Cmd, {{Ip, RtpPort}, {Ip, RtcpPort}}]),
@@ -184,7 +184,7 @@ command(#cmd{type = ?CMD_L, callid = C, mediaid = M, from = #party{tag = T}, par
 						{{phy, C, M, T}, {gen_server, start_link, [gen_rtp_channel, [Params1], []]}, permanent, 5000, worker, [gen_rtp_channel]}
 					),
 					RtpPid0 = get_pid(Ret0),
-					{_, {Ip, RtpPort, RtcpPort}, _} = gen_server:call(RtpPid0, get_phy),
+					{_Fd, {Ip, RtpPort, RtcpPort}, _} = gen_server:call(RtpPid0, get_phy),
 		%			gen_server:cast(RtpPid, {update, Params ++ [{sendrecv, SendRecvStrategy}]}),
 		%			gen_server:cast(RtpPid, {update, [{sendrecv, SendRecvStrategy}, {prefill, {Ip, Addr}}]}),
 					Port == 0 andalso spawn(backend_ser, reply, [Cmd, {{Ip, RtpPort}, {Ip, RtcpPort}}]),
