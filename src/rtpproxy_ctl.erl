@@ -73,7 +73,7 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr
 	backend_ser:reply(Cmd, {{{0,0,0,0}, RtpPort}, {{0,0,0,0}, RtcpPort}}),
 	{ok, sent};
 
-command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, params = Params, origin = #origin{pid = Pid}} = Cmd) ->
+command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T, addr = PreAddr}, params = Params, origin = #origin{pid = Pid}} = Cmd) ->
 	SupRet = supervisor:start_child(media_sup,
 		{
 			{media_channel_sup, C, M},
@@ -127,6 +127,10 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 			{_Fd, {Ip, RtpPort, RtcpPort}, _} = gen_server:call(RtpPid0, get_phy),
 %			gen_server:cast(RtpPid, {update, Params ++ [{sendrecv, SendRecvStrategy}]}),
 %			gen_server:cast(RtpPid, {update, [{sendrecv, SendRecvStrategy}, {prefill, {Ip, Addr}}]}),
+			case PreAddr of
+				{PreIp, PrePort} -> gen_server:cast(RtpPid0, {update, [{sendrecv, SendRecvStrategy}, {prefill, {PreIp, PrePort}}]});
+				_ -> ok
+			end,
 			Port == 0 andalso spawn(backend_ser, reply, [Cmd, {{Ip, RtpPort}, {Ip, RtcpPort}}]),
 			ok
 		end
@@ -151,7 +155,7 @@ command(#cmd{type = ?CMD_U, callid = C, mediaid = M, from = #party{tag = T}, par
 	end,
 	{ok, sent};
 
-command(#cmd{type = ?CMD_L, callid = C, mediaid = M, from = #party{tag = T}, params = Params, origin = #origin{pid = Pid}} = Cmd) ->
+command(#cmd{type = ?CMD_L, callid = C, mediaid = M, from = #party{tag = T, addr = PreAddr}, params = Params, origin = #origin{pid = Pid}} = Cmd) ->
 	case [ P || {{media_channel_sup, CID, MID}, P, _, _} <- supervisor:which_children(media_sup), CID == C, MID == M] of
 		[SupervisorPid] ->
 			% Determine IP...
@@ -187,6 +191,10 @@ command(#cmd{type = ?CMD_L, callid = C, mediaid = M, from = #party{tag = T}, par
 					{_Fd, {Ip, RtpPort, RtcpPort}, _} = gen_server:call(RtpPid0, get_phy),
 		%			gen_server:cast(RtpPid, {update, Params ++ [{sendrecv, SendRecvStrategy}]}),
 		%			gen_server:cast(RtpPid, {update, [{sendrecv, SendRecvStrategy}, {prefill, {Ip, Addr}}]}),
+					case PreAddr of
+						{PreIp, PrePort} -> gen_server:cast(RtpPid0, {update, [{sendrecv, SendRecvStrategy}, {prefill, {PreIp, PrePort}}]});
+						_ -> ok
+					end,
 					Port == 0 andalso spawn(backend_ser, reply, [Cmd, {{Ip, RtpPort}, {Ip, RtcpPort}}]),
 
 					% Set RTP path
