@@ -38,7 +38,7 @@ start_link() ->
 init(_) ->
 	process_flag(trap_exit, true),
 	Ets = ets:new(mmap, [public, named_table]),
-        error_logger:warning_msg("storage: started at ~p.~n", [node()]),
+	error_logger:info_msg("~s: started at ~p.~n", [?MODULE, node()]),
 	{ok, Ets}.
 
 handle_call({get, Filename}, _From, Ets) ->

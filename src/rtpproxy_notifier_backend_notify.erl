@@ -50,7 +50,7 @@ handle_info({init, NotifyInfo}, _) ->
 			IgnoreStart orelse send(gen_udp, F, NotifyInfo),
 			{gen_udp, F}
 	end,
-	error_logger:warning_msg("SER notify backend: started at ~p~n", [node()]),
+	error_logger:info_msg("~s: started at ~p.~n", [?MODULE, node()]),
 	{noreply, #state{tref = TRef, notify = NotifyInfo, fd = {Module, Fd}}};
 
 handle_info(Info, State) ->

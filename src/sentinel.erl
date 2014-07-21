@@ -21,7 +21,7 @@ start_link() ->
 init(_) ->
 	process_flag(trap_exit, true),
 	{ok, TRef} = timer:send_interval(10000, check),
-	error_logger:warning_msg("sentinel: started at ~p.~n", [node()]),
+	error_logger:info_msg("~s: started at ~p.~n", [?MODULE, node()]),
 	{ok, TRef}.
 
 handle_call(Call, _From, State) ->

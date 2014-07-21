@@ -34,7 +34,7 @@
 init([C, M, T]) ->
 	process_flag(trap_exit, true),
 	Filename = "/tmp/capture_cid_" ++ to_list(C) ++ "_mid_" ++ to_list(M) ++ "_tag_" ++ to_list(T),
-	error_logger:warning_msg("file writer: started at ~p.~n", [node()]),
+	error_logger:info_msg("~s: started at ~p.~n", [?MODULE, node()]),
 	{ok, {filename, Filename}}.
 
 handle_call(Call, _From, State) ->

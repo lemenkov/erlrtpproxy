@@ -53,7 +53,7 @@ handle_info({init, C}, _) ->
 		vend_attrs = [{?Cisco, [{?h323_connect_time, date_time_fmt()}]}]
 	},
 	eradius_acc:acc_start(Req),
-	error_logger:warning_msg("RADIUS notify backend: started at ~p with CallID: ~s~n", [node(), C]),
+	error_logger:info_msg("~s: started at ~p with CallID: ~s.~n", [?MODULE, node(), C]),
 	{noreply, #state{tref = TRef, req = Req}};
 
 handle_info(Info, State) ->

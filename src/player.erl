@@ -63,7 +63,7 @@ init([Subcriber, [CodecInfo | _], FN, Playcount]) ->
 		_ -> FN ++ FileExt
 	end,
 	{ok, {Fd, Size}} = gen_server:call(storage, {get, Filename}),
-	error_logger:warning_msg("player: started to play \"~s\", ~b times~n", [Filename ++ FileExt, Playcount]),
+	error_logger:info_msg("~s: started at ~p to play \"~s\", ~b times~n", [?MODULE, node(), Filename ++ FileExt, Playcount]),
 	{ok, #state{
 			subscriber = Subcriber,
 			tref	= TRef,
